@@ -1,0 +1,946 @@
+"""The plant catalogue: what we can grow, when, and how - written so a 10-year-old can follow it.
+
+Dates are "MM-DD" windows for central England (roughly the Midlands, last frost around early May).
+app/regions.py shifts them earlier or later from the user's postcode. A plant can have more than one
+window (garlic and broad beans can go in in autumn *or* spring), so every window field is a list.
+
+level: 1 = easy peasy, 2 = a bit more care, 3 = more care needed.
+where: "bed" and/or "pot" (containers). tender: killed by frost, so it only goes outside after the last frost.
+weeks: roughly how long from sowing (or planting, for perennials) until the first pick.
+succession: sow another small batch every N weeks for a steady supply (0 = no).
+filler: quick crop that's good for filling a gap in a bed that's gone bare.
+grow_on: weeks from sowing indoors until it's big enough to go outside.
+care: timed reminders, as (weeks after it's sown/planted in its final spot, how many weeks the job lasts, text).
+"""
+
+LEVELS = {
+    1: {"name": "Easy peasy", "emoji": "🟢"},
+    2: {"name": "A bit more care", "emoji": "🟠"},
+    3: {"name": "More care needed", "emoji": "🔴"},
+}
+
+PLANTS = [
+    # ---------------------------------------------------------------- easy peasy
+    {
+        "id": "radish", "name": "Radishes", "emoji": "🔴", "level": 1, "where": ["bed", "pot"],
+        "sow_out": [["03-15", "09-10"]], "harvest": [["04-20", "10-31"]],
+        "weeks": 4, "succession": 2, "filler": True, "depth": "1cm", "spacing": "3cm",
+        "blurb": "The fastest thing you can grow - ready in about 4 weeks!",
+        "tips": ["Sow a short row every 2 weeks so you always have some.",
+                 "Keep them watered or they go woody and hot."],
+        "care": [[2, 1, "Thin them out: pull out extra seedlings so each radish has a finger-width of space 👆"]],
+        "harvest_tip": "Pull them up when the red tops poke out of the soil, about the size of a marble.",
+        "eat": "Crunch them raw, or slice thinly into a sandwich with butter.",
+    },
+    {
+        "id": "salad", "name": "Salad leaves", "emoji": "🥬", "level": 1, "where": ["bed", "pot"],
+        "sow_in": [["02-15", "04-10"]], "sow_out": [["04-01", "09-10"]], "plant_out": [["04-01", "05-31"]],
+        "harvest": [["05-01", "10-31"]], "weeks": 6, "succession": 3, "filler": True, "grow_on": 4,
+        "depth": "1cm", "spacing": "10cm", "prefer": "sow_out",
+        "blurb": "Cut-and-come-again lettuce: snip leaves and they grow back.",
+        "tips": ["Pick a mixed 'cut and come again' seed packet.", "Slugs love lettuce - check under leaves 🐌."],
+        "care": [[3, 8, "Watch for slugs 🐌 - go out at dusk with a torch and move them far away"]],
+        "harvest_tip": "Snip the outside leaves with scissors, 3cm above the ground. Leave the middle to keep growing.",
+        "eat": "Wash, dry and toss with a little oil and lemon for your own salad.",
+    },
+    {
+        "id": "peas", "name": "Peas", "emoji": "🫛", "level": 1, "where": ["bed", "pot"],
+        "sow_in": [["03-01", "04-30"]], "sow_out": [["03-25", "06-30"]], "plant_out": [["04-10", "06-15"]],
+        "harvest": [["06-01", "09-15"]], "weeks": 12, "succession": 4, "grow_on": 4,
+        "depth": "4cm", "spacing": "8cm", "prefer": "sow_out",
+        "blurb": "Sweet peas straight from the pod - most never make it to the kitchen!",
+        "tips": ["Mice love pea seeds - starting them in a length of old guttering indoors stops that."],
+        "care": [[2, 2, "Help the first tendrils find the supports - they'll hold on by themselves after that 🌀"]],
+        "harvest_tip": "Pick when the pods are fat and bulging. The more you pick, the more they make.",
+        "eat": "Eat raw from the pod, or boil for 2 minutes with a bit of mint.",
+    },
+    {
+        "id": "broad_beans", "name": "Broad beans", "emoji": "🫘", "level": 1, "where": ["bed", "pot"],
+        "sow_out": [["10-15", "11-30"], ["02-20", "04-30"]], "harvest": [["06-01", "08-15"]],
+        "weeks": 14, "depth": "5cm", "spacing": "20cm",
+        "blurb": "Big seeds that are easy for small hands, and tough enough to sow in autumn.",
+        "tips": ["Autumn-sown ones are ready earliest - choose the variety 'Aquadulce Claudia'."],
+        "care": [[8, 3, "When the first beans appear, pinch off the very top of each plant - it stops blackfly 🐜"]],
+        "harvest_tip": "Pick pods when you can feel the beans inside, before the pods go lumpy and leathery.",
+        "eat": "Pop the beans out, boil for 3 minutes, and squash onto toast.",
+    },
+    {
+        "id": "garlic", "name": "Garlic", "emoji": "🧄", "level": 1, "where": ["bed", "pot"],
+        "sow_out": [["10-01", "12-15"], ["02-01", "03-15"]], "harvest": [["06-15", "08-15"]],
+        "weeks": 20, "depth": "3cm", "spacing": "15cm", "sow_verb": "Plant garlic cloves", "buy_word": "bulbs",
+        "blurb": "Push a clove in the ground and it turns into a whole bulb. Magic!",
+        "tips": ["Buy garlic from a garden supplier, not the supermarket - it's grown for our weather.",
+                 "Birds love pulling garlic out! Plant it deep, and cover it with netting or twigs until it grows roots.",
+                 "If one pops out, just push it back in - it'll be fine."],
+        "steps_sow": ["Split a garlic bulb into cloves 🧄", "Pinch off any loose papery bits at the pointy end - birds like to tug them ✂️",
+                      "Push each clove in, pointy end up, until the tip is 2-3cm under the soil (about a finger-joint deep) 👆",
+                      "Leave a gap the size of your hand between each one ✋", "Press the soil down firmly around each one 👋",
+                      "Cover with netting, fleece or twiggy sticks to stop birds pulling them out 🐦", "Stick in a label 🏷️ - they won't pop up for a few weeks"],
+        "care": [[0, 4, "Check your garlic every few days - push any that have popped out back in 🧄"],
+                 [8, 16, "Pull out weeds around your garlic - it doesn't like sharing 🌿"]],
+        "harvest_tip": "When the leaves turn yellow and flop over, loosen with a fork and lift the bulbs. Dry them in the sun for a week.",
+        "eat": "Roast a whole bulb in foil and squeeze the soft garlic onto bread.",
+    },
+    {
+        "id": "onions", "name": "Onions", "emoji": "🧅", "level": 1, "where": ["bed", "pot"],
+        "sow_out": [["03-15", "04-30"], ["09-15", "10-31"]], "harvest": [["06-01", "09-15"]],
+        "weeks": 18, "depth": "just covered", "spacing": "10cm", "sow_verb": "Plant onion sets", "buy_word": "sets",
+        "blurb": "Grown from 'sets' - tiny baby onions that you just push into the soil.",
+        "tips": ["Birds like to pull sets out - snip off the dry wispy tops first, and push them back in if they do."],
+        "steps_sow": ["Snip off the dry wispy tip of each onion so birds have nothing to grab ✂️",
+                      "Push each little onion into the soil so only the very tip is showing 🧅",
+                      "Leave a gap the size of your hand between each one ✋", "Press the soil down firmly around each one 👋",
+                      "Cover with netting or twiggy sticks for the first few weeks 🐦", "Water them in 🚿", "Stick in a label 🏷️"],
+        "care": [[0, 4, "Check your onions every few days - push any that have popped out back in 🧅"],
+                 [6, 14, "Pull out weeds around your onions - they hate sharing 🌿"]],
+        "harvest_tip": "When the leaves go yellow and flop over, lift them and leave them to dry in the sun.",
+        "eat": "Slice and fry slowly until soft and sweet - great in burgers.",
+    },
+    {
+        "id": "spring_onions", "name": "Spring onions", "emoji": "🌱", "level": 1, "where": ["bed", "pot"],
+        "sow_in": [["02-15", "07-01"]], "sow_out": [["03-01", "07-31"]], "plant_out": [["04-01", "08-15"]], "grow_on": 5,
+        "harvest": [["05-15", "10-31"]], "weeks": 8, "succession": 3,
+        "filler": True, "depth": "1cm", "spacing": "2cm",
+        "blurb": "Skinny mild onions that fit in any gap or pot.",
+        "tips": ["Sow a pinch every 3 weeks for a steady supply."],
+        "care": [],
+        "harvest_tip": "Pull them when they're as thick as a pencil.",
+        "eat": "Chop into scrambled eggs or noodles.",
+    },
+    {
+        "id": "potatoes", "name": "New potatoes", "emoji": "🥔", "level": 1, "where": ["bed", "pot"],
+        "sow_out": [["03-20", "04-30"]], "harvest": [["06-10", "07-31"]], "weeks": 12,
+        "depth": "12cm", "spacing": "30cm", "sow_verb": "Plant seed potatoes", "buy_word": "seed potatoes",
+        "blurb": "Digging for potatoes is like a treasure hunt. Grow them in a big bag if you're short of space.",
+        "tips": ["Buy 'first early' seed potatoes in February.",
+                 "Stand them in an egg box on a windowsill for a few weeks to grow little shoots ('chitting')."],
+        "steps_sow": ["Dig a hole with a trowel, about as deep as your hand ✋", "Put in one potato with the shoots pointing up 🥔",
+                      "Cover it with soil or compost", "Leave a big gap (a ruler length, 30cm) to the next one 📏",
+                      "In a bag: 3 potatoes on 15cm of compost, then cover with 10cm more 🛍️"],
+        "care": [[3, 4, "Earth up: pull soil or compost over the green shoots so just the tips show - it protects from frost ❄️"]],
+        "harvest_tip": "When the plants have flowered, dig gently with a fork (or tip the bag out) and hunt for your potatoes!",
+        "eat": "Boil until soft, add butter and a pinch of salt. Best potatoes you'll ever eat.",
+    },
+    {
+        "id": "courgette", "name": "Courgettes", "emoji": "🥒", "level": 1, "where": ["bed", "pot"], "tender": True,
+        "sow_in": [["04-10", "05-20"]], "sow_out": [["05-25", "06-15"]], "plant_out": [["05-25", "06-30"]],
+        "harvest": [["07-01", "10-10"]], "weeks": 10, "grow_on": 4, "depth": "2cm", "spacing": "90cm",
+        "blurb": "One plant gives loads - you'll be handing them out to the neighbours.",
+        "tips": ["Sow the flat seeds on their side so water doesn't rot them.", "One or two plants is plenty for a family."],
+        "care": [[2, 12, "Water at the bottom of the plant, not over the leaves, every few days when it's dry 💧"]],
+        "harvest_tip": "Cut them when they're about as long as a pencil. Leave them and they become giant marrows!",
+        "eat": "Grate into muffins or pancakes, or slice and fry with garlic.",
+    },
+    {
+        "id": "strawberries", "name": "Strawberries", "emoji": "🍓", "level": 1, "where": ["bed", "pot"],
+        "plant_out": [["03-15", "05-31"], ["08-01", "09-30"]], "harvest": [["06-01", "07-31"]],
+        "weeks": 8, "perennial": True, "spacing": "40cm", "buy_word": "plants",
+        "blurb": "Buy a few plants once and they give fruit for 3-4 years.",
+        "tips": ["Grow them in pots or a hanging basket to keep them away from slugs."],
+        "care": [[6, 4, "Tuck straw under the plants so the berries stay clean and dry 🍓"],
+                 [8, 4, "Net them so the birds don't get them first 🐦"]],
+        "harvest_tip": "Pick when they're red all over. Warm from the sun is best!",
+        "eat": "Straight from the plant. Or with cream.",
+    },
+    {
+        "id": "nasturtium", "name": "Nasturtiums", "emoji": "🌸", "level": 1, "where": ["bed", "pot"], "tender": True,
+        "sow_in": [["04-01", "05-15"]], "sow_out": [["05-10", "06-30"]], "plant_out": [["05-20", "06-15"]],
+        "harvest": [["06-15", "10-15"]], "weeks": 8, "grow_on": 3, "depth": "2cm", "spacing": "30cm", "prefer": "sow_out",
+        "blurb": "Flowers you can eat! Peppery leaves and bright petals.",
+        "tips": ["They like poor soil - don't feed them or you get all leaves and no flowers."],
+        "care": [],
+        "harvest_tip": "Pick flowers and young leaves whenever you like.",
+        "eat": "Scatter the petals on a salad - they taste a bit like watercress.",
+    },
+    {
+        "id": "chives", "name": "Chives", "emoji": "🌿", "level": 1, "where": ["bed", "pot"], "perennial": True,
+        "sow_in": [["03-15", "05-15"]], "sow_out": [["04-15", "06-15"]], "plant_out": [["05-01", "06-30"]],
+        "harvest": [["05-15", "10-15"]], "weeks": 10, "grow_on": 6, "depth": "1cm", "spacing": "20cm",
+        "blurb": "A mild oniony herb that comes back every year.",
+        "tips": ["The purple flowers are edible too."],
+        "care": [],
+        "harvest_tip": "Snip with scissors about 3cm from the bottom. They grow back.",
+        "eat": "Snip over mashed potato or into cream cheese.",
+    },
+    {
+        "id": "mint", "name": "Mint", "emoji": "🌿", "level": 1, "where": ["pot"], "perennial": True,
+        "plant_out": [["04-01", "09-30"]], "harvest": [["05-01", "10-15"]], "weeks": 4, "buy_word": "plants",
+        "blurb": "Buy a plant and it'll grow forever. Keep it in a pot - it spreads everywhere!",
+        "tips": ["Always keep mint in a pot, even if you sink the pot into a bed."],
+        "care": [],
+        "harvest_tip": "Pick the top leaves often to keep it bushy.",
+        "eat": "Pop a few leaves into water or lemonade, or make mint tea.",
+    },
+    {
+        "id": "chard", "name": "Swiss chard", "emoji": "🥬", "level": 1, "where": ["bed", "pot"],
+        "sow_in": [["03-15", "07-15"]], "sow_out": [["04-01", "08-15"]], "plant_out": [["04-15", "08-31"]], "grow_on": 4,
+        "harvest": [["06-01", "11-30"]], "weeks": 8, "filler": True,
+        "depth": "2cm", "spacing": "30cm",
+        "blurb": "Rainbow stems in red, yellow and pink. Keeps going for months.",
+        "tips": ["Choose 'Bright Lights' for rainbow colours 🌈."],
+        "care": [],
+        "harvest_tip": "Pick a few outside leaves at a time. It keeps growing new ones in the middle.",
+        "eat": "Chop and fry the stems first, then add the leaves for a minute.",
+    },
+    {
+        "id": "beetroot", "name": "Beetroot", "emoji": "🟣", "level": 1, "where": ["bed", "pot"],
+        "sow_in": [["03-01", "07-01"]], "sow_out": [["04-01", "07-15"]], "plant_out": [["04-01", "07-31"]], "grow_on": 4,
+        "harvest": [["06-15", "10-31"]], "weeks": 12, "succession": 4,
+        "filler": True, "depth": "2cm", "spacing": "10cm",
+        "blurb": "Sweet purple roots - and it will turn your pee pink! 😂",
+        "tips": ["Each 'seed' is actually a cluster of seeds, so you'll need to thin them."],
+        "care": [[3, 2, "Thin them out so each beetroot has a hand-width of space ✋"]],
+        "harvest_tip": "Pull them up when they're the size of a golf ball to a tennis ball.",
+        "eat": "Roast in the oven, or grate raw into a salad.",
+    },
+    {
+        "id": "runner_beans", "name": "Runner beans", "emoji": "🫘", "level": 1, "where": ["bed", "pot"], "tender": True,
+        "sow_in": [["04-20", "05-31"]], "sow_out": [["05-25", "06-30"]], "plant_out": [["05-25", "06-30"]],
+        "harvest": [["07-15", "10-10"]], "weeks": 12, "grow_on": 4, "depth": "5cm", "spacing": "20cm",
+        "blurb": "Climbs higher than you - build a bean wigwam!",
+        "tips": ["Tie 6 tall canes together at the top to make a wigwam, one plant per cane."],
+        "care": [[1, 2, "Help them start twisting round their canes - they climb anticlockwise 🌀"],
+                 [4, 10, "Water well every few days once the flowers appear 💧"]],
+        "harvest_tip": "Pick every couple of days when they're about 15-20cm long, before you can see bumps of beans.",
+        "eat": "Slice and boil for 3-4 minutes with butter.",
+    },
+    {
+        "id": "french_beans", "name": "French beans", "emoji": "🫘", "level": 1, "where": ["bed", "pot"], "tender": True,
+        "sow_in": [["04-15", "05-31"]], "sow_out": [["05-20", "07-10"]], "plant_out": [["05-25", "06-30"]],
+        "harvest": [["07-01", "09-30"]], "weeks": 10, "succession": 4, "filler": True, "grow_on": 4,
+        "depth": "5cm", "spacing": "15cm", "prefer": "sow_out",
+        "blurb": "'Dwarf' ones don't need canes, so they're perfect for pots.",
+        "tips": ["Choose a 'dwarf' variety for pots and small beds."],
+        "care": [],
+        "harvest_tip": "Pick them when they snap in half cleanly.",
+        "eat": "Steam for 3 minutes, or eat raw with dip.",
+    },
+    {
+        "id": "rhubarb", "name": "Rhubarb", "emoji": "🌿", "level": 1, "where": ["bed"], "perennial": True,
+        "plant_out": [["10-15", "03-15"]], "harvest": [["04-01", "06-30"]], "weeks": 52, "buy_word": "crowns",
+        "blurb": "Plant once, pick for 10 years. Wait a year before your first pick.",
+        "tips": ["Only eat the stems - the leaves are poisonous ⚠️."],
+        "care": [],
+        "harvest_tip": "From the second spring, hold a stem at the bottom and pull and twist. Never pick more than half.",
+        "eat": "Stewed with sugar, in a crumble with custard. Stems only!",
+    },
+    # ---------------------------------------------------------------- a bit more care
+    {
+        "id": "carrots", "name": "Carrots", "emoji": "🥕", "level": 2, "where": ["bed", "pot"],
+        "sow_out": [["04-01", "07-15"]], "harvest": [["07-01", "11-15"]], "weeks": 12, "succession": 4,
+        "depth": "1cm", "spacing": "5cm",
+        "blurb": "Sweet crunchy carrots. Short round ones grow well in pots.",
+        "tips": ["Mix the tiny seeds with sand so they're easier to sprinkle thinly.",
+                 "Try 'Paris Market' - round carrots that grow in shallow pots."],
+        "care": [[4, 2, "Thin them out so each carrot has 5cm of space - you can eat the tiny ones! 🥕"],
+                 [4, 10, "Carrot fly smells carrots from far away - cover with fine mesh or grow in a tall pot"]],
+        "harvest_tip": "Brush the soil away from the top - if it's as wide as your thumb, pull it up!",
+        "eat": "Wash and crunch raw, or roast with honey.",
+    },
+    {
+        "id": "tomatoes", "name": "Cherry tomatoes", "emoji": "🍅", "level": 2, "where": ["bed", "pot"], "tender": True,
+        "sow_in": [["03-01", "04-15"]], "plant_out": [["05-25", "06-15"]], "harvest": [["07-15", "10-10"]],
+        "weeks": 16, "grow_on": 8, "depth": "0.5cm", "spacing": "45cm",
+        "blurb": "Sweet little tomatoes you can pick like sweets.",
+        "tips": ["'Tumbling Tom' grows in a hanging basket, no pinching needed or canes needed.",
+                 "Tall ones like 'Sungold' need a cane - put it in before planting, then tie the stem on as it grows."],
+        "care": [[1, 12, "Tie the stem to its cane every week, and pinch out the little side shoots between the stem and a leaf ✂️"],
+                 [5, 10, "Feed with tomato food once a week when the flowers appear 🍼"],
+                 [0, 16, "Water every day in hot weather, at the bottom of the plant 💧"]],
+        "harvest_tip": "Pick when they're fully red and come off with a gentle pull.",
+        "eat": "Eat them warm off the plant, or halve them on pizza.",
+    },
+    {
+        "id": "tomatoes_big", "name": "Big tomatoes", "emoji": "🍅", "level": 2, "where": ["bed", "pot"], "tender": True,
+        "sow_in": [["03-01", "04-10"]], "plant_out": [["05-25", "06-15"]], "harvest": [["07-25", "10-10"]],
+        "weeks": 18, "grow_on": 8, "depth": "0.5cm", "spacing": "45cm",
+        "blurb": "Proper salad and beefsteak tomatoes. They get heavy, so they need strong support from day one.",
+        "tips": ["'Moneymaker' and 'Ailsa Craig' are easy classics. 'Gardener's Delight' is a sweet cherry-sized one.",
+                 "Put the cane in BEFORE planting - pushing it in later can spear the roots.",
+                 "Heavy trusses of fruit snap stems: tie the stem AND the fruit trusses to the cane."],
+        "care": [[1, 12, "Tie the stem to its cane every week with soft string, in a loose figure-of-8 🪢"],
+                 [1, 12, "Pinch out the side shoots that grow between the stem and a leaf - keep one main stem ✂️"],
+                 [5, 10, "Feed with tomato food once a week when the first flowers appear 🍼"],
+                 [7, 6, "As the fruit gets heavy, tie each truss (bunch of tomatoes) to the cane too 🍅"],
+                 [10, 2, "Pinch off the very top of the plant once it has 5-6 bunches of fruit, so it ripens those instead of growing taller ✂️"],
+                 [0, 16, "Water every day in hot weather, at the bottom of the plant - never let it dry out, or the fruit splits 💧"]],
+        "harvest_tip": "Pick when fully coloured and slightly soft. In autumn, pick the green ones and ripen them indoors.",
+        "eat": "Thick slices in a sandwich with salt and pepper, or roast them into pasta sauce.",
+    },
+    {
+        "id": "squash", "name": "Butternut squash", "emoji": "🎃", "level": 2, "where": ["bed"], "tender": True,
+        "sow_in": [["04-20", "05-20"]], "sow_out": [["06-01", "06-10"]], "plant_out": [["06-01", "06-20"]],
+        "harvest": [["09-15", "10-20"]], "weeks": 20, "grow_on": 4, "depth": "2cm", "spacing": "100cm",
+        "blurb": "Sweet, nutty squash that keeps for months. Big trailing plants - or train them up a strong frame.",
+        "tips": ["Plant on a mound of compost - squash are very hungry.",
+                 "Short of space? Grow them up a sturdy arch or fence and support each squash with a net sling."],
+        "care": [[2, 14, "Water well twice a week at the bottom of the plant 💧"],
+                 [8, 4, "Once 3-4 squash have formed, pinch off the ends of the long stems so the plant fills those out ✂️"],
+                 [10, 6, "Put a tile or piece of wood under each squash so it doesn't rot"]],
+        "harvest_tip": "When the skin is hard (your nail can't dent it) and the stem goes woody, cut with a bit of stalk. Before the first frost!",
+        "eat": "Halve, scoop out the seeds, roast with oil until soft. Or make soup.",
+    },
+    {
+        "id": "summer_squash", "name": "Summer squash", "emoji": "🛸", "level": 1, "where": ["bed", "pot"], "tender": True,
+        "sow_in": [["04-15", "05-20"]], "sow_out": [["05-25", "06-15"]], "plant_out": [["05-25", "06-30"]],
+        "harvest": [["07-01", "09-30"]], "weeks": 10, "grow_on": 4, "depth": "2cm", "spacing": "90cm",
+        "blurb": "Patty pans look like little flying saucers! Grow just like courgettes, in yellow, white or green.",
+        "tips": ["Try 'Sunburst' (yellow flying saucers) or a yellow courgette like 'Soleil'.",
+                 "Sow the flat seeds on their side so water doesn't rot them."],
+        "care": [[2, 12, "Water at the bottom of the plant every few days when it's dry 💧"]],
+        "harvest_tip": "Pick them small - patty pans the size of a biscuit, yellow courgettes the length of a pencil. The more you pick, the more you get.",
+        "eat": "Slice and fry in butter, or halve, stuff with cheese and bake.",
+    },
+    {
+        "id": "sweet_potatoes", "name": "Sweet potatoes", "emoji": "🍠", "level": 2, "where": ["bed", "pot"], "tender": True,
+        "plant_out": [["06-01", "06-20"]], "harvest": [["09-15", "10-15"]], "weeks": 16, "spacing": "30cm",
+        "buy_word": "slips",
+        "blurb": "Grown from 'slips' (little rooted cuttings) that arrive by post in May. They love heat - find your sunniest spot.",
+        "tips": ["Buy slips of a variety bred for the UK, like 'Beauregard' or 'Murasaki'.",
+                 "They need warmth: a greenhouse, a big pot on a sunny patio, or a bed covered in black plastic works best."],
+        "steps_plant": ["When your slips arrive, stand them in a jar of water for a day to perk up 🫙",
+                      "Plant them deep - bury the stem right up to the top few leaves 👆",
+                      "Leave a ruler-length (30cm) between each one 📏", "Water well, and cover with fleece for the first couple of weeks to keep them warm 🧣"],
+        "care": [[1, 14, "Water every few days in dry weather - but they don't need feeding 💧"],
+                 [8, 4, "Lift the long trailing stems now and then, so they don't root into the ground and make lots of tiny potatoes"]],
+        "harvest_tip": "Dig them up before the first frost, when the leaves start to yellow. Dig gently - the skin bruises easily.",
+        "eat": "Bake whole like a jacket potato, or cut into wedges and roast.",
+    },
+    {
+        "id": "cucumber", "name": "Cucumbers", "emoji": "🥒", "level": 2, "where": ["bed", "pot"], "tender": True,
+        "sow_in": [["04-15", "05-31"]], "plant_out": [["06-01", "06-30"]], "harvest": [["07-15", "09-30"]],
+        "weeks": 12, "grow_on": 4, "depth": "2cm", "spacing": "60cm",
+        "blurb": "Choose an 'outdoor' variety and grow it up a cane.",
+        "tips": ["Sow seeds on their side.", "Pick an 'outdoor' or 'ridge' type, like 'Marketmore'."],
+        "care": [[0, 12, "Water often - cucumbers are mostly water! 💧"]],
+        "harvest_tip": "Cut them off with scissors when they're a good size. Keep picking to get more.",
+        "eat": "Slice into sticks with dip, or into water with mint.",
+    },
+    {
+        "id": "pumpkin", "name": "Pumpkins", "emoji": "🎃", "level": 2, "where": ["bed"], "tender": True,
+        "sow_in": [["04-20", "05-20"]], "sow_out": [["06-01", "06-10"]], "plant_out": [["06-01", "06-20"]],
+        "harvest": [["09-15", "10-31"]], "weeks": 18, "grow_on": 4, "depth": "2cm", "spacing": "150cm",
+        "blurb": "Grow your own Halloween pumpkin! Needs lots of space.",
+        "tips": ["Plant on a mound of compost - they're very hungry."],
+        "care": [[2, 14, "Water well twice a week, at the bottom of the plant 💧"],
+                 [10, 6, "Put a tile or piece of wood under each pumpkin so it doesn't rot"]],
+        "harvest_tip": "When the skin is hard and the stem cracks, cut it off with a bit of stem. Before the first frost!",
+        "eat": "Carve it, then roast the flesh for soup and the seeds with salt for a snack.",
+    },
+    {
+        "id": "sweetcorn", "name": "Sweetcorn", "emoji": "🌽", "level": 2, "where": ["bed"], "tender": True,
+        "sow_in": [["04-15", "05-20"]], "plant_out": [["05-25", "06-20"]], "harvest": [["08-01", "09-30"]],
+        "weeks": 14, "grow_on": 4, "depth": "3cm", "spacing": "45cm",
+        "blurb": "Plant them in a block, not a line - the wind helps them make cobs.",
+        "tips": ["Plant in a square block of at least 9 (3 by 3)."],
+        "care": [[6, 8, "Water well when the tassels appear at the top 💧"]],
+        "harvest_tip": "When the silky tassels go brown, peel back a bit of leaf and pinch a kernel. Milky juice = ready!",
+        "eat": "Cook within an hour of picking - boil for 5 minutes and add butter.",
+    },
+    {
+        "id": "kale", "name": "Kale", "emoji": "🥬", "level": 2, "where": ["bed", "pot"],
+        "sow_in": [["03-15", "05-15"]], "sow_out": [["04-15", "06-15"]], "plant_out": [["05-15", "07-31"]],
+        "harvest": [["09-01", "03-15"]], "weeks": 12, "grow_on": 6, "depth": "1cm", "spacing": "45cm", "prefer": "sow_in",
+        "blurb": "Tough leafy green that keeps going all winter.",
+        "tips": ["Try 'Cavolo Nero' (dark and crinkly) or 'Redbor' (purple)."],
+        "care": [],
+        "harvest_tip": "Pick the lower leaves a few at a time. It keeps growing from the top.",
+        "eat": "Rub with oil and salt and bake for 10 minutes to make kale crisps.",
+    },
+    {
+        "id": "leeks", "name": "Leeks", "emoji": "🥬", "level": 2, "where": ["bed"],
+        "sow_out": [["03-15", "04-30"]], "plant_out": [["06-01", "07-15"]], "harvest": [["09-15", "03-31"]],
+        "weeks": 24, "depth": "1cm", "spacing": "15cm",
+        "blurb": "Sow them in spring and pick them all through winter.",
+        "tips": ["Sow in a little row, then move them when they're pencil-thin."],
+        "care": [[10, 3, "Move them: make a deep hole with a stick, drop a leek in, and fill the hole with water (no soil!) 💧"]],
+        "harvest_tip": "Dig them up whenever they're thick enough. They're fine to leave in the ground in winter.",
+        "eat": "Slice and melt in butter, or add to potato soup.",
+    },
+    {
+        "id": "parsnips", "name": "Parsnips", "emoji": "🥕", "level": 2, "where": ["bed"],
+        "sow_out": [["04-01", "05-31"]], "harvest": [["10-15", "02-28"]], "weeks": 30, "depth": "1cm", "spacing": "15cm",
+        "blurb": "Slow to grow but sweeter after a frost. Perfect for Christmas dinner.",
+        "tips": ["Always use fresh seeds - old parsnip seeds don't grow.", "They can take 3 weeks to come up. Be patient!"],
+        "care": [[5, 2, "Thin them out so each one has 15cm of space"]],
+        "harvest_tip": "Wait for a frost - it makes them sweeter. Dig carefully, they're long!",
+        "eat": "Roast with honey for Christmas dinner.",
+    },
+    {
+        "id": "basil", "name": "Basil", "emoji": "🌿", "level": 2, "where": ["pot"], "tender": True,
+        "sow_in": [["04-01", "06-15"]], "plant_out": [["06-01", "07-15"]], "harvest": [["07-01", "09-30"]],
+        "weeks": 8, "grow_on": 6, "depth": "just covered", "spacing": "20cm",
+        "blurb": "Loves sun and warmth - happiest on a sunny windowsill or patio.",
+        "tips": ["Water in the morning, not at night. It hates cold wet roots."],
+        "care": [],
+        "harvest_tip": "Pinch off the top leaves - this makes the plant bushier.",
+        "eat": "Tear onto pizza or pasta with tomatoes.",
+    },
+    {
+        "id": "raspberries", "name": "Raspberries", "emoji": "🍇", "level": 2, "where": ["bed", "pot"], "perennial": True,
+        "plant_out": [["11-01", "03-15"]], "harvest": [["08-01", "10-15"]], "weeks": 26, "buy_word": "canes",
+        "blurb": "Choose 'autumn fruiting' canes - they're the easiest to look after.",
+        "tips": ["'Autumn Bliss' is a great easy variety."],
+        "care": [[16, 3, "In February, cut all the canes down to the ground. New ones grow and fruit the same year ✂️"]],
+        "harvest_tip": "Pick when they're deep red and slide off easily.",
+        "eat": "By the handful, or on porridge.",
+    },
+    {
+        "id": "blueberries", "name": "Blueberries", "emoji": "🫐", "level": 2, "where": ["pot"], "perennial": True,
+        "plant_out": [["10-15", "03-31"]], "harvest": [["07-15", "09-15"]], "weeks": 26, "buy_word": "plants",
+        "blurb": "Need special 'ericaceous' compost, so grow them in a big pot.",
+        "tips": ["Use 'ericaceous' compost and water with rainwater, not tap water."],
+        "care": [[0, 30, "Water with rainwater from a water butt 🌧️"]],
+        "harvest_tip": "Pick when they're dark blue all over, with a dusty bloom.",
+        "eat": "In pancakes or muffins.",
+    },
+    # ---------------------------------------------------------------- more care needed
+    {
+        "id": "chillies", "name": "Chillies", "emoji": "🌶️", "level": 3, "where": ["pot"], "tender": True,
+        "sow_in": [["01-15", "03-31"]], "plant_out": [["06-01", "06-30"]], "harvest": [["07-15", "10-15"]],
+        "weeks": 20, "grow_on": 10, "depth": "0.5cm", "spacing": "40cm",
+        "blurb": "Need a long, warm season. Best on a sunny windowsill or in a greenhouse.",
+        "tips": ["Sow early - they're slow.", "Wash your hands after touching chillies! 🙌"],
+        "care": [[4, 12, "Feed with tomato food once a week when flowers appear 🍼"]],
+        "harvest_tip": "Cut them off with scissors. Green ones are milder, red ones are hotter.",
+        "eat": "Tiny bit in a stir-fry. A grown-up should chop them.",
+    },
+    {
+        "id": "peppers", "name": "Sweet peppers", "emoji": "🫑", "level": 3, "where": ["pot"], "tender": True,
+        "sow_in": [["02-15", "04-15"]], "plant_out": [["06-01", "06-20"]], "harvest": [["08-01", "10-15"]],
+        "weeks": 20, "grow_on": 10, "depth": "0.5cm", "spacing": "45cm",
+        "blurb": "Need warmth and patience. Great in a greenhouse or sunny porch.",
+        "tips": ["Keep them in the warmest, sunniest spot you have."],
+        "care": [[4, 12, "Feed with tomato food once a week when flowers appear 🍼"]],
+        "harvest_tip": "Pick them green, or wait a few more weeks for them to turn red and sweeter.",
+        "eat": "Slice into sticks with dip, or stuff and roast them.",
+    },
+    {
+        "id": "broccoli", "name": "Purple sprouting broccoli", "emoji": "🥦", "level": 3, "where": ["bed"],
+        "sow_in": [["04-01", "05-15"]], "plant_out": [["06-01", "07-15"]], "harvest": [["02-01", "04-30"]],
+        "weeks": 36, "grow_on": 6, "depth": "1cm", "spacing": "60cm",
+        "blurb": "A long wait, but it gives you fresh greens in early spring when little else is ready.",
+        "tips": ["It stays in the ground nearly a year - plan the space."],
+        "care": [
+                 [12, 4, "Push a strong stick in next to each plant so the wind doesn't knock it over"]],
+        "harvest_tip": "Snap off the purple shoots when they're about 10cm long, before the flowers open.",
+        "eat": "Steam for 3 minutes and dip in a soft-boiled egg.",
+    },
+    {
+        "id": "cauliflower", "name": "Cauliflower", "emoji": "🥦", "level": 3, "where": ["bed"],
+        "sow_in": [["03-01", "04-30"]], "plant_out": [["05-15", "06-30"]], "harvest": [["08-01", "10-31"]],
+        "weeks": 18, "grow_on": 6, "depth": "1cm", "spacing": "60cm",
+        "blurb": "Tricky but rewarding. Needs rich soil and lots of water.",
+        "tips": ["Never let them dry out, or the heads will be tiny."],
+        "care": [
+                 [10, 6, "Fold a few leaves over the white head to keep the sun off it"]],
+        "harvest_tip": "Cut when the head is firm and white, before it starts to split.",
+        "eat": "Cauliflower cheese!",
+    },
+    {
+        "id": "sprouts", "name": "Brussels sprouts", "emoji": "🥦", "level": 3, "where": ["bed"],
+        "sow_in": [["03-01", "04-15"]], "plant_out": [["05-15", "06-15"]], "harvest": [["10-15", "02-28"]],
+        "weeks": 28, "grow_on": 6, "depth": "1cm", "spacing": "60cm",
+        "blurb": "Tall plants with sprouts up the stem. Ready for Christmas.",
+        "tips": ["Firm the soil really well around them - they get top-heavy."],
+        "care": [
+                 [12, 4, "Push a strong stick in next to each plant so they don't fall over"]],
+        "harvest_tip": "Pick from the bottom of the stem up, when they're firm and the size of a walnut.",
+        "eat": "Halve and roast with a little oil until crispy - much nicer than boiled!",
+    },
+    {
+        "id": "melon", "name": "Melon", "emoji": "🍈", "level": 3, "where": ["pot"], "tender": True,
+        "sow_in": [["04-15", "05-15"]], "plant_out": [["06-01", "06-20"]], "harvest": [["08-01", "09-30"]],
+        "weeks": 16, "grow_on": 5, "depth": "2cm", "spacing": "90cm",
+        "blurb": "A challenge! Best in a greenhouse in the UK.",
+        "tips": ["Try a small variety like 'Minnesota Midget'."],
+        "care": [[6, 8, "Only keep 4 melons per plant - pinch off any others so they grow bigger"]],
+        "harvest_tip": "Ready when it smells sweet and the stalk starts to crack.",
+        "eat": "Chilled in slices on a hot day.",
+    },
+    {
+        "id": "aubergine", "name": "Aubergine", "emoji": "🍆", "level": 3, "where": ["pot"], "tender": True,
+        "sow_in": [["02-15", "03-31"]], "plant_out": [["06-01", "06-20"]], "harvest": [["08-01", "10-10"]],
+        "weeks": 20, "grow_on": 10, "depth": "1cm", "spacing": "50cm",
+        "blurb": "Needs a warm, sheltered sunny spot - a greenhouse is best.",
+        "tips": ["Choose a 'mini' variety for pots."],
+        "care": [[4, 12, "Feed with tomato food once a week when flowers appear 🍼"]],
+        "harvest_tip": "Cut them when the skin is shiny. Dull skin means it's past its best.",
+        "eat": "Slice, brush with oil and grill - or make a curry.",
+    },
+]
+
+BY_ID = {p["id"]: p for p in PLANTS}
+
+# Default step-by-step instructions, used when a plant doesn't have its own.
+STEPS_SOW_OUT = [
+    "Pull out any weeds and rake the top of your bed until it's crumbly, like cake crumbs 🍰",
+    "Make a little line in the soil {depth} deep with your finger or a stick ✏️",
+    "Drop the seeds in, about {spacing} apart 🌱",
+    "Gently cover them with soil and pat it down 👋",
+    "Water with a watering can that has a sprinkler head 🚿",
+    "Push in a label so you remember what's there 🏷️",
+]
+STEPS_SOW_IN = [
+    "Fill a small pot or tray with seed compost 🪴",
+    "Push the seeds in {depth} deep - a couple per pot 🌱",
+    "Water gently, then put them on a bright windowsill ☀️",
+    "Keep the compost damp but not soggy - check it every day 💧",
+    "When they have 2 proper leaves, give each seedling its own pot",
+]
+STEPS_PLANT_OUT_FROM_INDOORS = [
+    "Toughen them up ('hardening off'): put them outside in the day for a week, bring them in at night 🌗",
+    "Dig a hole a bit bigger than the pot 🕳️",
+    "Tip the plant out gently, holding the leaves, not the stem 🤲",
+    "Pop it in the hole, firm the soil around it, and water well 🚿",
+    "Leave about {spacing} between plants 📏",
+]
+STEPS_PLANT_BOUGHT = [
+    "Water your new plants in their pots first 🚿",
+    "Dig a hole a bit bigger than the pot 🕳️",
+    "Tip the plant out gently, holding the leaves, not the stem 🤲",
+    "Pop it in the hole, firm the soil around it, and water well 🚿",
+    "Leave about {spacing} between plants 📏",
+]
+
+# The no-dig bed journey, shown for any bed that hasn't been built yet.
+NODIG_STEPS = [
+    {"emoji": "☀️", "title": "Pick a sunny spot", "text": "Choose somewhere that gets sun for at least 6 hours a day. Most veg love the sun."},
+    {"emoji": "📏", "title": "Mark it out", "text": "About 1.2m wide is perfect - you can reach the middle from both sides without standing on it."},
+    {"emoji": "✂️", "title": "Squash the weeds", "text": "Cut grass and weeds down short. No digging! Leave the roots - worms will do the work for you 🪱"},
+    {"emoji": "📦", "title": "Lay cardboard", "text": "Cover the whole area with plain brown cardboard. Take off all the tape and stickers. Overlap the edges so no light gets through."},
+    {"emoji": "💧", "title": "Soak it", "text": "Water the cardboard until it's soggy. This helps it rot down and lets roots through."},
+    {"emoji": "🟫", "title": "Pile on compost", "text": "Spread 10-15cm of compost on top (about the height of your hand). You can plant straight into it!"},
+    {"emoji": "🪵", "title": "Edges (optional)", "text": "Wooden boards around the edge keep it tidy, but you don't need them."},
+    {"emoji": "🌱", "title": "Start planting", "text": "That's it - your no-dig bed is ready. Each autumn, just add a few more centimetres of compost on top."},
+]
+
+POT_STEPS = [
+    {"emoji": "🪣", "title": "Find a pot with holes", "text": "Any container works - buckets, old boxes, grow bags - as long as water can drain out of the bottom. Bigger is better!"},
+    {"emoji": "🟫", "title": "Fill with compost", "text": "Use peat-free multi-purpose compost. Fill to 2-3cm below the top."},
+    {"emoji": "☀️", "title": "Find a sunny spot", "text": "Put it somewhere sunny and sheltered from strong wind."},
+    {"emoji": "💧", "title": "Water often", "text": "Pots dry out quickly. In summer check every day - push your finger in, and if it's dry, water it."},
+]
+
+
+# ---- how much space, how much food ---------------------------------------------------------------
+# id: (cm apart in the row, cm between rows, what you plant, what you get from each [low, high, unit] or None,
+#      weeks of picking before the space is free again or None for "the whole picking window", family)
+# Family matters for "what next": don't follow a crop with its close relatives (they share pests and diseases).
+GROW = {
+    "radish":       (3, 15, "seeds", [1, 1, "radishes"], 3, "cabbage"),
+    "salad":        (10, 20, "plants", None, 8, "leaf"),
+    "peas":         (8, 40, "seeds", [15, 20, "pods"], 6, "bean"),
+    "broad_beans":  (20, 45, "seeds", [10, 15, "pods"], 5, "bean"),
+    "garlic":       (15, 30, "cloves", [1, 1, "bulbs"], 3, "onion"),
+    "onions":       (10, 25, "sets", [1, 1, "onions"], 3, "onion"),
+    "spring_onions": (2, 15, "seeds", [1, 1, "spring onions"], 6, "onion"),
+    "potatoes":     (30, 60, "seed potatoes", [1, 1.5, "kg of potatoes"], 4, "potato"),
+    "courgette":    (90, 90, "plants", [15, 25, "courgettes"], None, "squash"),
+    "strawberries": (40, 60, "plants", [0.25, 0.5, "kg of berries a year"], None, "fruit"),
+    "nasturtium":   (30, 30, "plants", None, None, "flower"),
+    "chives":       (20, 20, "plants", None, None, "onion"),
+    "mint":         (45, 45, "plants", None, None, "herb"),
+    "chard":        (30, 30, "plants", None, None, "beet"),
+    "beetroot":     (10, 30, "seeds", [1, 1, "beetroots"], 8, "beet"),
+    "runner_beans": (20, 60, "plants", [0.8, 1.2, "kg of beans"], None, "bean"),
+    "french_beans": (15, 30, "plants", [0.25, 0.4, "kg of beans"], None, "bean"),
+    "rhubarb":      (90, 90, "crowns", [1, 2, "kg of stems a year"], None, "fruit"),
+    "carrots":      (5, 20, "seeds", [1, 1, "carrots"], 10, "carrot"),
+    "tomatoes":     (45, 60, "plants", [100, 200, "cherry tomatoes"], None, "potato"),
+    "tomatoes_big": (45, 60, "plants", [3, 5, "kg of tomatoes"], None, "potato"),
+    "squash":       (100, 150, "plants", [2, 4, "squashes"], 4, "squash"),
+    "summer_squash": (90, 90, "plants", [10, 20, "squashes"], None, "squash"),
+    "sweet_potatoes": (30, 75, "slips", [0.5, 1, "kg of sweet potatoes"], 3, "sweetpotato"),
+    "cucumber":     (60, 60, "plants", [10, 20, "cucumbers"], None, "squash"),
+    "pumpkin":      (150, 150, "plants", [1, 3, "pumpkins"], 4, "squash"),
+    "sweetcorn":    (45, 45, "plants", [1, 2, "cobs"], 4, "corn"),
+    "kale":         (45, 45, "plants", None, None, "cabbage"),
+    "leeks":        (15, 30, "plants", [1, 1, "leeks"], None, "onion"),
+    "parsnips":     (15, 30, "seeds", [1, 1, "parsnips"], None, "carrot"),
+    "basil":        (20, 20, "plants", None, None, "herb"),
+    "raspberries":  (45, 100, "canes", [0.5, 1, "kg of berries a year"], None, "fruit"),
+    "blueberries":  (120, 120, "plants", [1, 3, "kg of berries a year (once grown)"], None, "fruit"),
+    "chillies":     (40, 40, "plants", [20, 50, "chillies"], None, "potato"),
+    "peppers":      (45, 45, "plants", [5, 10, "peppers"], None, "potato"),
+    "broccoli":     (60, 60, "plants", None, None, "cabbage"),
+    "cauliflower":  (60, 60, "plants", [1, 1, "cauliflowers"], 3, "cabbage"),
+    "sprouts":      (60, 75, "plants", [40, 50, "sprouts"], None, "cabbage"),
+    "melon":        (90, 90, "plants", [2, 4, "melons"], None, "squash"),
+    "aubergine":    (50, 50, "plants", [4, 6, "aubergines"], None, "potato"),
+}
+YIELD_TEXT = {  # for crops you keep picking, where a number would be silly
+    "salad": "a handful of leaves a week from each plant, for about 2 months",
+    "nasturtium": "flowers and leaves all summer - a few plants is plenty",
+    "chives": "snips all summer, and it comes back every year",
+    "mint": "one plant gives more than enough for a family",
+    "chard": "a few leaves a week from each plant, for months",
+    "kale": "a few leaves a week from each plant, from autumn to spring",
+    "basil": "a handful of leaves a week from each plant",
+    "broccoli": "several handfuls of purple shoots from each plant over 6-8 weeks",
+}
+PACK_HINTS = {  # help turning a shop order into a number of plants
+    "garlic": "One garlic bulb splits into about 8-12 cloves. Plant the big outside ones.",
+    "onions": "250g of onion sets is about 75-100 sets; 500g is about 150-200.",
+    "potatoes": "A 2kg bag of seed potatoes is about 20-25 potatoes.",
+    "radish": "A packet has hundreds of seeds - sow a short row every 2 weeks, not all at once.",
+    "carrots": "A packet has hundreds of seeds - sow a row, then another a month later.",
+}
+
+GROUPS = {"cabbage": "cabbage family", "onion": "onion family", "bean": "pea & bean family",
+          "potato": "tomato & potato family", "squash": "squash family", "carrot": "carrot family", "beet": "beet family"}
+
+for _p in PLANTS:
+    _sp, _row, _unit, _yield, _pick, _family = GROW[_p["id"]]
+    _p.update(sp_cm=_sp, row_cm=_row, unit=_unit, yield_each=_yield, pick_weeks=_pick, family=_family,
+              yield_text=YIELD_TEXT.get(_p["id"]), pack_hint=PACK_HINTS.get(_p["id"]))
+
+
+# ---- good and bad neighbours ----------------------------------------------------------------------
+# Traditional companion planting: some of it is proven (tall sweetcorn shading squash, nasturtiums luring
+# caterpillars away), some is gardeners' lore. Kept to the widely agreed pairs.
+GOOD_NEIGHBOURS = [
+    ("carrots", "onions", "the onion smell hides carrots from carrot fly"),
+    ("carrots", "leeks", "the leek smell hides carrots from carrot fly"),
+    ("carrots", "spring_onions", "the onion smell hides carrots from carrot fly"),
+    ("carrots", "chives", "the chive smell hides carrots from carrot fly"),
+    ("carrots", "garlic", "the garlic smell hides carrots from carrot fly"),
+    ("carrots", "radish", "radishes come up fast and mark the slow carrot rows"),
+    ("parsnips", "radish", "radishes come up fast and mark the slow parsnip rows"),
+    ("strawberries", "garlic", "garlic may help keep pests off strawberries"),
+    ("strawberries", "chives", "chive flowers bring bees to pollinate the berries"),
+    ("strawberries", "salad", "lettuce fills the gaps between strawberry plants"),
+    ("beetroot", "onions", "they grow at different depths, so share space well"),
+    ("beetroot", "garlic", "they grow at different depths, so share space well"),
+    ("beetroot", "salad", "quick lettuce fills gaps while beetroot grows"),
+    ("tomatoes", "basil", "classic partners - basil likes the same warm spot"),
+    ("tomatoes_big", "basil", "classic partners - basil likes the same warm spot"),
+    ("tomatoes_big", "nasturtium", "nasturtiums lure greenfly away from tomatoes"),
+    ("tomatoes_big", "chives", "chives may help keep greenfly away"),
+    ("sweetcorn", "squash", "'three sisters': big leaves shade out weeds under the corn"),
+    ("squash", "nasturtium", "nasturtiums bring in bees to pollinate squash flowers"),
+    ("summer_squash", "nasturtium", "nasturtiums bring in bees to pollinate squash flowers"),
+    ("summer_squash", "sweetcorn", "'three sisters': big leaves shade out weeds under the corn"),
+    ("squash", "runner_beans", "beans feed the soil for the hungry squash"),
+    ("tomatoes", "nasturtium", "nasturtiums lure greenfly away from tomatoes"),
+    ("tomatoes", "chives", "chives may help keep greenfly away"),
+    ("peppers", "basil", "basil likes the same warm, sunny spot"),
+    ("chillies", "basil", "basil likes the same warm, sunny spot"),
+    ("sweetcorn", "pumpkin", "'three sisters': big leaves shade out weeds under the corn"),
+    ("sweetcorn", "courgette", "'three sisters': big leaves shade out weeds under the corn"),
+    ("sweetcorn", "runner_beans", "'three sisters': beans can climb up the corn"),
+    ("sweetcorn", "french_beans", "beans feed the soil that hungry sweetcorn needs"),
+    ("courgette", "nasturtium", "nasturtiums bring in bees to pollinate courgette flowers"),
+    ("pumpkin", "nasturtium", "nasturtiums bring in bees to pollinate pumpkin flowers"),
+    ("cucumber", "nasturtium", "nasturtiums bring in bees and lure away greenfly"),
+    ("runner_beans", "nasturtium", "nasturtiums lure blackfly away from the beans"),
+    ("broad_beans", "nasturtium", "nasturtiums lure blackfly away from the beans"),
+    ("kale", "nasturtium", "caterpillars go for nasturtiums instead of your kale"),
+    ("broccoli", "nasturtium", "caterpillars go for nasturtiums instead of your broccoli"),
+    ("cauliflower", "nasturtium", "caterpillars go for nasturtiums instead of your cauliflower"),
+    ("sprouts", "nasturtium", "caterpillars go for nasturtiums instead of your sprouts"),
+    ("peas", "radish", "radishes are picked before the peas need the space"),
+    ("peas", "salad", "lettuce likes a bit of shade from the peas in summer"),
+    ("peas", "carrots", "they grow at different heights and depths"),
+    ("potatoes", "broad_beans", "beans add goodness to the soil for the potatoes"),
+    ("chard", "french_beans", "they share space well"),
+    ("leeks", "salad", "lettuce grows quickly between young leeks"),
+    ("kale", "salad", "lettuce grows quickly between young kale plants"),
+]
+BAD_NEIGHBOURS = [
+    ("onions", "peas", "onions can stunt peas"), ("onions", "broad_beans", "onions can stunt beans"),
+    ("onions", "runner_beans", "onions can stunt beans"), ("onions", "french_beans", "onions can stunt beans"),
+    ("garlic", "peas", "garlic can stunt peas"), ("garlic", "broad_beans", "garlic can stunt beans"),
+    ("garlic", "runner_beans", "garlic can stunt beans"), ("garlic", "french_beans", "garlic can stunt beans"),
+    ("leeks", "peas", "leeks can stunt peas"), ("leeks", "broad_beans", "leeks can stunt beans"),
+    ("tomatoes", "potatoes", "they catch the same disease (blight) and pass it between them"),
+    ("tomatoes_big", "potatoes", "they catch the same disease (blight) and pass it between them"),
+    ("cucumber", "potatoes", "potatoes can make cucumbers more likely to get disease"),
+    ("strawberries", "kale", "cabbage-family plants can stunt strawberries"),
+    ("strawberries", "broccoli", "cabbage-family plants can stunt strawberries"),
+    ("strawberries", "cauliflower", "cabbage-family plants can stunt strawberries"),
+    ("strawberries", "sprouts", "cabbage-family plants can stunt strawberries"),
+]
+
+
+def _neighbours(pairs):
+    out = {p["id"]: [] for p in PLANTS}
+    for a, b, why in pairs:
+        if a in out and b in out:
+            out[a].append({"plant_id": b, "why": why})
+            out[b].append({"plant_id": a, "why": why})
+    return out
+
+
+GOOD_WITH = _neighbours(GOOD_NEIGHBOURS)
+BAD_WITH = _neighbours(BAD_NEIGHBOURS)
+for _p in PLANTS:
+    _p.update(good_with=GOOD_WITH[_p["id"]], bad_with=BAD_WITH[_p["id"]])
+
+
+# ---- keeping the harvest ---------------------------------------------------------------------------
+# id: (how long it keeps, how to store it, how to freeze it - or why not)
+# "Blanch" = a quick dip in boiling water, then straight into icy water: it keeps colour and taste in the freezer.
+BLANCH = "blanch them (dip in boiling water for {t}, then straight into icy water - ask a grown-up to help)"
+STORE = {
+    "radish": ("1-2 weeks", ["Twist off the leaves", "Keep in a box or bag in the fridge"],
+               "Don't freeze - they go soggy. Sow a few at a time instead so you never have too many."),
+    "salad": ("3-5 days", ["Pick in the cool morning", "Wash, dry gently, and keep in a bag in the fridge with a piece of kitchen paper"],
+              "Don't freeze - it goes slimy. Just pick what you need each day."),
+    "peas": ("2-3 days - eat them fast, they lose their sweetness", ["Keep in their pods in the fridge"],
+             "Freeze brilliantly: pod them, " + BLANCH.format(t="1 minute") + ", dry, spread on a tray to freeze, then bag. Keeps 12 months."),
+    "broad_beans": ("about 5 days", ["Keep in their pods in the fridge"],
+                    "Freeze well: pod them, " + BLANCH.format(t="2 minutes") + ", dry and bag. Keeps 12 months."),
+    "garlic": ("6-9 months once dried", ["Dry it first (see the 'Dry your garlic' job) until the skins are papery",
+               "Trim the roots, and plait the stalks or hang them in a net", "Keep somewhere cool, dry and airy - not the fridge"],
+               "You can freeze peeled cloves in a bag and use them straight from frozen in cooking."),
+    "onions": ("2-3 months for autumn-planted, up to 6 months for spring-planted", ["Dry them first until the necks are thin and papery",
+               "Hang them in a net (or old tights, with a knot between each one!)", "Keep somewhere cool, dry and dark"],
+               "Chop and freeze in bags for cooking. Keeps about 6 months."),
+    "spring_onions": ("about 1 week", ["Keep in the fridge, or stand the roots in a glass of water"],
+                      "Chop and freeze in a bag - great sprinkled into cooking straight from frozen."),
+    "potatoes": ("1-2 weeks (new potatoes are best fresh)", ["Brush off the soil, don't wash", "Keep in a paper or cloth bag somewhere cool and dark",
+                 "Light turns them green - never eat green bits"],
+                 "Boil for 5 minutes, cool, then freeze - roast them straight from frozen."),
+    "courgette": ("about 1 week", ["Keep in the fridge"],
+                  "Grate and freeze in bags for cakes, soups and pasta sauce. (Frozen slices go soft - fine for cooking.)"),
+    "strawberries": ("2-3 days", ["Keep in the fridge, and only wash them just before eating"],
+                     "Pull off the green tops, freeze on a tray, then bag - perfect for smoothies. Or make jam!"),
+    "nasturtium": ("2-3 days", ["Keep in a box in the fridge with damp kitchen paper"], "Don't freeze - pick them fresh."),
+    "chives": ("about 1 week", ["Stand in a glass of water, or keep in a bag in the fridge"],
+               "Snip into an ice-cube tray, top up with water and freeze. Pop a cube into cooking."),
+    "mint": ("about 1 week", ["Stand in a glass of water like flowers"],
+             "Chop into an ice-cube tray with water and freeze - brilliant in drinks. Or hang bunches up to dry."),
+    "chard": ("3-5 days", ["Keep in a bag in the fridge"],
+              "Freeze the leaves: " + BLANCH.format(t="2 minutes") + ", squeeze out the water and bag."),
+    "beetroot": ("2-3 weeks in the fridge, months in a box of damp sand", ["Twist off the leaves, leaving a short stalk (so they don't 'bleed')",
+                 "Keep in the fridge, or layer in a box of damp sand in a cool shed"],
+                 "Cook them first, peel, slice and freeze. Or pickle them in jars."),
+    "runner_beans": ("about 5 days", ["Keep in a bag in the fridge"],
+                     "Freeze well: slice, " + BLANCH.format(t="2 minutes") + ", dry and bag. Keeps 12 months."),
+    "french_beans": ("about 5 days", ["Keep in a bag in the fridge"],
+                     "Freeze well: top and tail, " + BLANCH.format(t="2 minutes") + ", dry and bag. Keeps 12 months."),
+    "rhubarb": ("1-2 weeks", ["Cut off the leaves (they're poisonous) and keep the stems in the fridge"],
+                "Chop into chunks and freeze - no need to blanch. Keeps 12 months."),
+    "carrots": ("2-3 weeks", ["Twist off the green tops", "Keep in the fridge, or leave them in the ground and dig as you need them"],
+                "Slice, " + BLANCH.format(t="3 minutes") + ", dry and bag. Keeps 12 months."),
+    "tomatoes_big": ("about 1 week", ["Keep in a bowl at room temperature - the fridge spoils the taste",
+                     "At the end of summer, ripen green ones in a drawer next to a banana"],
+                     "Freeze whole in a bag for cooking - the skins slip off when they thaw. Or cook into sauce and freeze."),
+    "summer_squash": ("about 1 week", ["Keep in the fridge"],
+                      "Slice and freeze for cooking, or grate and freeze for cakes and soups - like courgettes."),
+    "sweet_potatoes": ("2-3 months once dried", ["Dry them somewhere warm first (see the 'Dry your sweet potatoes' job)",
+                       "Keep in a cool cupboard - NOT the fridge, the cold spoils them"],
+                       "Cook first - bake or mash - then freeze in portions."),
+    "squash": ("3-6 months once dried", ["Cut with a bit of stalk, and carry it by the squash, not the stalk",
+               "Dry it in the sun or a warm room for 1-2 weeks so the skin goes hard", "Keep somewhere cool and dry indoors"],
+               "Peel, cut into chunks and freeze raw, or roast first. Great for soup."),
+    "tomatoes": ("about 1 week", ["Keep in a bowl at room temperature - the fridge spoils the taste",
+                 "At the end of summer, ripen green ones on a sunny windowsill next to a banana"],
+                 "Freeze whole in a bag - the skins slip off when they thaw. Perfect for pasta sauce."),
+    "cucumber": ("about 1 week", ["Keep in the fridge"], "Don't freeze - they go mushy. Make quick pickles instead."),
+    "pumpkin": ("2-6 months once dried", ["Cut with a long bit of stalk - never carry it by the stalk!",
+                "Dry it in the sun or a warm room for 1-2 weeks so the skin goes hard", "Keep somewhere cool and dry indoors"],
+                "Cut into chunks, roast or boil until soft, cool and freeze. Great for soup."),
+    "sweetcorn": ("1 day - the sugar turns to starch fast!", ["Eat on the day you pick it if you can"],
+                  "Freeze whole cobs: " + BLANCH.format(t="4 minutes") + ". Or cut the kernels off and freeze in bags."),
+    "kale": ("about 1 week", ["Keep in a bag in the fridge - or just leave it on the plant and pick when needed"],
+             "Pull the leaves off the tough stalks, " + BLANCH.format(t="2 minutes") + ", squeeze and bag."),
+    "leeks": ("1-2 weeks", ["Leave them in the ground and dig as you need them", "Once dug, keep in the fridge"],
+              "Wash well, slice, and freeze in bags for soups and pies."),
+    "parsnips": ("2-3 weeks", ["Leave them in the ground over winter - frost makes them sweeter", "Once dug, keep in the fridge"],
+                 "Cut into chunks, " + BLANCH.format(t="2 minutes") + ", and freeze. Roast straight from frozen."),
+    "basil": ("about 1 week", ["Stand in a glass of water on the kitchen side - NOT the fridge, it turns black"],
+              "Blend with olive oil and freeze in an ice-cube tray. Or make pesto!"),
+    "raspberries": ("1-2 days", ["Keep in the fridge, don't wash until eating"],
+                    "Freeze on a tray, then bag. Keeps 12 months - lovely on porridge."),
+    "blueberries": ("1-2 weeks", ["Keep in the fridge, don't wash until eating"],
+                    "Freeze on a tray, then bag. Keeps 12 months - great in muffins."),
+    "chillies": ("1-2 weeks", ["Keep in the fridge"],
+                 "Freeze whole in a bag - chop straight from frozen. Or thread onto string and hang up to dry."),
+    "peppers": ("1-2 weeks", ["Keep in the fridge"], "Slice and freeze in bags - no need to blanch. Use in cooking."),
+    "broccoli": ("a few days", ["Keep in a bag in the fridge"],
+                 "Freeze well: " + BLANCH.format(t="2 minutes") + ", dry and bag."),
+    "cauliflower": ("about 1 week", ["Keep in the fridge"],
+                    "Cut into florets, " + BLANCH.format(t="3 minutes") + ", dry and bag."),
+    "sprouts": ("about 1 week", ["Leave them on the stalk - cut the whole stalk and stand it somewhere cool"],
+                "Freeze well: " + BLANCH.format(t="3 minutes") + ", dry and bag."),
+    "melon": ("3-5 days once ripe", ["Ripen at room temperature, then keep in the fridge"],
+              "Cut into cubes and freeze for smoothies and ice lollies."),
+    "aubergine": ("about 1 week", ["Keep somewhere cool, or in the fridge"],
+                  "Don't freeze raw - cook it first (curry, or roasted slices), then freeze."),
+}
+# crops that need drying ("curing") before storing: weeks, and how
+CURE = {
+    "garlic": (2, "Dry your garlic", ["Lay the bulbs out somewhere dry and airy, out of strong sun - a shed or porch is perfect 🌬️",
+               "Leave them for 2-3 weeks until the skins are papery and the stalks are dry", "Then trim the roots and plait or hang them up 🧄"]),
+    "onions": (2, "Dry your onions", ["Lay them out in the sun on a dry day, or on a rack in a shed if it's wet ☀️",
+               "Leave them for 2-3 weeks until the necks are thin, dry and papery", "Then hang them up in a net 🧅"]),
+    "sweet_potatoes": (1, "Dry your sweet potatoes", ["Brush off the soil, but don't wash them",
+                       "Keep them somewhere warm (like near a boiler or in a sunny porch) for 1-2 weeks so the skins toughen up",
+                       "Then store them in a cool cupboard 🍠"]),
+    "squash": (1, "Dry your squash", ["Put them somewhere sunny and dry - a windowsill or greenhouse ☀️",
+               "Leave for 1-2 weeks until the skin is really hard", "Then store them somewhere cool indoors"]),
+    "pumpkin": (1, "Dry your pumpkins", ["Put them somewhere sunny and dry - a windowsill or greenhouse ☀️",
+                "Leave for 1-2 weeks until the skin is hard and sounds hollow when you knock", "Then store them somewhere cool indoors 🎃"]),
+}
+for _p in PLANTS:
+    _keeps, _how, _freeze = STORE[_p["id"]]
+    _p.update(store={"keeps": _keeps, "how": _how, "freeze": _freeze})
+
+
+# ---- two planting seasons -------------------------------------------------------------------------
+# Crops you can plant in autumn *or* spring: do you need both? What to tell people, and whether we suggest it.
+SEASONS = {
+    "onions": (True, "Plant a spring batch too",
+               "Autumn onions are ready in June but only keep 2-3 months. Spring-planted sets are ready in August and "
+               "keep until next spring. Grow both and you'll have onions nearly all year."),
+    "garlic": (False, "Spring garlic?",
+               "Autumn is best - garlic needs a cold winter to make big bulbs. Spring-planted garlic works, but the bulbs "
+               "are smaller. Only plant a spring batch if you missed autumn or want more."),
+    "broad_beans": (True, "Sow a spring batch too",
+                    "Autumn-sown beans are ready first, in early June. A spring sowing starts picking in July - "
+                    "so with both you get beans for twice as long."),
+}
+
+
+# ---- jobs to do BEFORE planting -------------------------------------------------------------------
+# id: [(weeks before it goes in, title, steps)]. Supports go in first: push a cane in later and you spear the roots.
+_CANE_STEPS = [
+    "For each plant, push a strong cane (taller than a grown-up - about 1.8m) 30cm into the ground where it will go 🪜",
+    "Do it now, before planting - pushing canes in later can spear the roots",
+    "Put an upside-down pot or bottle on top of each cane to protect your eyes 👀",
+    "In a pot or grow bag: use a tomato frame, or tie 3 canes together into a wigwam over the pot",
+    "Have some soft garden string ready for tying in as they grow 🧶",
+]
+PREP = {
+    "tomatoes_big": [(1, "Put in strong tomato canes", _CANE_STEPS + [
+        "Big tomatoes get HEAVY - one cane per plant, pushed in firmly. For lots of plants, a frame with strings works too"])],
+    "tomatoes": [(1, "Put in tomato canes (not needed for tumbling ones)", _CANE_STEPS)],
+    "cucumber": [(1, "Put in a cane or frame for your cucumbers", [
+        "Push a strong cane or a trellis in where each cucumber will go 🪜", "Do it before planting so you don't spear the roots",
+        "You'll tie the stem to it as it climbs 🧶"])],
+    "runner_beans": [(1, "Build a bean wigwam", [
+        "Push 6-8 long canes (2.4m) into the ground in a circle, about 20cm deep 🪜",
+        "Tie them together at the top with string, like a tipi ⛺", "One bean plant goes at the bottom of each cane",
+        "Build it before planting - beans grow fast!"])],
+    "peas": [(1, "Put in pea supports", [
+        "Push twiggy sticks or a strip of netting along the row, about 1m tall 🪜",
+        "Peas hold on with little curly tendrils - they just need something to grab"])],
+    "broad_beans": [(1, "Get string supports ready", [
+        "Push a cane in at each corner of the row 🪜", "Run string round the canes at knee and waist height, so the plants don't flop over in the wind"])],
+    "peppers": [(0, "Put in a small cane", ["Push a small cane (1m) in next to each plant - peppers get heavy with fruit 🫑"])],
+    "chillies": [(0, "Put in a small cane", ["Push a small cane (1m) in next to each plant so it doesn't flop 🌶️"])],
+    "aubergine": [(0, "Put in a cane", ["Push a cane (1m) in next to each plant - the fruit is heavy 🍆"])],
+}
+for _p in PLANTS:
+    _p["prep"] = [{"title": t, "steps": st} for _, t, st in PREP.get(_p["id"], [])]
+
+
+# ---- who wants to eat it, and how to stop them ---------------------------------------------------------
+PESTS_WHO = {
+    "pigeons": ("🐦", "Wood pigeons", "strip the soft young leaves off peas, beans and cabbage-family plants"),
+    "birds": ("🐦", "Blackbirds & sparrows", "peck seedlings, pull out onion sets and steal ripe fruit"),
+    "mice": ("🐭", "Mice", "dig up and eat big seeds like peas, beans and sweetcorn"),
+    "slugs": ("🐌", "Slugs & snails", "munch seedlings overnight, worst in wet weather"),
+    "caterpillars": ("🐛", "Cabbage white caterpillars", "hatch under the leaves and eat them to lace"),
+    "carrot_fly": ("🪰", "Carrot fly", "lays eggs by the roots - the maggots tunnel into carrots"),
+    "blackfly": ("🐜", "Blackfly & greenfly", "tiny bugs that crowd the tips and suck the sap"),
+    "flea_beetle": ("🪲", "Flea beetles", "nibble lots of tiny round holes in young leaves"),
+    "pea_moth": ("🦋", "Pea moth", "lays eggs on the flowers - you find little maggots inside the pods"),
+    "leaf_miner": ("🪰", "Allium leaf miner", "a tiny fly whose maggots tunnel into onion-family stems in spring and autumn"),
+    "squirrels": ("🐿️", "Squirrels", "dig up bulbs and steal cobs and berries"),
+    "blight": ("🍂", "Blight", "not an animal - a disease that browns the leaves in warm, wet summers"),
+}
+_NET = ["Bend canes or plastic pipe into hoops over the row 🌈", "Stretch netting over the hoops, pulled tight so birds can't get tangled",
+        "Peg or weigh down the edges so nothing can sneak underneath 🧱", "Check it every day"]
+_MESH = ["Cover with fine insect mesh (like 'Enviromesh') on hoops - the holes are too small for flies and butterflies 🕸️",
+         "Bury or weigh down the edges so nothing can crawl underneath 🧱"]
+_SLUGS = ["Go on a slug hunt at dusk with a torch and move them far away 🔦",
+          "Sink a jam jar into the soil with a little beer in it - slugs fall in 🍺",
+          "Cut the bottom off a plastic bottle and pop it over each young plant, like a mini greenhouse 🍼"]
+# id: (who, how to protect, weeks to keep it covered ("all" = the whole time, 0 = no cover needed), when to uncover)
+PESTS = {
+    "peas": (["pigeons", "mice", "slugs", "pea_moth"],
+             ["Start them in a length of old guttering indoors, so mice can't dig up the seeds"] + _NET, 6,
+             "Once they're about 20cm tall and holding on to their supports. Pigeons mostly go for soft young shoots - "
+             "if they're really bad near you, leave the net on until the peas flower."),
+    "broad_beans": (["mice", "pigeons", "blackfly"], _NET, 4,
+                    "When they're about 15cm tall and the leaves are tough. Pinch off the tips later to stop blackfly."),
+    "runner_beans": (["slugs", "blackfly"], _SLUGS, 3, "Once they have 4-6 leaves and are twisting up their canes."),
+    "french_beans": (["slugs", "blackfly", "pigeons"], _SLUGS, 3, "Once they have 4-6 proper leaves."),
+    "kale": (["pigeons", "caterpillars", "slugs"], ["Use netting with small holes (butterfly netting) so butterflies can't lay eggs"] + _NET, "all",
+             "Keep it on the whole time - pigeons and caterpillars come back all year. Just lift it to weed and pick."),
+    "broccoli": (["pigeons", "caterpillars", "slugs"], ["Use netting with small holes (butterfly netting) so butterflies can't lay eggs"] + _NET, "all",
+                 "Keep it on the whole time - pigeons love broccoli right through winter. Just lift it to pick."),
+    "cauliflower": (["pigeons", "caterpillars", "slugs"], ["Use netting with small holes (butterfly netting) so butterflies can't lay eggs"] + _NET, "all",
+                    "Keep it on until you pick - pigeons and caterpillars come back all summer."),
+    "sprouts": (["pigeons", "caterpillars"], ["Use netting with small holes (butterfly netting) so butterflies can't lay eggs"] + _NET, "all",
+                "Keep it on the whole time - hungry pigeons love sprouts in winter."),
+    "radish": (["flea_beetle", "slugs"], ["Cover the row with fleece or fine mesh straight after sowing 🕸️"], "all",
+               "Radishes are so quick you can leave the cover on until you pick them."),
+    "salad": (["slugs", "birds"], _SLUGS, 4, "When the plants are bigger than your hand - but keep hunting slugs in wet weather."),
+    "beetroot": (["birds", "slugs"], _NET, 4, "Once they have 4-5 leaves - sparrows like pecking the tiny seedlings."),
+    "chard": (["birds", "slugs"], _NET, 4, "Once they have 4-5 leaves and are growing strongly."),
+    "carrots": (["carrot_fly", "slugs"], _MESH + ["No mesh? A 60cm-high barrier of clear plastic round the bed works too - carrot flies fly low!"], "all",
+                "Keep the mesh on until you pick - carrot fly can come any time in summer. Take it off only to weed, on a still day."),
+    "parsnips": (["carrot_fly", "slugs"], _MESH, "all", "Keep the mesh on until the autumn."),
+    "onions": (["birds", "leaf_miner"], _NET, 4, "Once they've rooted and the green shoots are growing - about 4 weeks."),
+    "garlic": (["birds", "leaf_miner"], _NET, 4, "Once they've rooted and the green shoots are showing - about 4 weeks."),
+    "leeks": (["leaf_miner"], _MESH, "all", "Keep the mesh on - the flies come in spring and again in autumn."),
+    "spring_onions": (["leaf_miner", "slugs"], _MESH, "all", "Keep it on until you pick them."),
+    "sweetcorn": (["mice", "birds", "squirrels"], ["Start them indoors in pots, so mice and birds can't get the seeds"] + _SLUGS[:1], 0,
+                  "Once they're planted out they're safe until the cobs form - then watch for squirrels."),
+    "courgette": (["slugs"], _SLUGS, 3, "Take the bottle off once the leaves touch its sides."),
+    "summer_squash": (["slugs"], _SLUGS, 3, "Take the bottle off once the leaves touch its sides."),
+    "pumpkin": (["slugs"], _SLUGS, 3, "Take the bottle off once the leaves touch its sides."),
+    "squash": (["slugs"], _SLUGS, 3, "Take the bottle off once the leaves touch its sides."),
+    "cucumber": (["slugs"], _SLUGS, 3, "Once the plant is climbing and has plenty of leaves."),
+    "melon": (["slugs"], _SLUGS, 3, "Once the plant is growing strongly."),
+    "sweet_potatoes": (["slugs", "mice"], ["Cover with fleece for the first 2 weeks to keep them warm"] + _SLUGS[:2], 2,
+                       "After 2 weeks, once they've settled in and started growing."),
+    "potatoes": (["slugs", "blight"], ["Earth up the shoots so slugs and frost can't get them", "In warm, wet summers watch for brown blotches (blight) - cut off the leaves and dig up the potatoes"], 0, ""),
+    "tomatoes": (["blackfly", "blight"], ["Grow nasturtiums nearby - greenfly go for them instead",
+                 "In warm, wet weather watch for brown blotches (blight) - pick all the fruit and ripen it indoors"], 0, ""),
+    "tomatoes_big": (["blackfly", "blight"], ["Grow nasturtiums nearby - greenfly go for them instead",
+                     "In warm, wet weather watch for brown blotches (blight) - pick all the fruit and ripen it indoors"], 0, ""),
+    "peppers": (["blackfly"], ["Squash greenfly with your fingers, or wash them off with a gentle spray of water 💦"], 0, ""),
+    "chillies": (["blackfly"], ["Squash greenfly with your fingers, or wash them off with a gentle spray of water 💦"], 0, ""),
+    "aubergine": (["blackfly"], ["Squash greenfly with your fingers, or wash them off with a gentle spray of water 💦"], 0, ""),
+    "basil": (["slugs"], ["Grow it in a pot, off the ground - slugs love basil"], 0, ""),
+    "strawberries": (["birds", "slugs", "squirrels"], ["Net them when the fruit starts to turn red - not before, so bees can pollinate the flowers"], 0, ""),
+    "raspberries": (["birds"], ["Net the canes when the berries start to colour"], 0, ""),
+    "blueberries": (["birds"], ["Net the bush when the berries start to go blue - birds strip them in a day!"], 0, ""),
+    "nasturtium": (["blackfly", "caterpillars"], ["Leave them - nasturtiums are a decoy that keeps pests off your other plants 🎯"], 0, ""),
+    "chives": ([], [], 0, ""), "mint": ([], [], 0, ""), "rhubarb": (["slugs"], ["Slugs sometimes nibble new shoots in spring - hunt them at dusk"], 0, ""),
+}
+for _p in PLANTS:
+    _who, _how, _cover, _uncover = PESTS[_p["id"]]
+    _p["pests"] = {"who": [dict(zip(("emoji", "name", "what"), PESTS_WHO[w])) for w in _who],
+                   "protect": _how, "cover": _cover, "uncover": _uncover}
+
+
+# ---- planting into a no-dig bed ------------------------------------------------------------------
+NODIG_PLANTING = [
+    "Never dig or turn the bed over - plant straight into the compost on top 🟫",
+    "Make a hole with a trowel or your fingers, pop the plant in, and press the compost firmly round it 👋",
+    "Pull weeds out gently while they're tiny - they come out easily from compost 🌿",
+    "When you clear a crop, twist or snip it off at the soil and leave the roots in - worms will eat them 🪱",
+    "Every autumn, spread another 3-5cm of compost on top. That's all the feeding it needs 🍂",
+]
+NODIG_CROPS = {
+    "sweetcorn": ["Start them in pots indoors - seeds sown straight into loose compost often get eaten by mice 🐭",
+                  "Sweetcorn is hungry: spread an extra bucket of compost where the block will go",
+                  "Plant in a square block (at least 3 x 3), 45cm apart - not a single line. The wind needs to blow pollen between them 🌬️",
+                  "Push each plant a bit deeper than it was in its pot and firm the compost well - they get tall and top-heavy",
+                  "No-dig compost holds water well, but water well when the tassels appear at the top 💧",
+                  "When you've picked the cobs, snip the stalks off at the soil and leave the roots in"],
+    "leeks": ["Wait until your leek seedlings are about as thick as a pencil 🖍️",
+              "Push a dibber (or a thick stick or old broom handle) 15cm straight down through the compost, 15cm apart 📏",
+              "Drop one leek into each hole - don't fill the hole with soil!",
+              "Fill each hole with water from a can - it washes enough compost round the roots 💧",
+              "The hole slowly fills itself. The part of the leek in the dark stays white and tasty",
+              "Leeks stay in the bed all winter - dig them up with a fork as you need them, then pop the old roots on the compost heap"],
+}
+for _p in PLANTS:
+    _p["nodig"] = NODIG_CROPS.get(_p["id"])

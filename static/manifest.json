@@ -1,0 +1,15 @@
+{
+  "name": "Grow to Gobble",
+  "short_name": "Grow to Gobble",
+  "description": "Grow the food you love to eat - step by step, from seed to gobble.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6efdf",
+  "theme_color": "#1f5c3b",
+  "icons": [
+    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/static/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

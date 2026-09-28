@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Grow to Gobble</title>
+<meta name="description" content="Grow the food you love to eat - step by step, from seed to gobble.">
+<meta name="theme-color" content="#1f5c3b">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Grow to Gobble">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar" id="topbar" hidden>
+  <a href="#/" class="brand" id="brand">Grow to Gobble</a>
+  <a href="#/me" class="top-me" id="top-me" aria-label="Me and settings">🧑‍🌾</a>
+</header>
+<main id="view" class="view" aria-live="polite"></main>
+<nav class="tabs" id="tabs" hidden aria-label="Main">
+  <a href="#/" data-tab="home"><span>🏡</span>Today</a>
+  <a href="#/garden" data-tab="garden"><span>🪴</span>Garden</a>
+  <a href="#/calendar" data-tab="calendar"><span>📅</span>Calendar</a>
+  <a href="#/plants" data-tab="plants"><span>🥕</span>Plants</a>
+  <a href="#/me" data-tab="me"><span>🏅</span>Badges</a>
+</nav>
+<div id="sheet" class="sheet" hidden role="dialog" aria-modal="true"><div class="sheet-card" id="sheet-card"></div></div>
+<div id="toast" class="toast" hidden></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
