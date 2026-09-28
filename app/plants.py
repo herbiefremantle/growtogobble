@@ -928,19 +928,3 @@ NODIG_PLANTING = [
     "When you clear a crop, twist or snip it off at the soil and leave the roots in - worms will eat them 🪱",
     "Every autumn, spread another 3-5cm of compost on top. That's all the feeding it needs 🍂",
 ]
-NODIG_CROPS = {
-    "sweetcorn": ["Start them in pots indoors - seeds sown straight into loose compost often get eaten by mice 🐭",
-                  "Sweetcorn is hungry: spread an extra bucket of compost where the block will go",
-                  "Plant in a square block (at least 3 x 3), 45cm apart - not a single line. The wind needs to blow pollen between them 🌬️",
-                  "Push each plant a bit deeper than it was in its pot and firm the compost well - they get tall and top-heavy",
-                  "No-dig compost holds water well, but water well when the tassels appear at the top 💧",
-                  "When you've picked the cobs, snip the stalks off at the soil and leave the roots in"],
-    "leeks": ["Wait until your leek seedlings are about as thick as a pencil 🖍️",
-              "Push a dibber (or a thick stick or old broom handle) 15cm straight down through the compost, 15cm apart 📏",
-              "Drop one leek into each hole - don't fill the hole with soil!",
-              "Fill each hole with water from a can - it washes enough compost round the roots 💧",
-              "The hole slowly fills itself. The part of the leek in the dark stays white and tasty",
-              "Leeks stay in the bed all winter - dig them up with a fork as you need them, then pop the old roots on the compost heap"],
-}
-for _p in PLANTS:
-    _p["nodig"] = NODIG_CROPS.get(_p["id"])

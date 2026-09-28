@@ -593,8 +593,7 @@ function drawSpace(id) {
     <div class="card">${steps.map((st, i) => `<div class="nodig-step"><span class="e">${st.emoji}</span><div style="flex:1"><b>${i + 1}. ${esc(st.title)}</b><div class="small">${esc(st.text)}</div></div>
       ${pot ? "" : `<button class="tick ${done.has(i) ? "done" : ""}" data-tick="s${s.id}:nodig${i}" ${done.has(i) ? 'data-undo="1"' : ""} aria-label="Done">${done.has(i) ? "✓" : ""}</button>`}</div>`).join("")}</div>
     ${pot ? "" : `<p class="small muted">🕰️ Best time to build: autumn or winter, so it's ready for spring. But you can build one any time and plant straight into the compost.</p>
-    <div class="card tint-leaf"><h3>🌱 Planting into your no-dig bed</h3><ol class="steps">${S.cat.nodig_planting.map((t) => `<li>${esc(t)}</li>`).join("")}</ol></div>
-    ${S.cat.nodig_crops.map((id) => nodigCropCard(plant(id), true)).join("")}`}
+    <div class="card tint-leaf"><h3>🌱 Planting into your no-dig bed</h3><ol class="steps">${S.cat.nodig_planting.map((t) => `<li>${esc(t)}</li>`).join("")}</ol></div>`}
     <button class="btn" id="edit-space">✏️ Name, size or delete</button>`);
   $("#edit-space").onclick = () => addSpaceSheet(s);
 }
@@ -737,14 +736,6 @@ function pestsCard(p) {
     ${cover ? `<div class="checkbox"><b>${cover}</b>${x.uncover ? `<div>🙌 <b>When to uncover:</b> ${esc(x.uncover)}</div>` : ""}</div>` : ""}</div>`;
 }
 
-// Crop-specific tips for planting into a no-dig bed
-function nodigCropCard(p, withLink) {
-  if (!p.nodig) return "";
-  return `<div class="card tint-soil"><h3>📦 ${esc(p.name)} in a no-dig bed</h3>
-    <ol class="steps">${p.nodig.map((t) => `<li>${esc(t)}</li>`).join("")}</ol>
-    ${withLink ? `<button class="btn small" data-open-plant="${p.id}">${p.emoji} All about ${esc(p.name.toLowerCase())}</button>` : ""}</div>`;
-}
-
 function storeCard(p) {
   const st = p.store;
   return `<div class="card tint-plum"><h3>🫙 Keeping it</h3>
@@ -792,7 +783,6 @@ function openPlant(id, spaceId, startMethod, after) {
     ${p.tips.length ? `<div class="card tint-sun pip">${PIP}<div><h3 style="margin-bottom:4px">Pip's top tips</h3><ul>${p.tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></div></div>` : ""}
     ${roomCard(p)}
     ${p.prep.map((x) => `<div class="card tint-soil"><h3>🪜 Before you plant: ${esc(x.title.charAt(0).toLowerCase() + x.title.slice(1))}</h3><ol class="steps">${x.steps.map((st) => `<li>${esc(st)}</li>`).join("")}</ol></div>`).join("")}
-    ${nodigCropCard(p, false)}
     ${steps ? `<div class="card"><h3>👣 How to plant</h3><ol class="steps">${steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></div>` : ""}
     ${neighboursCard(p)}
     ${pestsCard(p)}
