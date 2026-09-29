@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS spaces (
     width_m REAL,
     length_m REAL,
     soil TEXT,
+    built INTEGER,                    -- a bed: 1 already built, 0 still to build, NULL not asked yet
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS crops (
@@ -104,7 +105,8 @@ def connect():
 # columns added after the first version: (table, column, type)
 MIGRATIONS = [("spaces", "width_m", "REAL"), ("spaces", "length_m", "REAL"), ("crops", "quantity", "INTEGER"),
               ("crops", "bed_free_on", "TEXT"), ("users", "is_admin", "INTEGER NOT NULL DEFAULT 0"),
-              ("users", "last_active", "TEXT"), ("spaces", "soil", "TEXT")]
+              ("users", "last_active", "TEXT"), ("spaces", "soil", "TEXT"),
+              ("spaces", "built", "INTEGER")]
 
 
 def init():

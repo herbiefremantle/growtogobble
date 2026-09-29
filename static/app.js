@@ -73,9 +73,15 @@ async function api(method, path, body) {
 
 // Every change returns the whole garden; store it, celebrate new badges, redraw.
 async function change(method, path, body, message) {
+  // remember where you were, so ticking a box doesn't jump you back to the top
+  const y = window.scrollY, card = $("#sheet-card"), sheetOpen = !$("#sheet").hidden, sheetY = card.scrollTop;
+  const openHow = [...document.querySelectorAll("details[open]")].map((el) => el.dataset.key).filter(Boolean);
   try {
     S.g = await api(method, path, body);
     render();
+    openHow.forEach((k) => { const el = document.querySelector(`details[data-key="${k}"]`); if (el) el.open = true; });
+    window.scrollTo(0, y);
+    if (sheetOpen && !$("#sheet").hidden) card.scrollTop = sheetY;
     if (message) toast(message);
     if (S.g.new_badges && S.g.new_badges.length) celebrate(S.g.new_badges);
     return true;
@@ -204,7 +210,7 @@ function joinPage() {
 
 // ---- onboarding ------------------------------------------------------------------------------------
 
-const onb = { step: 1, counts: { bed: 1, pot: 0, allotment: 0 }, picked: new Set(), filter: "all" };
+const onb = { step: 1, counts: { bed: 1, pot: 0, allotment: 0 }, built: null, picked: new Set(), filter: "all" };
 
 function onboarding() {
   if (onb.step === 1) {
@@ -217,16 +223,22 @@ function onboarding() {
             { bed: "Made with cardboard and compost", pot: "Pots, tubs, grow bags, window boxes", allotment: "A whole plot to fill" }[k]}</div></div>
           <div class="counter"><button class="btn small" data-dec="${k}" aria-label="Fewer">−</button><b>${onb.counts[k]}</b><button class="btn small" data-inc="${k}" aria-label="More">+</button></div>
         </div>`).join("")}
+      ${onb.counts.bed + onb.counts.allotment ? `<div class="card"><b>Are your beds already built?</b>
+        <div class="chips" style="margin-top:8px"><button class="btn small ${onb.built === true ? "primary" : ""}" data-built="1">✅ Yes, ready to plant</button>
+        <button class="btn small ${onb.built === false ? "primary" : ""}" data-built="0">🛠️ Not yet - show me how</button></div></div>` : ""}
       <button class="btn primary wide" id="next" ${Object.values(onb.counts).some((n) => n) ? "" : "disabled"}>Next: choose your food 👉</button>`;
     view.onclick = (e) => {
       const inc = e.target.closest("[data-inc]"), dec = e.target.closest("[data-dec]");
       if (inc) { onb.counts[inc.dataset.inc] = Math.min(9, onb.counts[inc.dataset.inc] + 1); onboarding(); }
       if (dec) { onb.counts[dec.dataset.dec] = Math.max(0, onb.counts[dec.dataset.dec] - 1); onboarding(); }
+      const bt = e.target.closest("[data-built]");
+      if (bt) { onb.built = bt.dataset.built === "1"; onboarding(); }
     };
     $("#next").onclick = async () => {
       for (const [kind, n] of Object.entries(onb.counts)) {
         const base = { bed: "Bed", pot: "Pot", allotment: "Allotment" }[kind];
-        for (let i = 1; i <= n; i++) S.g = await api("POST", "/api/spaces", { name: n > 1 ? `${base} ${i}` : (kind === "pot" ? "My pots" : "My " + base.toLowerCase()), kind });
+        for (let i = 1; i <= n; i++) S.g = await api("POST", "/api/spaces", { name: n > 1 ? `${base} ${i}` : (kind === "pot" ? "My pots" : "My " + base.toLowerCase()), kind,
+          built: kind === "pot" ? null : onb.built });
       }
       onb.step = 2; view.onclick = null; onboarding();
     };
@@ -260,7 +272,8 @@ function onboarding() {
     <p>We've worked out when to do everything for ${esc(S.me.region.name)}.</p></div>
     ${first ? `<div class="card tint-leaf"><div class="small muted"><b>Your first job</b></div><div class="job"><div class="job-emoji">${plant(first.plant_id).emoji}</div>
       <div class="job-body"><div class="job-title">${esc(first.title)}</div><div class="job-when">${whenText(first)}</div></div></div></div>` : ""}
-    <div class="card tint-sun"><b>🛒 Next: get your seeds</b><p class="small muted" style="margin:4px 0 0">Your shopping list has a one-tap link for each one.</p></div>
+    <div class="card tint-sun"><b>📍 Next: choose where they grow</b><p class="small muted" style="margin:4px 0 0">They aren't in any beds yet. Put each one where you want it, or tap "Suggest a layout" and we'll share them out for you to check first.</p></div>
+    <div class="card"><b>🛒 Then: get your seeds</b><p class="small muted" style="margin:4px 0 0">Your shopping list has a one-tap link for each one.</p></div>
     <button class="btn primary wide" id="done">Let's go! 👉</button>`;
   $("#done").onclick = () => { onb.step = 1; go("#/"); };
 }
@@ -328,7 +341,7 @@ function jobCard(job, opts = {}) {
     <div class="job-body">
       <div class="job-title">${esc(job.title)}</div>
       <div class="job-when ${hot ? "hot" : ""}">${job.emoji} ${whenText(job)}${where}</div>
-      ${job.steps.length ? `<details class="how" ${opts.open ? "open" : ""}><summary>Show me how</summary><ol class="steps">${job.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></details>` : ""}
+      ${job.steps.length ? `<details class="how" data-key="${esc(job.key)}" ${opts.open ? "open" : ""}><summary>Show me how</summary><ol class="steps">${job.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></details>` : ""}
       ${extra}
     </div>
     ${canTick && job.status !== "missed" ? `<button class="tick ${done ? "done" : ""}" data-tick="${esc(job.key)}" ${done ? 'data-undo="1"' : ""} aria-label="${done ? "Undo" : tickLabel}" title="${done ? "Undo" : tickLabel}">${done ? "✓" : ""}</button>` : ""}
@@ -355,7 +368,17 @@ document.addEventListener("click", async (e) => {
   const cr = e.target.closest("[data-open-crop]");
   if (cr) { openCrop(Number(cr.dataset.openCrop)); return; }
   const sp = e.target.closest("[data-open-space]");
-  if (sp) { openSpace(Number(sp.dataset.openSpace)); }
+  if (sp) { openSpace(Number(sp.dataset.openSpace)); return; }
+  const sb = e.target.closest("[data-setbuilt]");
+  if (sb) {
+    const target = space(Number(sb.dataset.setbuilt));
+    await change("PATCH", `/api/spaces/${target.id}`, { name: target.name, kind: target.kind, soil: target.soil, width_m: target.width_m,
+      length_m: target.length_m, built: sb.dataset.v === "1" }, sb.dataset.v === "1" ? "Great - no building instructions needed ✅" : "Let's build it! 📦");
+    if (sb.dataset.v === "0") openSpace(target.id);
+    return;
+  }
+  const lay = e.target.closest("[data-layout]");
+  if (lay) openLayout(lay.dataset.layout === "unplaced");
 });
 
 function activeCrops() { return S.g.crops.filter((c) => !c.finished_on); }
@@ -377,7 +400,9 @@ function home() {
   if (!S.g.spaces.length) { go("#/start"); return; }
 
   const suggestions = S.g.spaces.filter((s) => s.suggestion && s.suggestion.plants.length);
-  const unbuilt = S.g.spaces.filter((s) => s.kind !== "pot" && s.nodig_done.length < S.cat.nodig_steps.length);
+  const unbuilt = S.g.spaces.filter((s) => s.kind !== "pot" && s.built === 0 && s.nodig_done.length < S.cat.nodig_steps.length);
+  const unknown = S.g.spaces.filter((s) => s.kind !== "pot" && s.built === null);
+  const unplaced = activeCrops().filter((c) => !c.space_id);
 
   view.innerHTML = `
     <div class="card hello"><div class="hello-text"><h1>${hello}, ${esc(S.me.name)}! 👋</h1>
@@ -387,6 +412,11 @@ function home() {
     <div class="section-title"><h2>🧤 Jobs to do now</h2><span class="muted small">${now.length || ""}</span></div>
     <div class="card">${now.length ? now.map((j) => jobCard(j, { showSpace: true })).join("") :
       `<div class="empty"><div class="big">😌</div><b>Nothing to do right now.</b><br>Have a look at what's coming up, or add something new to grow.</div>`}</div>
+    ${unplaced.length ? `<div class="card tint-sun"><b>📍 ${unplaced.length} plant${unplaced.length === 1 ? " isn't" : "s aren't"} in a bed yet</b>
+      <div class="small muted" style="margin:2px 0 8px">${unplaced.slice(0, 8).map((c) => plant(c.plant_id).emoji).join(" ")} Choose where each one goes, or let us suggest a layout to look over first.</div>
+      <div class="row"><button class="btn small primary" data-layout="unplaced">🧩 Suggest a layout</button><a class="btn small" href="#/garden">Place them myself</a></div></div>` : ""}
+    ${unknown.map((s) => `<div class="card tint-soil"><b>🟫 Is ${esc(s.name)} already built?</b>
+      <div class="row" style="margin-top:8px"><button class="btn small primary" data-setbuilt="${s.id}" data-v="1">✅ Yes, it's ready</button><button class="btn small" data-setbuilt="${s.id}" data-v="0">🛠️ Not yet - show me how</button></div></div>`).join("")}
     ${unbuilt.length ? `<div class="card tint-soil row" style="justify-content:space-between" data-open-space="${unbuilt[0].id}">
       <div><b>📦 Build ${esc(unbuilt[0].name)}</b><div class="small muted">No-dig bed: ${unbuilt[0].nodig_done.length} of ${S.cat.nodig_steps.length} steps done</div></div>
       <span class="btn small">Let's build 👉</span></div>` : ""}
@@ -536,8 +566,8 @@ function gardenPage() {
       const k = SPACE_KINDS[s.kind];
       const built = s.nodig_done.length, total = S.cat.nodig_steps.length;
       return `<div class="card">
-        <div class="space-head"><span class="e">${k.emoji}</span><h3>${esc(s.name)}</h3><button class="btn small ghost" data-open-space="${s.id}">${s.kind === "pot" ? "Details" : built < total ? "Details & build" : "Details ✅"}</button></div>
-        ${s.kind !== "pot" && built < total ? `<div class="progress" title="No-dig bed ${built} of ${total}"><i style="width:${(100 * built) / total}%"></i></div>` : ""}
+        <div class="space-head"><span class="e">${k.emoji}</span><h3>${esc(s.name)}</h3><button class="btn small ghost" data-open-space="${s.id}">${s.kind === "pot" || s.built === 1 ? "Open" : s.built === 0 && built < total ? "Build it" : "Open"}</button></div>
+        ${s.kind !== "pot" && s.built === 0 && built < total ? `<div class="progress" title="No-dig bed ${built} of ${total}"><i style="width:${(100 * built) / total}%"></i></div>` : ""}
         ${usageBar(s)}
         ${s.clashes.map((x) => `<div class="checkbox warn small" style="margin-top:8px">🙅 ${plant(x.a).emoji} ${esc(plant(x.a).name)} and ${plant(x.b).emoji} ${esc(plant(x.b).name)} don't like sharing: ${esc(x.why)}.</div>`).join("")}
         ${crops.map(cropRow).join("") || `<p class="small muted" style="margin:8px 0 0">Nothing growing here yet.</p>`}
@@ -545,7 +575,8 @@ function gardenPage() {
       </div>`;
     }).join("")}
     ${unplaced.length ? `<div class="card"><h3>📍 Not placed yet</h3>${unplaced.map(cropRow).join("")}</div>` : ""}
-    <div class="row"><button class="btn" id="add-space">➕ Add a bed or pot</button><a class="btn" href="#/plants">🥕 Add plants</a></div>
+    <div class="row"><button class="btn" id="add-space">➕ Add a bed or pot</button><a class="btn" href="#/plants">🥕 Add plants</a>
+      ${activeCrops().length && S.g.spaces.length > 1 ? `<button class="btn" data-layout="all">🧩 Suggest a layout</button>` : ""}</div>
     ${finished.length ? `<details class="card" style="margin-top:14px"><summary><b>Finished (${finished.length})</b></summary>${finished.map(cropRow).join("")}</details>` : ""}`;
   $("#add-space").onclick = addSpaceSheet;
 }
@@ -576,6 +607,8 @@ function spaceForm(s) {
       </div>
       <p class="area" id="area"></p>
       <p class="small muted" style="margin:4px 0 0">Measure with a tape measure in metres (100cm = 1m). A standard raised bed is 1.2 × 2.4 m. A half allotment plot is about 5 × 25 m.</p></div>
+    <div id="builtq"><label class="field">Is it already built?</label>
+    <div class="kinds two">${[[1, "✅", "Yes, it's ready"], [0, "🛠️", "Not yet - show me how"]].map(([v, e, t]) => `<label class="kind ${s && s.built === v ? "on" : ""}"><input type="radio" name="built" value="${v}" ${s && s.built === v ? "checked" : ""}><span class="e">${e}</span><b>${t}</b></label>`).join("")}</div></div>
     <label class="field">What's the soil like?</label>
     <div class="soils">${Object.entries(S.cat.soil_types).map(([k, v]) => `<label class="soilopt ${soil === k ? "on" : ""}"><input type="radio" name="soil" value="${k}" ${soil === k ? "checked" : ""}><span>${v.emoji}</span> ${esc(v.name)}</label>`).join("")}</div>
     <div class="checkbox" id="soiltip"></div>`;
@@ -587,7 +620,8 @@ function wireSpaceForm(s, afterSave) {
   const refresh = () => {
     card.querySelectorAll(".kind").forEach((el) => el.classList.toggle("on", el.querySelector("input").checked));
     card.querySelectorAll(".soilopt").forEach((el) => el.classList.toggle("on", el.querySelector("input").checked));
-    $("#size").hidden = val("kind") === "pot";
+    $("#size").hidden = $("#builtq").hidden = val("kind") === "pot";
+    card.querySelectorAll("#builtq .kind").forEach((el) => el.classList.toggle("on", el.querySelector("input").checked));
     const w = Number($("#sw").value), l = Number($("#sl").value);
     $("#area").innerHTML = w && l ? `= <b>${(w * l).toFixed(2).replace(/\.?0+$/, "")} m²</b> of growing space` : "";
     const t = S.cat.soil_types[val("soil") || "unknown"];
@@ -597,7 +631,8 @@ function wireSpaceForm(s, afterSave) {
   card.addEventListener("change", refresh);
   refresh();
   $("#save").onclick = async () => {
-    const body = { name: $("#sn").value || "My bed", kind: val("kind"), soil: val("soil"),
+    const b = val("built");
+    const body = { name: $("#sn").value || "My bed", kind: val("kind"), soil: val("soil"), built: b == null ? null : b === "1",
                    width_m: Number($("#sw").value) || null, length_m: Number($("#sl").value) || null };
     if (await change(s ? "PATCH" : "POST", s ? `/api/spaces/${s.id}` : "/api/spaces", body, s ? "Saved ✅" : "Added ✅") && afterSave) afterSave();
   };
@@ -620,21 +655,66 @@ function drawSpace(id) {
   const pot = s.kind === "pot";
   const steps = pot ? S.cat.pot_steps : S.cat.nodig_steps;
   const done = new Set(s.nodig_done);
+  const here = activeCrops().filter((c) => c.space_id === s.id);
+  const stepList = (ticks) => `<div class="card">${steps.map((st, i) => `<div class="nodig-step"><span class="e">${st.emoji}</span><div style="flex:1"><b>${i + 1}. ${esc(st.title)}</b><div class="small">${esc(st.text)}</div></div>
+      ${ticks ? `<button class="tick ${done.has(i) ? "done" : ""}" data-tick="s${s.id}:nodig${i}" ${done.has(i) ? 'data-undo="1"' : ""} aria-label="Done">${done.has(i) ? "✓" : ""}</button>` : ""}</div>`).join("")}</div>`;
+  const tips = `<details class="card" data-key="tips-${s.id}"><summary><b>🌱 Planting into a no-dig bed - tips</b></summary><ol class="steps">${S.cat.nodig_planting.map((t) => `<li>${esc(t)}</li>`).join("")}</ol></details>`;
+  let build = "";
+  if (pot) build = `<details class="card" data-key="pots-${s.id}"><summary><b>🪴 Setting up pots - how to</b></summary>${stepList(false)}</details>`;
+  else if (s.built === 1) build = `${tips}<details class="card" data-key="build-${s.id}"><summary><b>🛠️ How to build a no-dig bed</b> <span class="small muted">(if you make another one)</span></summary>${stepList(false)}</details>`;
+  else if (s.built === 0) build = `<h2 style="margin-top:20px">📦 Build your no-dig bed</h2>
+    <div class="progress"><i style="width:${(100 * done.size) / steps.length}%"></i></div><p class="small muted">${done.size} of ${steps.length} steps done. Tick each one as you go!</p>
+    ${stepList(true)}<p class="small muted">🕰️ Best time to build: autumn or winter, so it's ready for spring. But you can build one any time and plant straight into the compost.</p>${tips}`;
+  else build = `<div class="card tint-soil"><b>Is ${esc(s.name)} already built?</b>
+      <div class="row" style="margin-top:8px"><button class="btn small primary" data-setbuilt="${s.id}" data-v="1">✅ Yes, it's ready</button><button class="btn small" data-setbuilt="${s.id}" data-v="0">🛠️ Not yet - show me how</button></div></div>`;
   openSheet(`<div class="plant-head"><span class="e">${SPACE_KINDS[s.kind].emoji}</span><div><h2 style="margin:0">${esc(s.name)}</h2>
-      <div class="muted">${pot ? "Growing in pots" : "Your bed, and how to build it"}</div></div></div>
-    <div class="card"><h3>✏️ About this ${pot ? "space" : "bed"}</h3>${spaceForm(s)}
-      <div class="row" style="margin-top:14px"><button class="btn primary" id="save">Save</button><button class="btn danger small" id="del">🗑️ Delete</button></div></div>
-    <h2 style="margin-top:20px">${pot ? "🪴 Setting up pots" : "📦 Build a no-dig bed"}</h2>
-    ${pot ? "" : `<div class="progress"><i style="width:${(100 * done.size) / steps.length}%"></i></div><p class="small muted">${done.size} of ${steps.length} steps done. Tick each one as you go!</p>`}
-    <div class="card">${steps.map((st, i) => `<div class="nodig-step"><span class="e">${st.emoji}</span><div style="flex:1"><b>${i + 1}. ${esc(st.title)}</b><div class="small">${esc(st.text)}</div></div>
-      ${pot ? "" : `<button class="tick ${done.has(i) ? "done" : ""}" data-tick="s${s.id}:nodig${i}" ${done.has(i) ? 'data-undo="1"' : ""} aria-label="Done">${done.has(i) ? "✓" : ""}</button>`}</div>`).join("")}</div>
-    ${pot ? "" : `<p class="small muted">🕰️ Best time to build: autumn or winter, so it's ready for spring. But you can build one any time and plant straight into the compost.</p>
-    <div class="card tint-leaf"><h3>🌱 Planting into your no-dig bed</h3><ol class="steps">${S.cat.nodig_planting.map((t) => `<li>${esc(t)}</li>`).join("")}</ol></div>`}`);
+      <div class="muted">${pot ? "Growing in pots" : s.built === 1 ? "Built and ready to plant ✅" : s.built === 0 ? "Let's build it" : "Your bed"}</div></div></div>
+    <div class="card"><h3>🌱 Growing here</h3>${here.map(cropRow).join("") || `<p class="small muted" style="margin:0">Nothing yet.</p>`}
+      <div class="row" style="margin-top:10px"><a class="btn small" href="#/plants" data-close>➕ Add plants</a><button class="btn small" data-layout="all">🧩 Suggest a layout</button></div></div>
+    <details class="card" data-key="about-${s.id}" ${s.width_m || s.built !== null ? "" : "open"}><summary><b>✏️ About this ${pot ? "space" : "bed"}</b> <span class="small muted">name, size, soil${pot ? "" : ", built?"}</span></summary>${spaceForm(s)}
+      <div class="row" style="margin-top:14px"><button class="btn primary" id="save">Save</button><button class="btn danger small" id="del">🗑️ Delete</button></div></details>
+    ${build}`);
   wireSpaceForm(s);
   $("#del").onclick = async () => {
     if (!confirm(`Delete ${s.name}? Plants in it stay in your plan, just not placed.`)) return;
     if (await change("DELETE", `/api/spaces/${s.id}`, null, "Deleted")) closeSheet();
   };
+}
+
+// ---- suggested layout: shown for checking, saved only when agreed --------------------------------------
+
+async function openLayout(onlyUnplaced) {
+  S.sheet = null;
+  openSheet(`<h2>🧩 Suggested layout</h2><p class="muted">Working it out…</p>`);
+  let moves;
+  try { moves = (await api("GET", "/api/layout" + (onlyUnplaced ? "?only_unplaced=true" : ""))).moves; }
+  catch (e) { openSheet(`<h2>🧩 Suggested layout</h2><div class="error">${esc(e.message)}</div>`); return; }
+  const plan = Object.fromEntries(moves.map((m) => [m.crop_id, m.space_id]));
+  const notes = Object.fromEntries(moves.map((m) => [m.crop_id, m.note]));
+  const draw = () => {
+    const groups = S.g.spaces.map((sp) => ({ sp, ids: moves.map((m) => m.crop_id).filter((id) => plan[id] === sp.id) }));
+    const later = moves.map((m) => m.crop_id).filter((id) => !plan[id]);
+    const row = (id) => {
+      const c = crop(id), p = plant(c.plant_id);
+      const opts = S.g.spaces.filter((sp) => p.where.includes(sp.kind === "pot" ? "pot" : "bed"));
+      const moved = c.space_id !== plan[id];
+      return `<div class="lay-row"><span class="e">${p.emoji}</span><div style="flex:1;min-width:0"><b>${esc(p.name)}</b>${rowLabel(c) ? ` <span class="chip grey">${rowLabel(c)}</span>` : ""}
+        <div class="small muted">${notes[id] ? esc(notes[id]) : ""}${moved && c.space_id ? `${notes[id] ? " · " : ""}moving from ${esc(space(c.space_id).name)}` : ""}</div></div>
+        <select data-plan="${id}" aria-label="Where ${esc(p.name)} goes"><option value="">📍 Decide later</option>${opts.map((sp) => `<option value="${sp.id}" ${plan[id] === sp.id ? "selected" : ""}>${SPACE_KINDS[sp.kind].emoji} ${esc(sp.name)}</option>`).join("")}</select></div>`;
+    };
+    openSheet(`<h2>🧩 Suggested layout</h2>
+      <p class="small muted">We've shared ${onlyUnplaced ? "your unplaced plants" : "everything that isn't in the ground yet"} between your beds and pots - keeping bad neighbours apart, families together, and not overfilling any bed. <b>Nothing changes until you tap "Use this layout".</b> Change any of them first if you like.</p>
+      ${groups.filter((g) => g.ids.length).map((g) => `<div class="card"><h3>${SPACE_KINDS[g.sp.kind].emoji} ${esc(g.sp.name)}</h3>${g.ids.map(row).join("")}</div>`).join("")}
+      ${later.length ? `<div class="card"><h3>📍 Decide later</h3>${later.map(row).join("")}</div>` : ""}
+      ${moves.length ? `<div class="row" style="position:sticky;bottom:0;background:var(--bg);padding:10px 0"><button class="btn primary" id="lay-ok">✅ Use this layout</button><button class="btn ghost" data-close>Not now</button></div>`
+        : `<p>Everything is already planted, so there's nothing to move.</p>`}`);
+    $("#sheet-card").onchange = (e) => { const sel = e.target.closest("[data-plan]"); if (sel) { plan[sel.dataset.plan] = sel.value ? Number(sel.value) : null; const y = $("#sheet-card").scrollTop; draw(); $("#sheet-card").scrollTop = y; } };
+    const ok = $("#lay-ok");
+    if (ok) ok.onclick = async () => {
+      if (await change("POST", "/api/layout", { moves: Object.entries(plan).map(([crop_id, space_id]) => ({ crop_id: Number(crop_id), space_id })) }, "Layout saved 🧩")) closeSheet();
+    };
+  };
+  draw();
 }
 
 // ---- crop detail -----------------------------------------------------------------------------------
@@ -869,7 +949,7 @@ function openPlant(id, spaceId, startMethod, after) {
       <label class="field" for="qty">How many ${esc(p.unit)}?</label>
       <div class="counter qty"><button class="btn small" data-q="-1" aria-label="Fewer">−</button><input id="qty" type="number" inputmode="numeric" min="1" max="5000" value="${qty}"><button class="btn small" data-q="1" aria-label="More">+</button></div>
       <div id="rows">${rowsHtml()}</div>
-      ${fits.length ? `<label class="field" for="sp">Where?</label><select id="sp">${fits.map((s) => `<option value="${s.id}" ${s.id === spaceId ? "selected" : ""}>${SPACE_KINDS[s.kind].emoji} ${esc(s.name)}</option>`).join("")}</select>`
+      ${fits.length ? `<label class="field" for="sp">Where?</label><select id="sp"><option value="">📍 Decide later</option>${fits.map((s) => `<option value="${s.id}" ${s.id === spaceId ? "selected" : ""}>${SPACE_KINDS[s.kind].emoji} ${esc(s.name)}</option>`).join("")}</select>`
         : `<p class="small muted">${p.where.includes("pot") ? "" : "This one needs a bed - it's too big for pots. "}Add a ${p.where.includes("pot") ? "bed or pot" : "bed"} in My garden to place it.</p>`}
       <div id="check" class="check-box" aria-live="polite"></div>
       <button class="btn primary wide" style="margin-top:14px" id="add">Add ${esc(p.name.toLowerCase())} 🌱</button></div>`);
@@ -880,7 +960,7 @@ function openPlant(id, spaceId, startMethod, after) {
     timer = setTimeout(async () => {
       const sp = $("#sp"), n = ++asked;
       const params = new URLSearchParams({ plant_id: p.id, method, quantity: qty });
-      if (sp) params.set("space_id", sp.value);
+      if (sp && sp.value) params.set("space_id", sp.value);
       if (after) params.set("after", after);
       try {
         const r = await api("GET", "/api/check?" + params);
@@ -905,7 +985,7 @@ function openPlant(id, spaceId, startMethod, after) {
   $("#add").onclick = async () => {
     const sp = $("#sp");
     const many = batches > 1 && p.succession && method !== "plants";
-    if (await change("POST", "/api/crops", { plant_id: p.id, method, quantity: qty, after: after || null, space_id: sp ? Number(sp.value) : null,
+    if (await change("POST", "/api/crops", { plant_id: p.id, method, quantity: qty, after: after || null, space_id: sp && sp.value ? Number(sp.value) : null,
       batches: many ? batches : 1, every_weeks: every }, many ? `${batches} rows of ${p.name.toLowerCase()} planned 🌱` : `${p.name} added to your plan! 🌱`)) closeSheet();
   };
 }

@@ -328,6 +328,7 @@ class SpaceIn(BaseModel):
     width_m: Optional[float] = None
     length_m: Optional[float] = None
     soil: Optional[str] = None
+    built: Optional[bool] = None
 
 
 def _soil(v):
@@ -343,9 +344,9 @@ def add_space(body: SpaceIn, user=Depends(auth.current_user)):
     if body.kind not in ("bed", "pot", "allotment"):
         raise HTTPException(400, "Unknown kind of space")
     with db.connect() as conn:
-        conn.execute("INSERT INTO spaces (user_id, name, kind, width_m, length_m, soil, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        conn.execute("INSERT INTO spaces (user_id, name, kind, width_m, length_m, soil, built, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                      (user["id"], body.name.strip()[:40] or "My bed", body.kind, _size(body.width_m), _size(body.length_m),
-                      _soil(body.soil), clock.now().isoformat()))
+                      _soil(body.soil), None if body.built is None else int(body.built), clock.now().isoformat()))
         return garden.payload(conn, user)
 
 
@@ -356,6 +357,8 @@ def rename_space(space_id: int, body: SpaceIn, user=Depends(auth.current_user)):
         conn.execute("UPDATE spaces SET name = ?, kind = ?, width_m = ?, length_m = ?, soil = ? WHERE id = ?",
                      (body.name.strip()[:40] or "My bed", body.kind, _size(body.width_m), _size(body.length_m),
                       _soil(body.soil), space_id))
+        if body.built is not None:
+            conn.execute("UPDATE spaces SET built = ? WHERE id = ?", (int(body.built), space_id))
         return garden.payload(conn, user)
 
 
@@ -444,15 +447,42 @@ class CropsIn(BaseModel):
 
 @app.post("/api/crops/bulk")
 def add_crops(body: CropsIn, user=Depends(auth.current_user)):
-    """Onboarding: add several at once, each into the first space it suits."""
+    """Onboarding: add several at once. They start "not placed yet" - the user places them, or agrees to a
+    suggested layout (/api/layout) - nothing goes into a bed without them saying so."""
     with db.connect() as conn:
-        spaces = db.rows(conn, "SELECT * FROM spaces WHERE user_id = ? ORDER BY id", user["id"])
         for plant_id in body.crops[:40]:
             plant = catalogue.BY_ID.get(str(plant_id))
-            if not plant:
-                continue
-            fits = [s for s in spaces if ("pot" if s["kind"] == "pot" else "bed") in plant["where"]]
-            _new_crop(conn, user, plant["id"], fits[0]["id"] if fits else None, None)
+            if plant:
+                _new_crop(conn, user, plant["id"], None, None)
+        return garden.payload(conn, user)
+
+
+@app.get("/api/layout")
+def layout_suggestion(only_unplaced: bool = False, user=Depends(auth.current_user)):
+    """A suggested spread of crops over all the beds and pots. Nothing is saved until POST /api/layout."""
+    with db.connect() as conn:
+        state = garden.load(conn, user)
+    return {"moves": planner.suggest_layout(state["spaces"], state["with_jobs"], state["today"], only_unplaced)}
+
+
+class Move(BaseModel):
+    crop_id: int
+    space_id: Optional[int] = None
+
+
+class Layout(BaseModel):
+    moves: list
+
+
+@app.post("/api/layout")
+def layout_apply(body: Layout, user=Depends(auth.current_user)):
+    with db.connect() as conn:
+        for raw in body.moves[:200]:
+            move = Move(**raw)
+            _own(conn, "crops", move.crop_id, user)
+            if move.space_id is not None:
+                _own(conn, "spaces", move.space_id, user)
+            conn.execute("UPDATE crops SET space_id = ? WHERE id = ?", (move.space_id, move.crop_id))
         return garden.payload(conn, user)
 
 

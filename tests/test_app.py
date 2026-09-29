@@ -135,7 +135,7 @@ def test_full_journey(client):
     client.post("/api/spaces", json={"name": "Bed 1", "kind": "bed"})
     g = client.post("/api/crops/bulk", json={"crops": ["radish", "tomatoes"]}).json()
     radish = next(c for c in g["crops"] if c["plant_id"] == "radish")
-    assert radish["space_id"] == g["spaces"][0]["id"]
+    assert radish["space_id"] is None  # nothing goes into a bed until the user says so
     assert "planner" not in [b["id"] for b in g["new_badges"]]
 
     g = client.post("/api/done", json={"key": "c%d:sow" % radish["id"]}).json()
@@ -408,3 +408,27 @@ def test_locked_out_admin_gets_a_reset_link_in_the_logs(client, monkeypatch):
     assert "https://example.up.railway.app/#/reset?token=" in link
     token = link.split("token=")[1]
     assert client.post("/api/reset", json={"token": token, "password": "fresh-start-1"}).status_code == 200
+
+
+def test_layout_is_only_a_suggestion_until_agreed(client):
+    _join(client)
+    client.post("/api/spaces", json={"name": "Bed 1", "kind": "bed", "width_m": 1.2, "length_m": 2.4})
+    client.post("/api/spaces", json={"name": "Bed 2", "kind": "bed", "width_m": 1.2, "length_m": 2.4})
+    g = client.post("/api/spaces", json={"name": "Pots", "kind": "pot"}).json()
+    ids = {s["name"]: s["id"] for s in g["spaces"]}
+    g = client.post("/api/crops/bulk", json={"crops": ["onions", "peas", "courgette", "basil", "carrots", "potatoes"]}).json()
+    assert all(c["space_id"] is None for c in g["crops"])
+    moves = client.get("/api/layout").json()["moves"]
+    where = {next(c["plant_id"] for c in g["crops"] if c["id"] == m["crop_id"]): m["space_id"] for m in moves}
+    assert where["basil"] == ids["Pots"]                       # pot-only plants go in pots
+    assert where["onions"] != where["peas"]                     # bad neighbours kept apart
+    assert {where["onions"], where["peas"]} <= {ids["Bed 1"], ids["Bed 2"], ids["Pots"]}
+    assert all(c["space_id"] is None for c in client.get("/api/garden").json()["crops"])  # nothing saved yet
+    g = client.post("/api/layout", json={"moves": [{"crop_id": m["crop_id"], "space_id": m["space_id"]} for m in moves]}).json()
+    assert all(c["space_id"] is not None for c in g["crops"])
+
+
+def test_built_bed_counts_as_built(client):
+    _join(client)
+    g = client.post("/api/spaces", json={"name": "Plot", "kind": "bed", "built": True}).json()
+    assert g["spaces"][0]["built"] == 1 and "builder" in [b["id"] for b in g["new_badges"]]

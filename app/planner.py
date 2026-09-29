@@ -457,7 +457,7 @@ def earned_badges(crops, spaces, done_keys, has_push):
     earned = set()
     if len(crops) >= 3:
         earned.add("planner")
-    if any(s["kind"] != "pot" and nodig_done(s["id"], done_keys) for s in spaces):
+    if any(s["kind"] != "pot" and (s.get("built") or nodig_done(s["id"], done_keys)) for s in spaces):
         earned.add("builder")
     if any(s["kind"] == "pot" for s in spaces):
         earned.add("potter")
@@ -507,3 +507,81 @@ def other_season(crop, shift):
     start, end = min(later)
     recommend, title, why = advice
     return {"recommend": recommend, "title": title, "why": why, "window": [start.isoformat(), end.isoformat()]}
+
+
+# ---- suggested layout across all the beds -------------------------------------------------------------
+
+def movable(crop, jobs, today):
+    """A crop can still be moved to another bed if it isn't in the ground yet."""
+    if crop.get("finished_on") or crop.get("planted_on") or (crop["method"] == "sow_out" and crop.get("sown_on")):
+        return False
+    return True
+
+
+def suggest_layout(spaces, crops_with_jobs, today, only_unplaced=False):
+    """Share the crops out between the beds and pots - nothing is saved, it's a suggestion to agree to.
+    Biggest crops are placed first. For each, every space it suits is scored:
+      - room at its busiest moment (a bed that would overflow scores badly; pots have no size limit)
+      - bad neighbours in the ground at the same time (big penalty), good neighbours (small bonus)
+      - the same plant family already there (bonus - keeps families together, which makes rotation easy)
+      - plants that like pots best (herbs, blueberries, chillies...) go in pots when there are some
+    Returns [{crop_id, space_id, from_space_id, note}]."""
+    work = [(dict(c), j) for c, j in crops_with_jobs]
+    moving = [(c, j) for c, j in work if not c.get("finished_on") and movable(c, j, today)
+              and (not only_unplaced or not c.get("space_id"))]
+    ids = {c["id"] for c, _ in moving}
+    for c, _ in moving:  # start from a clean slate for everything that's being placed
+        c["_from"] = c.get("space_id")
+        c["space_id"] = None
+    moving.sort(key=lambda cj: -(quantity(cj[0]) * area_each(catalogue.BY_ID[cj[0]["plant_id"]])))
+    out = []
+    for crop, jobs in moving:
+        plant = catalogue.BY_ID[crop["plant_id"]]
+        c0, c1 = crop_starts(crop, jobs), crop_finishes(crop, jobs)
+        best = None
+        for space in spaces:
+            kind = "pot" if space["kind"] == "pot" else "bed"
+            if kind not in plant["where"]:
+                continue
+            here = [(c, j) for c, j in work if c.get("space_id") == space["id"] and not c.get("finished_on")
+                    and overlap(c0, c1, crop_starts(c, j), crop_finishes(c, j))]
+            trial = dict(crop, space_id=space["id"])
+            use = usage(space, [(c, j) for c, j in work if c["id"] != crop["id"]], extra=(trial, jobs))
+            score, note = 0.0, ""
+            if use["area"]:
+                fill = use["peak"] / use["area"]
+                score -= fill * 10
+                if fill > 1:
+                    score -= 100 + 20 * (fill - 1)
+                    note = "a bit full"
+            if kind == "pot":
+                if plant["where"] == ["pot"]:
+                    score += 20  # herbs, blueberries, chillies... belong in pots
+                else:
+                    # pots have no size to fill, so don't let them swallow everything: beds come first,
+                    # and each thing already in the pots makes them a little less attractive
+                    in_pots = sum(1 for c, _ in work if c.get("space_id") == space["id"] and not c.get("finished_on"))
+                    score -= 8 + in_pots
+                    if plant.get("tender") and plant["level"] >= 2:
+                        score += 3  # tender plants do well in a sheltered pot
+            names = {c["plant_id"] for c, _ in here}
+            if plant["id"] in {c["plant_id"] for c, _ in work if c.get("space_id") == space["id"] and not c.get("finished_on")}:
+                score += 6  # keep rows of the same crop together
+            bad = [x for x in catalogue.BAD_WITH[plant["id"]] if x["plant_id"] in names]
+            good = [x for x in catalogue.GOOD_WITH[plant["id"]] if x["plant_id"] in names]
+            family = any(catalogue.BY_ID[c["plant_id"]]["family"] == plant["family"] for c, _ in here if c["plant_id"] != plant["id"])
+            score -= 50 * len(bad)
+            score += 3 * len(good) + (4 if family else 0)
+            if bad:
+                note = "keep an eye: next to %s" % catalogue.BY_ID[bad[0]["plant_id"]]["name"].lower()
+            elif good:
+                note = "good next to %s" % catalogue.BY_ID[good[0]["plant_id"]]["name"].lower()
+            elif family:
+                note = "with its family"
+            if best is None or score > best[0]:
+                best = (score, space["id"], note)
+        if best:
+            crop["space_id"] = best[1]
+        out.append({"crop_id": crop["id"], "space_id": best[1] if best else None,
+                    "from_space_id": crop["_from"], "note": best[2] if best else "no bed or pot suits it"})
+    return out
