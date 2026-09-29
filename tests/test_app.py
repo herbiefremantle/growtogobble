@@ -441,3 +441,29 @@ def test_take_a_crop_out_of_its_bed(client):
     assert c["space_id"] == sid
     g = client.patch("/api/crops/%d" % c["id"], json={"plant_id": "peas", "clear_space": True}).json()
     assert g["crops"][0]["space_id"] is None
+
+
+def test_invites_are_counted_and_joins_credited(client, monkeypatch):
+    monkeypatch.setenv("ADMIN_EMAIL", "boss@example.com")
+    _join(client, "boss@example.com")
+    first = client.post("/api/invites").json()
+    second = client.post("/api/invites").json()
+    assert second["sent"] == 2 and second["joined"] == 0 and "/#/join?invite=" in second["link"]
+    token = second["link"].split("invite=")[1]
+    assert client.get("/api/invites/" + token).json() == {"name": "Sam"}
+    client.post("/api/logout")
+    r = client.post("/api/register", json={"name": "Alex", "email": "alex@example.com", "password": "carrots-99",
+                                           "age_ok": True, "invite": token})
+    assert r.status_code == 200
+    client.post("/api/logout")
+    client.post("/api/register", json={"name": "Jo", "email": "jo@example.com", "password": "carrots-99", "age_ok": True})
+    client.post("/api/logout")
+    client.post("/api/login", json={"email": "boss@example.com", "password": "sunflower1"})
+    mine = client.get("/api/invites").json()
+    assert mine["sent"] == 2 and mine["joined"] == 1 and mine["people"][0]["name"] == "Alex"
+    assert "ambassador" in [b["id"] for b in client.get("/api/garden").json()["new_badges"]]
+    admin = client.get("/api/admin").json()
+    assert admin["invites"] == {"sent": 2, "joined": 1}
+    alex = next(u for u in admin["users"] if u["name"] == "Alex")
+    assert alex["invited_by_name"] == "Sam"
+    assert next(u for u in admin["users"] if u["name"] == "Sam")["invites_joined"] == 1

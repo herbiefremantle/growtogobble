@@ -449,10 +449,11 @@ BADGES = [
     {"id": "green", "emoji": "💚", "name": "Green Fingers", "text": "Did 50 garden jobs"},
     {"id": "brave", "emoji": "🏆", "name": "Brave Grower", "text": "Picked a 'more care' crop"},
     {"id": "alerts", "emoji": "🔔", "name": "Ready for Action", "text": "Turned on garden alerts"},
+    {"id": "ambassador", "emoji": "💌", "name": "Garden Ambassador", "text": "A friend joined from your invite"},
 ]
 
 
-def earned_badges(crops, spaces, done_keys, has_push):
+def earned_badges(crops, spaces, done_keys, has_push, friends_joined=0):
     plants_picked = {c["plant_id"] for c in crops if c.get("harvested_on")}
     earned = set()
     if len(crops) >= 3:
@@ -481,6 +482,8 @@ def earned_badges(crops, spaces, done_keys, has_push):
         earned.add("brave")
     if has_push:
         earned.add("alerts")
+    if friends_joined:
+        earned.add("ambassador")
     return earned
 
 

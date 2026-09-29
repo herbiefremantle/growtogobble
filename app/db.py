@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS users (
     cal_token TEXT NOT NULL,
     is_admin INTEGER NOT NULL DEFAULT 0,
     last_active TEXT,
+    invited_by INTEGER,               -- who invited them (users.id), if they came from an invite link
+    invite_token TEXT,                -- which invite link they used
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS spaces (
@@ -72,6 +74,11 @@ CREATE TABLE IF NOT EXISTS sent (           -- alerts already sent, so nobody ge
     PRIMARY KEY (user_id, key)
 );
 CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS invites (        -- each time someone taps "Invite a friend"
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS resets (         -- one-time "set a new password" links an admin makes
     token_hash TEXT PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -106,7 +113,7 @@ def connect():
 MIGRATIONS = [("spaces", "width_m", "REAL"), ("spaces", "length_m", "REAL"), ("crops", "quantity", "INTEGER"),
               ("crops", "bed_free_on", "TEXT"), ("users", "is_admin", "INTEGER NOT NULL DEFAULT 0"),
               ("users", "last_active", "TEXT"), ("spaces", "soil", "TEXT"),
-              ("spaces", "built", "INTEGER")]
+              ("spaces", "built", "INTEGER"), ("users", "invited_by", "INTEGER"), ("users", "invite_token", "TEXT")]
 
 
 def init():

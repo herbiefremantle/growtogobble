@@ -86,6 +86,7 @@ class Register(BaseModel):
     password: str
     postcode: Optional[str] = ""
     age_ok: bool = False
+    invite: Optional[str] = None      # the invite link they came from, if any
 
 
 class Login(BaseModel):
@@ -138,11 +139,12 @@ def register(body: Register, request: Request):
     with db.connect() as conn:
         if conn.execute("SELECT 1 FROM users WHERE email = ?", (email,)).fetchone():
             raise HTTPException(400, "There's already an account with that email. Try logging in.")
+        invite = conn.execute("SELECT * FROM invites WHERE token = ?", ((body.invite or "")[:64],)).fetchone()
         cur = conn.execute(
-            "INSERT INTO users (email, name, pw_hash, outcode, region, lat, lon, cal_token, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (email, name, auth.hash_password(body.password), oc, region, lat, lon,
-             secrets.token_urlsafe(24), clock.now().isoformat()))
+            "INSERT INTO users (email, name, pw_hash, outcode, region, lat, lon, cal_token, invited_by, invite_token, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (email, name, auth.hash_password(body.password), oc, region, lat, lon, secrets.token_urlsafe(24),
+             invite["user_id"] if invite else None, invite["token"] if invite else None, clock.now().isoformat()))
         user = auth.promote_if_admin_email(conn, dict(conn.execute("SELECT * FROM users WHERE id = ?", (cur.lastrowid,)).fetchone()))
     resp = JSONResponse(_me(user))
     auth.set_cookie(resp, request, user["id"])
@@ -257,6 +259,41 @@ def delete_me(body: DeleteAccount, user=Depends(auth.current_user)):
     return resp
 
 
+# ---- invites: share a sign-up link, and keep a tally of who joins ------------------------------------
+
+def _invite_stats(conn, user_id):
+    sent = conn.execute("SELECT COUNT(*) FROM invites WHERE user_id = ?", (user_id,)).fetchone()[0]
+    joined = db.rows(conn, "SELECT name, created_at FROM users WHERE invited_by = ? ORDER BY created_at DESC", user_id)
+    return {"sent": sent, "joined": len(joined), "people": [{"name": j["name"], "joined_on": j["created_at"][:10]} for j in joined]}
+
+
+@app.post("/api/invites")
+def new_invite(request: Request, user=Depends(auth.current_user)):
+    """A fresh invite link each time "Invite a friend" is tapped, so every share is counted."""
+    token = secrets.token_urlsafe(9)
+    with db.connect() as conn:
+        conn.execute("INSERT INTO invites (token, user_id, created_at) VALUES (?, ?, ?)", (token, user["id"], clock.now().isoformat()))
+        stats = _invite_stats(conn, user["id"])
+    return dict(stats, link=str(request.base_url).rstrip("/") + "/#/join?invite=" + token)
+
+
+@app.get("/api/invites")
+def my_invites(user=Depends(auth.current_user)):
+    with db.connect() as conn:
+        return _invite_stats(conn, user["id"])
+
+
+@app.get("/api/invites/{token}")
+def who_invited(token: str):
+    """For the sign-up page: 'Pete invited you'. Only the first name, nothing else."""
+    with db.connect() as conn:
+        row = conn.execute("SELECT u.name FROM invites i JOIN users u ON u.id = i.user_id WHERE i.token = ?",
+                           (token[:64],)).fetchone()
+    if not row:
+        raise HTTPException(404, "Unknown invite")
+    return {"name": row["name"].split()[0]}
+
+
 # ---- admin ---------------------------------------------------------------------------------------
 
 @app.get("/api/admin")
@@ -266,9 +303,14 @@ def admin_overview(admin=Depends(auth.current_admin)):
         users = db.rows(conn, """
             SELECT u.id, u.name, u.email, u.outcode, u.region, u.is_admin, u.last_active, u.created_at,
                    (SELECT COUNT(*) FROM crops c WHERE c.user_id = u.id) AS crops,
-                   (SELECT COUNT(*) FROM push_subs p WHERE p.user_id = u.id) AS devices
+                   (SELECT COUNT(*) FROM push_subs p WHERE p.user_id = u.id) AS devices,
+                   (SELECT COUNT(*) FROM invites i WHERE i.user_id = u.id) AS invites_sent,
+                   (SELECT COUNT(*) FROM users j WHERE j.invited_by = u.id) AS invites_joined,
+                   (SELECT name FROM users b WHERE b.id = u.invited_by) AS invited_by_name
             FROM users u ORDER BY u.created_at DESC""")
-    return {"users": users, "on_volume": db.on_volume(), "db_path": db.path(), "me": admin["id"]}
+        totals = {"sent": conn.execute("SELECT COUNT(*) FROM invites").fetchone()[0],
+                  "joined": conn.execute("SELECT COUNT(*) FROM users WHERE invited_by IS NOT NULL").fetchone()[0]}
+    return {"users": users, "on_volume": db.on_volume(), "db_path": db.path(), "me": admin["id"], "invites": totals}
 
 
 @app.post("/api/admin/users/{user_id}/reset")

@@ -18,11 +18,12 @@ def load(conn, user, today=None):
     crops = rows(conn, "SELECT * FROM crops WHERE user_id = ? ORDER BY id", user["id"])
     done = {r["key"] for r in rows(conn, "SELECT key FROM done WHERE user_id = ?", user["id"])}
     has_push = conn.execute("SELECT 1 FROM push_subs WHERE user_id = ?", (user["id"],)).fetchone() is not None
+    friends = conn.execute("SELECT COUNT(*) FROM users WHERE invited_by = ?", (user["id"],)).fetchone()[0]
     with_jobs = [(c, planner.crop_jobs(c, shift, done, today)) for c in crops]
     liked = {c["plant_id"] for c in crops}
     return {
         "today": today, "shift": shift, "spaces": spaces, "crops": crops, "done": done,
-        "with_jobs": with_jobs, "liked": liked, "has_push": has_push,
+        "with_jobs": with_jobs, "liked": liked, "has_push": has_push, "friends_joined": friends,
     }
 
 
@@ -33,7 +34,7 @@ def active_jobs(state):
 
 def update_badges(conn, user, state):
     """Record any newly earned badges and return them (so the app can celebrate)."""
-    earned = planner.earned_badges(state["crops"], state["spaces"], state["done"], state["has_push"])
+    earned = planner.earned_badges(state["crops"], state["spaces"], state["done"], state["has_push"], state["friends_joined"])
     have = {r["badge"] for r in rows(conn, "SELECT badge FROM badges WHERE user_id = ?", user["id"])}
     new = sorted(earned - have)
     for badge in new:

@@ -188,7 +188,9 @@ function loginPage() {
 }
 
 function joinPage() {
-  view.innerHTML = `<div class="auth-card"><div class="hero" style="padding-bottom:0"><div class="big">🌱</div><h1>Let's get growing</h1></div>
+  const invite = new URLSearchParams(location.hash.split("?")[1] || "").get("invite");
+  if (invite) api("GET", "/api/invites/" + encodeURIComponent(invite)).then((r) => { const el = $("#invited"); if (el) el.textContent = `💌 ${r.name} invited you!`; }, () => {});
+  view.innerHTML = `<div class="auth-card"><div class="hero" style="padding-bottom:0"><div class="big">🌱</div><h1>Let's get growing</h1><p id="invited" style="margin:0;font-weight:800;color:var(--forest)"></p></div>
   <form class="card" id="f">
     <label class="field" for="name">Your first name</label><input id="name" type="text" autocomplete="given-name" maxlength="40" required>
     <label class="field" for="email">Email</label><input id="email" type="email" autocomplete="email" required>
@@ -202,7 +204,7 @@ function joinPage() {
   $("#f").onsubmit = async (e) => {
     e.preventDefault();
     try {
-      S.me = await api("POST", "/api/register", { name: $("#name").value, email: $("#email").value, password: $("#pw").value, postcode: $("#pc").value, age_ok: $("#age").checked });
+      S.me = await api("POST", "/api/register", { name: $("#name").value, email: $("#email").value, password: $("#pw").value, postcode: $("#pc").value, age_ok: $("#age").checked, invite });
       await boot("#/start");
     } catch (err) { $("#err").innerHTML = `<div class="error">${esc(err.message)}</div>`; }
   };
@@ -1147,6 +1149,10 @@ function mePage() {
     <p class="muted">${got} of ${S.g.badges.length} earned. Keep growing!</p>
     <div class="badges">${S.g.badges.map((b) => `<div class="badge ${b.earned_on ? "got" : "locked"}"><span class="e">${b.emoji}</span><b>${esc(b.name)}</b><small>${esc(b.text)}</small></div>`).join("")}</div>
     <div class="section-title"><h2>⚙️ My account</h2></div>
+    <div class="card tint-leaf" id="invite-card"><h3>💌 Invite a friend</h3>
+      <p class="small" style="margin:0 0 10px">Know someone who'd love to grow their own? Send them a link - we'll keep count of who joins from your invites.</p>
+      <div id="invite-tally" class="small muted" style="margin-bottom:10px">…</div>
+      <button class="btn primary" id="invite">💌 Invite someone</button><div id="invite-out"></div></div>
     ${S.me.is_admin ? `<a class="card tint-plum row" href="#/admin" style="justify-content:space-between;text-decoration:none;color:inherit"><b>🛠️ Admin: accounts & password resets</b><span class="btn small">Open 👉</span></a>` : ""}
     <div class="card">
       <label class="field" for="nm">Name</label><input id="nm" type="text" maxlength="40" value="${esc(S.me.name)}">
@@ -1172,6 +1178,33 @@ function mePage() {
       <label class="field" for="delpw">Type your password to confirm</label><input id="delpw" type="password" autocomplete="current-password">
       <button class="btn danger" id="delete" style="margin-top:12px">Delete everything</button></details>`;
   wirePush();
+  const tally = (t) => {
+    $("#invite-tally").innerHTML = t.sent ? `You've sent <b>${t.sent}</b> invite${t.sent === 1 ? "" : "s"} · <b>${t.joined}</b> joined${t.joined ? " 🎉" : ""}`
+      + (t.people.length ? `<div style="margin-top:4px">${t.people.map((x) => `🌱 ${esc(x.name)} <span class="muted">(${fmt(x.joined_on)})</span>`).join("<br>")}</div>` : "")
+      : "You haven't invited anyone yet.";
+  };
+  api("GET", "/api/invites").then(tally, () => { $("#invite-tally").textContent = ""; });
+  $("#invite").onclick = async () => {
+    try {
+      const t = await api("POST", "/api/invites");
+      tally(t);
+      const text = `${S.me.name.split(" ")[0]} has invited you to Grow to Gobble - grow the food you love to eat, step by step 🌱`;
+      if (navigator.share) {
+        try { await navigator.share({ title: "Grow to Gobble", text, url: t.link }); return; } catch (e) { if (e.name === "AbortError") return; }
+      }
+      const msg = encodeURIComponent(text + " " + t.link);
+      $("#invite-out").innerHTML = `<div class="checkbox"><b>Send them this link:</b>
+        <input type="text" readonly value="${esc(t.link)}" onclick="this.select()">
+        <div class="row"><button class="btn small" data-copy="${esc(t.link)}">📋 Copy</button>
+        <a class="btn small" href="https://wa.me/?text=${msg}" target="_blank" rel="noopener">💬 WhatsApp</a>
+        <a class="btn small" href="mailto:?subject=${encodeURIComponent("Grow to Gobble")}&body=${msg}">✉️ Email</a>
+        <a class="btn small" href="sms:?&body=${msg}">📱 Text</a></div></div>`;
+    } catch (e) { toast(e.message); }
+  };
+  $("#invite-card").onclick = (e) => {
+    const c = e.target.closest("[data-copy]");
+    if (c) navigator.clipboard.writeText(c.dataset.copy).then(() => toast("Link copied 📋"), () => toast("Select the link and copy it"));
+  };
   $("#save").onclick = async () => {
     try {
       S.me = await api("PATCH", "/api/me", { name: $("#nm").value, email: $("#em").value, postcode: $("#pc").value });
@@ -1210,11 +1243,15 @@ function drawAdmin(data) {
     <div class="card ${data.on_volume ? "tint-leaf" : "tint-tomato"}"><b>${data.on_volume ? "✅ Accounts are saved safely" : "⚠️ Accounts are NOT on permanent storage"}</b>
       <p class="small" style="margin:4px 0 0">${data.on_volume ? "The database is on a Railway volume, so it survives updates and restarts."
         : "On Railway: open the service → Settings → Volumes → Add volume, mount path /data. Until then, accounts are wiped whenever the app updates. (On your own computer this is normal.)"}</p></div>
+    <div class="card tint-leaf"><b>💌 Invites:</b> ${data.invites.sent} sent · ${data.invites.joined} joined${data.invites.sent ? ` (${Math.round((100 * data.invites.joined) / data.invites.sent)}%)` : ""}
+      ${data.users.some((u) => u.invites_sent) ? `<div class="small" style="margin-top:6px">${data.users.filter((u) => u.invites_sent).sort((a, b) => b.invites_joined - a.invites_joined || b.invites_sent - a.invites_sent)
+        .map((u) => `${esc(u.name)}: ${u.invites_sent} sent, <b>${u.invites_joined} joined</b>`).join("<br>")}</div>` : ""}</div>
     <p class="muted">${data.users.length} account${data.users.length === 1 ? "" : "s"}. There's no email sending yet, so to reset someone's password, make a link and send it to them yourself - it works once, for 48 hours.</p>
     ${data.users.map((u) => `<div class="card">
       <div class="row" style="justify-content:space-between"><div><b>${esc(u.name)}</b> ${u.is_admin ? `<span class="chip">🛠️ Admin</span>` : ""}${u.id === data.me ? ` <span class="chip grey">You</span>` : ""}
         <div class="small muted">${esc(u.email)}${u.outcode ? " · " + esc(u.outcode) : ""}</div>
-        <div class="small muted">Joined ${fmt(u.created_at.slice(0, 10))} · last active ${ago(u.last_active)} · ${u.crops} crop${u.crops === 1 ? "" : "s"} · ${u.devices ? "🔔 reminders on" : "no reminders"}</div></div></div>
+        <div class="small muted">Joined ${fmt(u.created_at.slice(0, 10))} · last active ${ago(u.last_active)} · ${u.crops} crop${u.crops === 1 ? "" : "s"} · ${u.devices ? "🔔 reminders on" : "no reminders"}</div>
+        <div class="small muted">💌 ${u.invited_by_name ? `Invited by ${esc(u.invited_by_name)}` : "Signed up on their own"} · sent ${u.invites_sent} invite${u.invites_sent === 1 ? "" : "s"}, ${u.invites_joined} joined</div></div></div>
       <div class="row" style="margin-top:10px">
         <button class="btn small" data-reset="${u.id}">🔑 Password reset link</button>
         ${u.id === data.me ? "" : `<button class="btn small ghost" data-admin="${u.id}" data-to="${u.is_admin ? 0 : 1}">${u.is_admin ? "Remove admin" : "Make admin"}</button>
