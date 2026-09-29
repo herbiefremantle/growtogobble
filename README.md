@@ -44,6 +44,9 @@ Code: https://github.com/herbiefremantle/growtogobble - every push to `main` red
    - `ADMIN_EMAIL=you@example.com` - that account becomes an admin (comma-separate several). Admins get an
      **Admin** page under Badges → My account: every account, one-time password-reset links, make/remove admins,
      delete accounts, and a check that the database is safely on the volume.
+   - **Locked out of the admin account?** Add `ADMIN_RESET_LINK=1` and let it redeploy: a one-time password
+     reset link for each `ADMIN_EMAIL` account appears in the service's **Deploy Logs**. Open it, set a new
+     password, then delete the variable.
 
 Notifications need HTTPS (Railway gives you that). On iPhone they work once the app is added to the Home Screen (iOS 16.4+).
 

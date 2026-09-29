@@ -23,9 +23,32 @@ STATIC = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 logging.basicConfig(level=logging.INFO)
 
 
+def admin_reset_links():
+    """Locked-out admin? Set ADMIN_RESET_LINK=1 on Railway and restart: a one-time reset link for each
+    ADMIN_EMAIL account is written to the deploy logs, which only the Railway project's owner can read.
+    Remove the variable afterwards (each restart makes a new link and cancels the old one)."""
+    if os.environ.get("ADMIN_RESET_LINK", "").strip().lower() not in ("1", "true", "yes"):
+        return []
+    domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "")
+    base = ("https://" + domain) if domain else ""
+    out = []
+    with db.connect() as conn:
+        for email in sorted(auth.admin_emails()):
+            row = conn.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
+            if not row:
+                msg = "No account for %s yet - just sign up with that email and it becomes the admin." % email
+            else:
+                msg = "Password reset link for %s (works once, for %d hours): %s/#/reset?token=%s" % (
+                    email, auth.RESET_HOURS, base, auth.create_reset(conn, row["id"], None))
+            logging.getLogger("admin").warning(msg)
+            out.append(msg)
+    return out
+
+
 @asynccontextmanager
 async def lifespan(app):
     db.init()
+    admin_reset_links()
     task = None
     if os.environ.get("ALERTS", "1") != "0":
         task = asyncio.create_task(alerts.loop())

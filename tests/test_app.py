@@ -393,3 +393,18 @@ def test_harvest_follows_the_real_sowing_date(client):
     harvest = next(j for j in g["crops"][0]["jobs"] if j["kind"] == "harvest")
     assert harvest["start"] == "2027-04-29"  # 4 weeks after the sowing date entered, not the season
     assert client.patch("/api/crops/%d" % c["id"], json={"plant_id": "radish", "sown_on": "2030-01-01"}).status_code == 400
+
+
+def test_locked_out_admin_gets_a_reset_link_in_the_logs(client, monkeypatch):
+    from app import main
+    monkeypatch.setenv("ADMIN_EMAIL", "boss@example.com")
+    assert main.admin_reset_links() == []  # off unless ADMIN_RESET_LINK is set
+    monkeypatch.setenv("ADMIN_RESET_LINK", "1")
+    monkeypatch.setenv("RAILWAY_PUBLIC_DOMAIN", "example.up.railway.app")
+    assert "just sign up" in main.admin_reset_links()[0]
+    _join(client, "boss@example.com")
+    client.post("/api/logout")
+    link = main.admin_reset_links()[0]
+    assert "https://example.up.railway.app/#/reset?token=" in link
+    token = link.split("token=")[1]
+    assert client.post("/api/reset", json={"token": token, "password": "fresh-start-1"}).status_code == 200
