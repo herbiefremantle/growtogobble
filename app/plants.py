@@ -928,3 +928,102 @@ NODIG_PLANTING = [
     "When you clear a crop, twist or snip it off at the soil and leave the roots in - worms will eat them 🪱",
     "Every autumn, spread another 3-5cm of compost on top. That's all the feeding it needs 🍂",
 ]
+
+
+# ---- soil and feeding -----------------------------------------------------------------------------
+# Only gentle, garden-safe improvers: compost, well-rotted manure, leaf mould, seaweed, comfrey/tomato feed,
+# chicken manure pellets, garden lime, grit. No chemical weedkillers or pesticides anywhere in the app.
+IMPROVERS = {
+    "compost": ("🟫", "Compost", "Garden or peat-free bagged compost. Feeds the soil and holds water. Every crop likes it."),
+    "manure": ("🐴", "Well-rotted manure", "Horse or cow manure that's been left a year so it's dark and crumbly, not smelly. "
+               "Loads of food for hungry crops. Wear gloves and wash your hands after."),
+    "leafmould": ("🍂", "Leaf mould", "Rotted autumn leaves - free! Makes soil soft and crumbly."),
+    "seaweed": ("🌊", "Seaweed feed", "A liquid you add to the watering can. A gentle all-round boost."),
+    "tomato_feed": ("🍅", "Tomato feed (or comfrey feed)", "A liquid feed high in potash - helps plants make more flowers and fruit."),
+    "chicken": ("🐔", "Chicken manure pellets", "An organic slow-release feed - sprinkle a handful per square metre in spring."),
+    "lime": ("🪨", "Garden lime", "Only if your soil is acidic - helps cabbage-family plants and stops a disease called club root. Don't add with manure at the same time."),
+    "grit": ("🪨", "Horticultural grit or sharp sand", "Helps water drain away in heavy soil - roots hate sitting in water."),
+    "ericaceous": ("🫐", "Ericaceous compost", "Special 'acid' compost for blueberries. Water them with rainwater too."),
+}
+SOIL_PROFILES = {
+    "hungry": ("Rich, moist soil packed with goodness",
+               ["manure", "compost", "chicken", "tomato_feed"],
+               "These are hungry plants. Dig a hole (or make a mound) and fill it with manure or compost before planting, then feed every week or two once the fruit starts.",
+               "Grows fine in plain compost - but a big bucket of well-rotted manure underneath can double what you pick."),
+    "fruiting": ("Rich compost, kept moist, in the warmest spot you have",
+                 ["compost", "tomato_feed", "seaweed"],
+                 "Plant into good compost, then feed with tomato feed once a week as soon as the first flowers appear.",
+                 "The weekly tomato feed once flowers appear is the big one - it's what makes lots of fruit instead of just leaves."),
+    "cabbage": ("Firm, rich soil that isn't acidic",
+                ["manure", "compost", "chicken", "lime"],
+                "Add manure or compost the season before, then firm the soil well - tread it down! Loose soil makes floppy plants.",
+                "Firm soil and a sprinkle of chicken manure pellets in spring give bigger, tighter heads."),
+    "beans": ("Any decent soil - they make their own food from the air!",
+              ["compost", "seaweed"],
+              "Peas and beans take nitrogen from the air, so they don't need rich soil. Some compost in the planting trench helps hold water.",
+              "Lots of water once they flower is what makes more pods - more than any feed."),
+    "roots": ("Light, crumbly soil with no stones",
+              ["compost", "leafmould", "grit"],
+              "NO fresh manure - it makes carrots and parsnips split into funny forked shapes! Use soil that was manured last year, or plain compost.",
+              "Crumbly, stone-free soil is the secret - long straight roots need nothing in their way."),
+    "onions": ("Well-drained soil that doesn't stay wet",
+               ["compost", "grit", "seaweed"],
+               "Add compost, and grit if your soil is heavy clay - onions and garlic rot if they sit in water. No fresh manure.",
+               "Weeding is the big one: onions and garlic hate competition. A weed-free bed gives much bigger bulbs."),
+    "leafy": ("Moist soil with plenty of compost",
+              ["compost", "chicken", "seaweed"],
+              "Leafy crops like steady water and a bit of goodness. Compost plus a sprinkle of chicken manure pellets is plenty.",
+              "Never let them dry out - dry soil makes salad bitter and bolt (run to seed)."),
+    "herbs": ("Poor, free-draining soil - they don't like it too rich",
+              ["grit", "compost"],
+              "Most herbs like it quite poor and sunny. Too much food makes them floppy and less tasty.",
+              "Keep picking - that's what keeps herbs bushy."),
+    "flowers": ("Poor soil - really!",
+                ["grit"],
+                "Nasturtiums flower best in poor soil. Feed them and you get all leaves and no flowers.",
+                "Leave them hungry and give them sun."),
+    "berries": ("Rich soil with a thick mulch on top",
+                ["compost", "manure", "tomato_feed"],
+                "Dig in compost or well-rotted manure before planting, then spread a thick layer on top every spring.",
+                "Tomato feed every 2 weeks while they flower and fruit gives more, sweeter berries."),
+    "blueberries": ("Acid soil only - grow them in a pot",
+                    ["ericaceous"],
+                    "Blueberries need 'ericaceous' (acid) compost. Normal compost or tap water slowly kills them - use rainwater.",
+                    "Use rainwater and a pot that's bigger every couple of years."),
+    "sweet_potato": ("Light, warm, sandy soil",
+                     ["compost", "grit"],
+                     "They like light soil that warms up fast. No manure - it makes lots of leaves and few potatoes.",
+                     "Warmth matters more than food: black plastic over the bed or a greenhouse gives much bigger crops."),
+}
+SOIL_OF = {
+    "courgette": "hungry", "summer_squash": "hungry", "pumpkin": "hungry", "squash": "hungry", "cucumber": "hungry",
+    "melon": "hungry", "sweetcorn": "hungry", "potatoes": "hungry", "leeks": "hungry", "rhubarb": "hungry",
+    "tomatoes": "fruiting", "tomatoes_big": "fruiting", "peppers": "fruiting", "chillies": "fruiting", "aubergine": "fruiting",
+    "kale": "cabbage", "broccoli": "cabbage", "cauliflower": "cabbage", "sprouts": "cabbage",
+    "peas": "beans", "broad_beans": "beans", "runner_beans": "beans", "french_beans": "beans",
+    "carrots": "roots", "parsnips": "roots", "beetroot": "roots", "radish": "roots",
+    "onions": "onions", "garlic": "onions", "spring_onions": "onions",
+    "salad": "leafy", "chard": "leafy",
+    "chives": "herbs", "mint": "herbs", "basil": "herbs", "nasturtium": "flowers",
+    "strawberries": "berries", "raspberries": "berries", "blueberries": "blueberries", "sweet_potatoes": "sweet_potato",
+}
+for _p in PLANTS:
+    _likes, _add, _how, _bigger = SOIL_PROFILES[SOIL_OF[_p["id"]]]
+    _p["soil"] = {"likes": _likes, "how": _how, "bigger": _bigger,
+                  "add": [dict(zip(("emoji", "name", "what"), IMPROVERS[a])) for a in _add]}
+
+# What kind of soil have you got? (for a bed's settings)
+SOIL_TYPES = {
+    "compost": {"name": "No-dig compost", "emoji": "🟫", "test": "You built a no-dig bed or filled it with bought compost.",
+                "tips": "The easiest soil there is. Just add 3-5cm more compost on top every autumn."},
+    "loam": {"name": "Loam (lucky you!)", "emoji": "🌱", "test": "Dark and crumbly. Squeeze a damp handful: it holds together, then crumbles when poked.",
+             "tips": "The best garden soil. Keep it that way with a layer of compost every autumn."},
+    "clay": {"name": "Clay", "emoji": "🧱", "test": "Sticky when wet, hard and cracked when dry. A damp handful squeezes into a smooth, shiny ball.",
+             "tips": "Rich in food but drains slowly. Add lots of compost and some grit - or build a no-dig bed on top. Don't walk on it when wet."},
+    "sandy": {"name": "Sandy", "emoji": "🏖️", "test": "Gritty, light and dries out fast. A damp handful falls apart straight away.",
+              "tips": "Warms up early in spring - great for carrots! But water and food wash through, so add compost or manure every year."},
+    "chalky": {"name": "Chalky or stony", "emoji": "🪨", "test": "Pale, with lumps of white chalk or lots of stones. Often drains very fast.",
+               "tips": "Add plenty of compost and manure to hold water. Blueberries won't grow in it - keep them in pots."},
+    "unknown": {"name": "Not sure yet", "emoji": "❓", "test": "Try the squeeze test: grab a damp handful and squeeze.",
+                "tips": "Sticky shiny ball = clay. Falls apart = sandy. Holds then crumbles = loam."},
+}

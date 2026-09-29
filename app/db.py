@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS users (
     lat REAL,
     lon REAL,
     cal_token TEXT NOT NULL,
+    is_admin INTEGER NOT NULL DEFAULT 0,
+    last_active TEXT,
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS spaces (
@@ -23,6 +25,7 @@ CREATE TABLE IF NOT EXISTS spaces (
     kind TEXT NOT NULL,               -- bed | pot | allotment
     width_m REAL,
     length_m REAL,
+    soil TEXT,
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS crops (
@@ -68,7 +71,18 @@ CREATE TABLE IF NOT EXISTS sent (           -- alerts already sent, so nobody ge
     PRIMARY KEY (user_id, key)
 );
 CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS resets (         -- one-time "set a new password" links an admin makes
+    token_hash TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires TEXT NOT NULL,
+    created_by INTEGER
+);
 """
+
+
+def on_volume():
+    """True when the database lives on a mounted disk (a Railway volume) - so it survives redeploys."""
+    return os.path.ismount(os.path.dirname(os.path.abspath(path())))
 
 
 def path():
@@ -89,7 +103,8 @@ def connect():
 
 # columns added after the first version: (table, column, type)
 MIGRATIONS = [("spaces", "width_m", "REAL"), ("spaces", "length_m", "REAL"), ("crops", "quantity", "INTEGER"),
-              ("crops", "bed_free_on", "TEXT")]
+              ("crops", "bed_free_on", "TEXT"), ("users", "is_admin", "INTEGER NOT NULL DEFAULT 0"),
+              ("users", "last_active", "TEXT"), ("spaces", "soil", "TEXT")]
 
 
 def init():

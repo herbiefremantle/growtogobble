@@ -334,3 +334,62 @@ def test_warns_when_the_same_crop_is_already_planned_elsewhere(client):
     # something not planned yet isn't flagged
     chard = next(x for x in garlic["then"]["plants"] if x["plant_id"] == "chard")
     assert chard["already"] == []
+
+
+# ---- accounts & admin -------------------------------------------------------------------------------
+
+def test_admin_email_becomes_admin_and_can_reset_a_password(client, monkeypatch):
+    monkeypatch.setenv("ADMIN_EMAIL", "boss@example.com")
+    _join(client, "kid@example.com")
+    assert client.get("/api/admin").status_code == 403  # an ordinary account can't see the admin page
+    client.post("/api/logout")
+    me = _join(client, "boss@example.com")
+    assert me["is_admin"] is True
+    admin = client.get("/api/admin").json()
+    kid = next(u for u in admin["users"] if u["email"] == "kid@example.com")
+    link = client.post("/api/admin/users/%d/reset" % kid["id"]).json()["link"]
+    token = link.split("token=")[1]
+    client.post("/api/logout")
+    assert client.post("/api/reset", json={"token": token, "password": "brand-new-pw"}).status_code == 200
+    assert client.post("/api/reset", json={"token": token, "password": "again-again"}).status_code == 400  # one use only
+    assert client.post("/api/login", json={"email": "kid@example.com", "password": "brand-new-pw"}).status_code == 200
+
+
+def test_change_password_and_email(client):
+    _join(client)
+    assert client.post("/api/me/password", json={"current": "wrong-one", "new": "whatever12"}).status_code == 400
+    assert client.post("/api/me/password", json={"current": "sunflower1", "new": "tulip-time"}).status_code == 200
+    assert client.patch("/api/me", json={"email": "new@example.com"}).json()["email"] == "new@example.com"
+    client.post("/api/logout")
+    assert client.post("/api/login", json={"email": "new@example.com", "password": "tulip-time"}).status_code == 200
+
+
+def test_only_admin_cant_be_deleted(client, monkeypatch):
+    monkeypatch.setenv("ADMIN_EMAIL", "boss@example.com")
+    _join(client, "boss@example.com")
+    r = client.post("/api/me/delete", json={"password": "sunflower1"})
+    assert r.status_code == 400 and "only admin" in r.json()["detail"]
+
+
+# ---- batches, dates, soil ------------------------------------------------------------------------------
+
+def test_three_rows_of_carrots_two_weeks_apart(client):
+    _join(client)  # today is 10 Apr 2027 in these tests
+    sid = client.post("/api/spaces", json={"name": "Bed", "kind": "bed", "soil": "clay"}).json()["spaces"][0]["id"]
+    g = client.post("/api/crops", json={"plant_id": "carrots", "space_id": sid, "batches": 3, "every_weeks": 2,
+                                        "quantity": 30}).json()
+    carrots = sorted((c for c in g["crops"] if c["plant_id"] == "carrots"), key=lambda c: c["anchor"])
+    assert len(carrots) == 3
+    sows = [next(j for j in c["jobs"] if j["kind"] == "sow_out")["start"] for c in carrots]
+    assert sows[1] > sows[0] and sows[2] > sows[1]
+    assert g["spaces"][0]["soil"] == "clay"
+
+
+def test_harvest_follows_the_real_sowing_date(client):
+    _join(client)
+    sid = client.post("/api/spaces", json={"name": "Bed", "kind": "bed"}).json()["spaces"][0]["id"]
+    c = client.post("/api/crops", json={"plant_id": "radish", "space_id": sid}).json()["crops"][0]
+    g = client.patch("/api/crops/%d" % c["id"], json={"plant_id": "radish", "sown_on": "2027-04-01"}).json()
+    harvest = next(j for j in g["crops"][0]["jobs"] if j["kind"] == "harvest")
+    assert harvest["start"] == "2027-04-29"  # 4 weeks after the sowing date entered, not the season
+    assert client.patch("/api/crops/%d" % c["id"], json={"plant_id": "radish", "sown_on": "2030-01-01"}).status_code == 400

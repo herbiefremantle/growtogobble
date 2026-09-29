@@ -165,6 +165,6 @@ def catalogue_payload(user=None):
     return {
         "plants": out, "levels": catalogue.LEVELS, "methods": planner.METHODS,
         "nodig_steps": catalogue.NODIG_STEPS, "pot_steps": catalogue.POT_STEPS,
-        "nodig_planting": catalogue.NODIG_PLANTING,
+        "nodig_planting": catalogue.NODIG_PLANTING, "soil_types": catalogue.SOIL_TYPES,
         "affiliate": shops.is_affiliate(),
     }

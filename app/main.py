@@ -73,6 +73,9 @@ class Login(BaseModel):
 class Profile(BaseModel):
     name: Optional[str] = None
     postcode: Optional[str] = None
+    email: Optional[str] = None
+
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def _place(postcode):
@@ -92,7 +95,7 @@ def _me(user):
         "id": user["id"], "name": user["name"], "email": user["email"], "outcode": user["outcode"],
         "region": dict(region, id=user["region"]),
         "calendar_path": "/calendar/%s.ics" % user["cal_token"],
-        "push_key": alerts.public_key(),
+        "push_key": alerts.public_key(), "is_admin": bool(user["is_admin"]),
     }
 
 
@@ -100,7 +103,7 @@ def _me(user):
 def register(body: Register, request: Request):
     email = body.email.strip().lower()
     name = body.name.strip()[:40]
-    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+    if not EMAIL_RE.match(email):
         raise HTTPException(400, "Please enter a proper email address.")
     if not name:
         raise HTTPException(400, "What should we call you?")
@@ -117,7 +120,7 @@ def register(body: Register, request: Request):
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (email, name, auth.hash_password(body.password), oc, region, lat, lon,
              secrets.token_urlsafe(24), clock.now().isoformat()))
-        user = dict(conn.execute("SELECT * FROM users WHERE id = ?", (cur.lastrowid,)).fetchone())
+        user = auth.promote_if_admin_email(conn, dict(conn.execute("SELECT * FROM users WHERE id = ?", (cur.lastrowid,)).fetchone()))
     resp = JSONResponse(_me(user))
     auth.set_cookie(resp, request, user["id"])
     return resp
@@ -133,7 +136,9 @@ def login(body: Login, request: Request):
     if not row or not auth.check_password(body.password, row["pw_hash"]):
         auth.record_failure(ip)
         raise HTTPException(400, "That email and password don't match.")
-    resp = JSONResponse(_me(dict(row)))
+    with db.connect() as conn:
+        user = auth.promote_if_admin_email(conn, dict(row))
+    resp = JSONResponse(_me(user))
     auth.set_cookie(resp, request, row["id"])
     return resp
 
@@ -155,6 +160,13 @@ def update_me(body: Profile, user=Depends(auth.current_user)):
     with db.connect() as conn:
         if body.name is not None and body.name.strip():
             conn.execute("UPDATE users SET name = ? WHERE id = ?", (body.name.strip()[:40], user["id"]))
+        if body.email is not None and body.email.strip().lower() != user["email"]:
+            email = body.email.strip().lower()
+            if not EMAIL_RE.match(email):
+                raise HTTPException(400, "Please enter a proper email address.")
+            if conn.execute("SELECT 1 FROM users WHERE email = ?", (email,)).fetchone():
+                raise HTTPException(400, "Another account already uses that email.")
+            conn.execute("UPDATE users SET email = ? WHERE id = ?", (email, user["id"]))
         if body.postcode is not None:
             oc, region, lat, lon = _place(body.postcode)
             conn.execute("UPDATE users SET outcode = ?, region = ?, lat = ?, lon = ? WHERE id = ?",
@@ -167,15 +179,106 @@ class DeleteAccount(BaseModel):
     password: str
 
 
+class NewPassword(BaseModel):
+    current: str
+    new: str
+
+
+@app.post("/api/me/password")
+def change_password(body: NewPassword, request: Request, user=Depends(auth.current_user)):
+    ip = request.client.host if request.client else "?"
+    if auth.too_many_failures(ip):
+        raise HTTPException(429, "Too many tries. Have a break and try again in 10 minutes.")
+    if not auth.check_password(body.current, user["pw_hash"]):
+        auth.record_failure(ip)
+        raise HTTPException(400, "Your current password isn't right.")
+    if len(body.new) < auth.MIN_PASSWORD:
+        raise HTTPException(400, "Your new password needs at least %d characters." % auth.MIN_PASSWORD)
+    with db.connect() as conn:
+        conn.execute("UPDATE users SET pw_hash = ? WHERE id = ?", (auth.hash_password(body.new), user["id"]))
+    return {"ok": True}
+
+
+class Reset(BaseModel):
+    token: str
+    password: str
+
+
+@app.post("/api/reset")
+def reset_password(body: Reset, request: Request):
+    """Set a new password using a one-time link from an admin, and log straight in."""
+    with db.connect() as conn:
+        uid = auth.redeem_reset(conn, body.token, body.password)
+        user = dict(conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone())
+    resp = JSONResponse(_me(user))
+    auth.set_cookie(resp, request, uid)
+    return resp
+
+
+def _only_admin(conn, user_id):
+    others = conn.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1 AND id != ?", (user_id,)).fetchone()[0]
+    row = conn.execute("SELECT is_admin FROM users WHERE id = ?", (user_id,)).fetchone()
+    return bool(row and row["is_admin"]) and others == 0
+
+
 @app.post("/api/me/delete")
 def delete_me(body: DeleteAccount, user=Depends(auth.current_user)):
     if not auth.check_password(body.password, user["pw_hash"]):
         raise HTTPException(400, "That password isn't right.")
     with db.connect() as conn:
+        if _only_admin(conn, user["id"]):
+            raise HTTPException(400, "You're the only admin, so this account can't be deleted. Make someone else an admin first.")
         conn.execute("DELETE FROM users WHERE id = ?", (user["id"],))
     resp = JSONResponse({"ok": True})
     resp.delete_cookie(auth.COOKIE)
     return resp
+
+
+# ---- admin ---------------------------------------------------------------------------------------
+
+@app.get("/api/admin")
+def admin_overview(admin=Depends(auth.current_admin)):
+    """Everyone's accounts (no garden details), and whether the database is safe on a volume."""
+    with db.connect() as conn:
+        users = db.rows(conn, """
+            SELECT u.id, u.name, u.email, u.outcode, u.region, u.is_admin, u.last_active, u.created_at,
+                   (SELECT COUNT(*) FROM crops c WHERE c.user_id = u.id) AS crops,
+                   (SELECT COUNT(*) FROM push_subs p WHERE p.user_id = u.id) AS devices
+            FROM users u ORDER BY u.created_at DESC""")
+    return {"users": users, "on_volume": db.on_volume(), "db_path": db.path(), "me": admin["id"]}
+
+
+@app.post("/api/admin/users/{user_id}/reset")
+def admin_reset_link(user_id: int, request: Request, admin=Depends(auth.current_admin)):
+    with db.connect() as conn:
+        if not conn.execute("SELECT 1 FROM users WHERE id = ?", (user_id,)).fetchone():
+            raise HTTPException(404, "No such account")
+        token = auth.create_reset(conn, user_id, admin["id"])
+    return {"link": str(request.base_url).rstrip("/") + "/#/reset?token=" + token, "hours": auth.RESET_HOURS}
+
+
+class AdminFlag(BaseModel):
+    is_admin: bool
+
+
+@app.post("/api/admin/users/{user_id}/admin")
+def admin_set_admin(user_id: int, body: AdminFlag, admin=Depends(auth.current_admin)):
+    with db.connect() as conn:
+        if not body.is_admin and _only_admin(conn, user_id):
+            raise HTTPException(400, "That's the only admin - make someone else an admin first.")
+        conn.execute("UPDATE users SET is_admin = ? WHERE id = ?", (1 if body.is_admin else 0, user_id))
+    return admin_overview(admin)
+
+
+@app.delete("/api/admin/users/{user_id}")
+def admin_delete(user_id: int, admin=Depends(auth.current_admin)):
+    if user_id == admin["id"]:
+        raise HTTPException(400, "To delete your own account, use Settings.")
+    with db.connect() as conn:
+        if _only_admin(conn, user_id):
+            raise HTTPException(400, "That's the only admin.")
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    return admin_overview(admin)
 
 
 # ---- plants & garden ------------------------------------------------------------------------------
@@ -201,6 +304,11 @@ class SpaceIn(BaseModel):
     kind: str
     width_m: Optional[float] = None
     length_m: Optional[float] = None
+    soil: Optional[str] = None
+
+
+def _soil(v):
+    return v if v in catalogue.SOIL_TYPES else None
 
 
 def _size(v):
@@ -212,9 +320,9 @@ def add_space(body: SpaceIn, user=Depends(auth.current_user)):
     if body.kind not in ("bed", "pot", "allotment"):
         raise HTTPException(400, "Unknown kind of space")
     with db.connect() as conn:
-        conn.execute("INSERT INTO spaces (user_id, name, kind, width_m, length_m, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        conn.execute("INSERT INTO spaces (user_id, name, kind, width_m, length_m, soil, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                      (user["id"], body.name.strip()[:40] or "My bed", body.kind, _size(body.width_m), _size(body.length_m),
-                      clock.now().isoformat()))
+                      _soil(body.soil), clock.now().isoformat()))
         return garden.payload(conn, user)
 
 
@@ -222,8 +330,9 @@ def add_space(body: SpaceIn, user=Depends(auth.current_user)):
 def rename_space(space_id: int, body: SpaceIn, user=Depends(auth.current_user)):
     with db.connect() as conn:
         _own(conn, "spaces", space_id, user)
-        conn.execute("UPDATE spaces SET name = ?, kind = ?, width_m = ?, length_m = ? WHERE id = ?",
-                     (body.name.strip()[:40] or "My bed", body.kind, _size(body.width_m), _size(body.length_m), space_id))
+        conn.execute("UPDATE spaces SET name = ?, kind = ?, width_m = ?, length_m = ?, soil = ? WHERE id = ?",
+                     (body.name.strip()[:40] or "My bed", body.kind, _size(body.width_m), _size(body.length_m),
+                      _soil(body.soil), space_id))
         return garden.payload(conn, user)
 
 
@@ -242,6 +351,11 @@ class CropIn(BaseModel):
     method: Optional[str] = None
     quantity: Optional[int] = None
     after: Optional[str] = None       # a follow-on crop: not before this date (when the space is free)
+    batches: Optional[int] = None     # sow several rows a few weeks apart, each tracked on its own
+    every_weeks: Optional[int] = None
+    sown_on: Optional[str] = None     # correcting when it really happened
+    planted_on: Optional[str] = None
+    harvested_on: Optional[str] = None
 
 
 def _qty(n):
@@ -284,8 +398,20 @@ def _new_crop(conn, user, plant_id, space_id, method, today=None, quantity=None,
 
 @app.post("/api/crops")
 def add_crop(body: CropIn, user=Depends(auth.current_user)):
+    """Add a crop - or several batches of it, a few weeks apart (e.g. a row of carrots every 2 weeks)."""
+    batches = max(1, min(body.batches or 1, 8))
+    every = max(1, min(body.every_weeks or 2, 8))
     with db.connect() as conn:
-        _new_crop(conn, user, body.plant_id, body.space_id, body.method, quantity=body.quantity, after=_after(body.after))
+        first = _new_crop(conn, user, body.plant_id, body.space_id, body.method, quantity=body.quantity, after=_after(body.after))
+        start = date.fromisoformat(conn.execute("SELECT anchor FROM crops WHERE id = ?", (first,)).fetchone()["anchor"])
+        plant = catalogue.BY_ID[body.plant_id]
+        method = conn.execute("SELECT method FROM crops WHERE id = ?", (first,)).fetchone()["method"]
+        for i in range(1, batches):
+            when = start + i * every * planner.WEEK
+            win = planner.next_window(planner.first_window(plant, method), when, garden.shift_for(user))
+            if not win or win[0] > when + planner.WEEK:  # past the end of this sowing season
+                break
+            _new_crop(conn, user, body.plant_id, body.space_id, method, quantity=body.quantity, after=when)
         return garden.payload(conn, user)
 
 
@@ -358,6 +484,13 @@ def edit_crop(crop_id: int, body: CropIn, user=Depends(auth.current_user)):
             conn.execute("UPDATE crops SET space_id = ? WHERE id = ?", (body.space_id, crop_id))
         if body.quantity is not None:
             conn.execute("UPDATE crops SET quantity = ? WHERE id = ?", (_qty(body.quantity), crop_id))
+        for field in ("sown_on", "planted_on", "harvested_on"):
+            value = getattr(body, field)
+            if value is not None:
+                when = _after(value) if value else None
+                if when and when > clock.today():
+                    raise HTTPException(400, "That date is in the future.")
+                conn.execute("UPDATE crops SET %s = ? WHERE id = ?" % field, (when.isoformat() if when else None, crop_id))
         if body.method and body.method != crop["method"] and not (crop["sown_on"] or crop["planted_on"]):
             plant = catalogue.BY_ID[crop["plant_id"]]
             if body.method not in planner.methods_for(plant):

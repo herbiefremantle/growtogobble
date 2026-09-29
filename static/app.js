@@ -121,8 +121,8 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheet
 function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
 window.addEventListener("hashchange", render);
 
-const PAGES = { "": home, garden: gardenPage, calendar: calendarPage, plants: plantsPage, me: mePage, shop: shopPage, start: onboarding };
-const PUBLIC = { welcome, login: loginPage, join: joinPage };
+const PAGES = { "": home, garden: gardenPage, calendar: calendarPage, plants: plantsPage, me: mePage, shop: shopPage, start: onboarding, admin: adminPage };
+const PUBLIC = { welcome, login: loginPage, join: joinPage, reset: resetPage };
 
 function render() {
   const [route, query] = location.hash.replace(/^#\/?/, "").split("?");
@@ -132,6 +132,7 @@ function render() {
   document.body.style.paddingBottom = loggedIn && route !== "start" ? "" : "20px";
   view.onclick = null;
   if (!loggedIn) { (PUBLIC[route] || welcome)(); return; }
+  if (route === "reset") { $("#topbar").hidden = $("#tabs").hidden = true; resetPage(); return; }
   if (PUBLIC[route]) { go("#/"); return; }
   const tab = route === "shop" ? "" : route;
   document.querySelectorAll(".tabs a").forEach((a) => a.classList.toggle("on", (a.dataset.tab === "home" ? "" : a.dataset.tab) === tab));
@@ -171,7 +172,8 @@ function loginPage() {
     <label class="field" for="pw">Password</label><input id="pw" type="password" autocomplete="current-password" required>
     <div id="err"></div>
     <button class="btn primary wide" style="margin-top:16px">Log in</button>
-  </form><p class="small muted" style="text-align:center"><a href="#/join">New here? Make an account</a></p></div>`;
+  </form><p class="small muted" style="text-align:center"><a href="#/join">New here? Make an account</a></p>
+  <p class="small muted" style="text-align:center">Forgotten your password? Ask whoever runs Grow to Gobble for a reset link.</p></div>`;
   $("#f").onsubmit = async (e) => {
     e.preventDefault();
     try { S.me = await api("POST", "/api/login", { email: $("#email").value, password: $("#pw").value }); await boot(); }
@@ -319,7 +321,8 @@ function jobCard(job, opts = {}) {
     extra = `<div class="row" style="margin-top:8px"><button class="btn small" data-replan="${job.crop_id}">📅 Plan it for next time</button>
       <button class="btn small ghost" data-tick="${esc(job.key)}">I did it anyway</button></div>`;
   }
-  const where = opts.showSpace && c.space_name ? ` · ${esc(c.space_name)}` : "";
+  const row = rowLabel(c);
+  const where = (opts.showSpace && c.space_name ? ` · ${esc(c.space_name)}` : "") + (row ? ` · ${row}` : "");
   return `<div class="job">
     <div class="job-emoji k-${job.kind}">${p.emoji}<small>${job.emoji}</small></div>
     <div class="job-body">
@@ -507,11 +510,19 @@ function nextJob(c) {
   return open.find((j) => j.status === "now") || open[0];
 }
 
+// Several rows of the same crop in one bed (sown a few weeks apart): "Row 1", "Row 2"... in sowing order
+function rowLabel(c) {
+  const same = S.g.crops.filter((x) => x.plant_id === c.plant_id && x.space_id === c.space_id && !x.finished_on)
+    .sort((a, b) => (a.sown_on || a.planted_on || a.anchor).localeCompare(b.sown_on || b.planted_on || b.anchor) || a.id - b.id);
+  return same.length > 1 && !c.finished_on ? "Row " + (same.findIndex((x) => x.id === c.id) + 1) : "";
+}
+
 function cropRow(c) {
-  const p = plant(c.plant_id), j = nextJob(c);
+  const p = plant(c.plant_id), j = nextJob(c), row = rowLabel(c);
+  const when = c.sown_on ? "sown " + fmt(c.sown_on) : c.planted_on ? "planted " + fmt(c.planted_on) : "";
   return `<div class="crop-row" data-open-crop="${c.id}">
     <span class="e">${p.emoji}</span>
-    <div class="n">${esc(p.name)}<div class="small muted" style="font-weight:600">${j ? esc(j.title) + " · " + whenText(j) : c.finished_on ? "Finished" : "All done 🎉"}</div></div>
+    <div class="n">${esc(p.name)}${row ? ` <span class="chip grey">${row}${when ? " · " + when : ""}</span>` : ""}<div class="small muted" style="font-weight:600">${j ? esc(j.title) + " · " + whenText(j) : c.finished_on ? "Finished" : "All done 🎉"}</div></div>
     <div class="stage" aria-label="Stage ${c.stage + 1} of 5">${STAGES.map((e, i) => `<span class="${i <= c.stage ? "on" : ""}">${e}</span>`).join("")}</div>
   </div>`;
 }
@@ -525,7 +536,7 @@ function gardenPage() {
       const k = SPACE_KINDS[s.kind];
       const built = s.nodig_done.length, total = S.cat.nodig_steps.length;
       return `<div class="card">
-        <div class="space-head"><span class="e">${k.emoji}</span><h3>${esc(s.name)}</h3><button class="btn small ghost" data-open-space="${s.id}">${s.kind === "pot" ? "How to" : built < total ? "Build it" : "Built ✅"}</button></div>
+        <div class="space-head"><span class="e">${k.emoji}</span><h3>${esc(s.name)}</h3><button class="btn small ghost" data-open-space="${s.id}">${s.kind === "pot" ? "Details" : built < total ? "Details & build" : "Details ✅"}</button></div>
         ${s.kind !== "pot" && built < total ? `<div class="progress" title="No-dig bed ${built} of ${total}"><i style="width:${(100 * built) / total}%"></i></div>` : ""}
         ${usageBar(s)}
         ${s.clashes.map((x) => `<div class="checkbox warn small" style="margin-top:8px">🙅 ${plant(x.a).emoji} ${esc(plant(x.a).name)} and ${plant(x.b).emoji} ${esc(plant(x.b).name)} don't like sharing: ${esc(x.why)}.</div>`).join("")}
@@ -551,30 +562,52 @@ function usageBar(s) {
     <div class="progress"><i style="width:${Math.min(100, pct)}%"></i></div></div>`;
 }
 
-function addSpaceSheet(existing) {
-  const s = existing && existing.id ? existing : null;
-  openSheet(`<h2>${s ? "Change" : "Add"} a growing space</h2>
-    <label class="field" for="sn">Name</label><input id="sn" type="text" maxlength="40" value="${esc(s ? s.name : "")}" placeholder="e.g. Back bed, Patio pots">
+// The details of a bed or pot: name, kind, size and soil - shared by "add" and the bed's own page
+function spaceForm(s) {
+  const kind = s ? s.kind : "bed", soil = (s && s.soil) || (kind === "pot" ? "compost" : "unknown");
+  return `<label class="field" for="sn">Name</label><input id="sn" type="text" maxlength="40" value="${esc(s ? s.name : "")}" placeholder="e.g. Back bed, Patio pots">
     <label class="field">What kind?</label>
-    ${Object.entries(SPACE_KINDS).map(([k, v]) => `<label class="method ${(s ? s.kind : "bed") === k ? "on" : ""}"><input type="radio" name="kind" value="${k}" ${(s ? s.kind : "bed") === k ? "checked" : ""}> <span style="font-size:26px">${v.emoji}</span> <b>${v.label}</b></label>`).join("")}
-    <div id="size"><label class="field">How big is it? <span class="muted small">(metres - so we can check what fits)</span></label>
-      <div class="row" style="flex-wrap:nowrap"><input id="sw" type="number" step="0.1" min="0.1" inputmode="decimal" placeholder="1.2" value="${s && s.width_m ? s.width_m : ""}" aria-label="Width in metres">
-      <span>×</span><input id="sl" type="number" step="0.1" min="0.1" inputmode="decimal" placeholder="2.4" value="${s && s.length_m ? s.length_m : ""}" aria-label="Length in metres"></div>
-      <p class="small muted" style="margin-top:6px">Not sure? A standard raised bed is 1.2 × 2.4 m. A half allotment plot is about 5 × 25 m.</p></div>
-    <div class="row" style="margin-top:12px"><button class="btn primary" id="save">${s ? "Save" : "Add it"}</button>
-    ${s ? `<button class="btn danger" id="del">Delete</button>` : ""}</div>`);
-  const showSize = () => { $("#size").hidden = document.querySelector("input[name=kind]:checked").value === "pot"; };
-  showSize();
-  $("#sheet-card").onchange = (e) => { if (e.target.name === "kind") { document.querySelectorAll(".method").forEach((m) => m.classList.toggle("on", m.contains(e.target))); showSize(); } };
+    <div class="kinds">${Object.entries(SPACE_KINDS).map(([k, v]) => `<label class="kind ${kind === k ? "on" : ""}"><input type="radio" name="kind" value="${k}" ${kind === k ? "checked" : ""}><span class="e">${v.emoji}</span><b>${v.label}</b></label>`).join("")}</div>
+    <div id="size"><label class="field">How big is it? <span class="muted small">(so we can check what fits)</span></label>
+      <div class="size-row">
+        <label class="big-num"><span>Width</span><input id="sw" type="number" step="0.1" min="0.1" inputmode="decimal" placeholder="1.2" value="${s && s.width_m ? s.width_m : ""}"><em>m</em></label>
+        <span class="times">×</span>
+        <label class="big-num"><span>Length</span><input id="sl" type="number" step="0.1" min="0.1" inputmode="decimal" placeholder="2.4" value="${s && s.length_m ? s.length_m : ""}"><em>m</em></label>
+      </div>
+      <p class="area" id="area"></p>
+      <p class="small muted" style="margin:4px 0 0">Measure with a tape measure in metres (100cm = 1m). A standard raised bed is 1.2 × 2.4 m. A half allotment plot is about 5 × 25 m.</p></div>
+    <label class="field">What's the soil like?</label>
+    <div class="soils">${Object.entries(S.cat.soil_types).map(([k, v]) => `<label class="soilopt ${soil === k ? "on" : ""}"><input type="radio" name="soil" value="${k}" ${soil === k ? "checked" : ""}><span>${v.emoji}</span> ${esc(v.name)}</label>`).join("")}</div>
+    <div class="checkbox" id="soiltip"></div>`;
+}
+
+function wireSpaceForm(s, afterSave) {
+  const card = $("#sheet-card");
+  const val = (n) => { const el = card.querySelector(`input[name=${n}]:checked`); return el && el.value; };
+  const refresh = () => {
+    card.querySelectorAll(".kind").forEach((el) => el.classList.toggle("on", el.querySelector("input").checked));
+    card.querySelectorAll(".soilopt").forEach((el) => el.classList.toggle("on", el.querySelector("input").checked));
+    $("#size").hidden = val("kind") === "pot";
+    const w = Number($("#sw").value), l = Number($("#sl").value);
+    $("#area").innerHTML = w && l ? `= <b>${(w * l).toFixed(2).replace(/\.?0+$/, "")} m²</b> of growing space` : "";
+    const t = S.cat.soil_types[val("soil") || "unknown"];
+    $("#soiltip").innerHTML = `<div><b>${t.emoji} How to tell:</b> ${esc(t.test)}</div><div><b>🌱 What to do:</b> ${esc(t.tips)}</div>`;
+  };
+  card.addEventListener("input", refresh);
+  card.addEventListener("change", refresh);
+  refresh();
   $("#save").onclick = async () => {
-    const body = { name: $("#sn").value || "My bed", kind: document.querySelector("input[name=kind]:checked").value,
+    const body = { name: $("#sn").value || "My bed", kind: val("kind"), soil: val("soil"),
                    width_m: Number($("#sw").value) || null, length_m: Number($("#sl").value) || null };
-    if (await change(s ? "PATCH" : "POST", s ? `/api/spaces/${s.id}` : "/api/spaces", body, s ? "Saved" : "Added ✅")) closeSheet();
+    if (await change(s ? "PATCH" : "POST", s ? `/api/spaces/${s.id}` : "/api/spaces", body, s ? "Saved ✅" : "Added ✅") && afterSave) afterSave();
   };
-  if (s) $("#del").onclick = async () => {
-    if (!confirm(`Delete ${s.name}? Plants in it stay in your plan, just not placed.`)) return;
-    if (await change("DELETE", `/api/spaces/${s.id}`, null, "Deleted")) closeSheet();
-  };
+}
+
+function addSpaceSheet() {
+  S.sheet = null;
+  openSheet(`<h2>Add a growing space</h2>${spaceForm(null)}
+    <button class="btn primary wide" id="save" style="margin-top:16px">Add it</button>`);
+  wireSpaceForm(null, closeSheet);
 }
 
 function openSpace(id) {
@@ -588,14 +621,20 @@ function drawSpace(id) {
   const steps = pot ? S.cat.pot_steps : S.cat.nodig_steps;
   const done = new Set(s.nodig_done);
   openSheet(`<div class="plant-head"><span class="e">${SPACE_KINDS[s.kind].emoji}</span><div><h2 style="margin:0">${esc(s.name)}</h2>
-      <div class="muted">${pot ? "Growing in pots" : "Build a no-dig bed, step by step"}</div></div></div>
+      <div class="muted">${pot ? "Growing in pots" : "Your bed, and how to build it"}</div></div></div>
+    <div class="card"><h3>✏️ About this ${pot ? "space" : "bed"}</h3>${spaceForm(s)}
+      <div class="row" style="margin-top:14px"><button class="btn primary" id="save">Save</button><button class="btn danger small" id="del">🗑️ Delete</button></div></div>
+    <h2 style="margin-top:20px">${pot ? "🪴 Setting up pots" : "📦 Build a no-dig bed"}</h2>
     ${pot ? "" : `<div class="progress"><i style="width:${(100 * done.size) / steps.length}%"></i></div><p class="small muted">${done.size} of ${steps.length} steps done. Tick each one as you go!</p>`}
     <div class="card">${steps.map((st, i) => `<div class="nodig-step"><span class="e">${st.emoji}</span><div style="flex:1"><b>${i + 1}. ${esc(st.title)}</b><div class="small">${esc(st.text)}</div></div>
       ${pot ? "" : `<button class="tick ${done.has(i) ? "done" : ""}" data-tick="s${s.id}:nodig${i}" ${done.has(i) ? 'data-undo="1"' : ""} aria-label="Done">${done.has(i) ? "✓" : ""}</button>`}</div>`).join("")}</div>
     ${pot ? "" : `<p class="small muted">🕰️ Best time to build: autumn or winter, so it's ready for spring. But you can build one any time and plant straight into the compost.</p>
-    <div class="card tint-leaf"><h3>🌱 Planting into your no-dig bed</h3><ol class="steps">${S.cat.nodig_planting.map((t) => `<li>${esc(t)}</li>`).join("")}</ol></div>`}
-    <button class="btn" id="edit-space">✏️ Name, size or delete</button>`);
-  $("#edit-space").onclick = () => addSpaceSheet(s);
+    <div class="card tint-leaf"><h3>🌱 Planting into your no-dig bed</h3><ol class="steps">${S.cat.nodig_planting.map((t) => `<li>${esc(t)}</li>`).join("")}</ol></div>`}`);
+  wireSpaceForm(s);
+  $("#del").onclick = async () => {
+    if (!confirm(`Delete ${s.name}? Plants in it stay in your plan, just not placed.`)) return;
+    if (await change("DELETE", `/api/spaces/${s.id}`, null, "Deleted")) closeSheet();
+  };
 }
 
 // ---- crop detail -----------------------------------------------------------------------------------
@@ -611,7 +650,8 @@ function drawCrop(id) {
   const fits = S.g.spaces.filter((s) => p.where.includes(s.kind === "pot" ? "pot" : "bed"));
   const timeline = c.jobs.filter((j) => j.kind !== "buy" || j.status !== "done");
   const near = new Set(activeCrops().filter((x) => x.space_id && x.space_id === c.space_id && x.id !== c.id).map((x) => x.plant_id));
-  openSheet(`<div class="plant-head"><span class="blob l${p.level}">${p.emoji}</span><div><h2 style="margin:0">${esc(p.name)}</h2>
+  const row = rowLabel(c);
+  openSheet(`<div class="plant-head"><span class="blob l${p.level}">${p.emoji}</span><div><h2 style="margin:0">${esc(p.name)}${row ? ` <span class="chip grey" style="vertical-align:middle">${row}</span>` : ""}</h2>
       <div class="stage" style="font-size:20px;margin-top:4px">${STAGES.map((e, i) => `<span class="${i <= c.stage ? "on" : ""}">${e}</span>`).join("")}</div></div></div>
     <div class="row" style="margin-bottom:12px">
       <select id="cs" aria-label="Where it grows" style="flex:1">${fits.map((s) => `<option value="${s.id}" ${s.id === c.space_id ? "selected" : ""}>${SPACE_KINDS[s.kind].emoji} ${esc(s.name)}</option>`).join("")}
@@ -622,6 +662,7 @@ function drawCrop(id) {
       <div><b>How many ${esc(p.unit)}?</b><div class="small">🧺 ${esc(c.harvest || "")}</div>${c.space_id && S.g.spaces.find((s) => s.id === c.space_id).kind !== "pot" ? `<div class="small muted">📏 Uses about ${c.area} m²</div>` : ""}</div>
       <div class="counter qty"><button class="btn small" data-cq="-1" aria-label="Fewer">−</button><input id="cq" type="number" inputmode="numeric" min="1" value="${c.qty}"><button class="btn small" data-cq="1" aria-label="More">+</button></div></div></div>
     <div class="card">${timeline.map((j) => jobCard(j)).join("")}</div>
+    ${datesCard(c)}
     ${secondCard(c, p)}
     ${p.succession && c.method !== "plants" ? `<div class="card"><b>🔁 Steady supply</b><p class="small" style="margin:4px 0 0">Sow a little every ${p.succession} weeks instead of all at once - you'll get a few each week rather than loads at the same time. We'll remind you when it's time for the next batch.</p></div>` : ""}
     ${thenCard(c.then && dict(c.then, { family: p.family_name }), "When they're picked, grow next", c.space_id)}
@@ -631,6 +672,8 @@ function drawCrop(id) {
       ${c.finished_on ? "" : `<button class="btn" id="finish">🧹 All finished, clear it</button>`}
       <button class="btn danger" id="remove">🗑️ Remove</button></div>`);
   $("#cs").onchange = (e) => change("PATCH", `/api/crops/${c.id}`, { plant_id: c.plant_id, space_id: Number(e.target.value) }, "Moved");
+  document.querySelectorAll("[data-date]").forEach((inp) => (inp.onchange = () => change("PATCH", `/api/crops/${c.id}`,
+    { plant_id: c.plant_id, [inp.dataset.date]: inp.value || "" }, inp.value ? "Date saved - plan updated 📅" : "Date cleared")));
   document.querySelectorAll("[data-second]").forEach((b) => (b.onclick = () => change("POST", "/api/crops", {
     plant_id: c.plant_id, method: c.method, quantity: c.qty, space_id: Number(b.dataset.space), after: c.second.window[0],
   }, `Second batch of ${p.name.toLowerCase()} planned 🌗`)));
@@ -712,6 +755,18 @@ function thenCard(then, title, spaceId) {
     <p class="small muted" style="margin:8px 0 0">We skip ${then.family ? "the " + esc(then.family) : "its close relatives"} - they share the same pests and diseases.</p></div>`;
 }
 
+// When things really happened - harvest dates are worked out from these, not the season's averages
+function datesCard(c) {
+  const rows = [];
+  if (c.method !== "plants") rows.push(["sown_on", c.method === "sow_in" ? "🏠 Sown indoors" : "🌱 Sown"]);
+  if (c.method !== "sow_out") rows.push(["planted_on", "🌿 Planted out"]);
+  rows.push(["harvested_on", "🧺 First picked"]);
+  const shown = rows.filter(([f]) => c[f] || (f === "sown_on") || (f === "planted_on" && c.sown_on) || (f === "harvested_on" && (c.sown_on || c.planted_on)));
+  return `<div class="card"><h3>📅 Dates</h3>
+    <p class="small muted" style="margin:0 0 8px">We note the date when you tick a job. Did it on a different day? Change it here - picking dates move to match.</p>
+    ${shown.map(([f, label]) => `<label class="daterow"><span>${label}</span><input type="date" data-date="${f}" value="${c[f] || ""}" max="${S.g.today}"></label>`).join("")}</div>`;
+}
+
 // Autumn/spring crops: do you need both? And where the second batch could go.
 function secondCard(c, p) {
   const s2 = c.second;
@@ -734,6 +789,16 @@ function pestsCard(p) {
     <div class="nbs">${x.who.map((w) => `<div class="nb bad"><span class="e">${w.emoji}</span><span><b>${esc(w.name)}</b><small>${esc(w.what)}</small></span></div>`).join("")}</div>
     ${x.protect.length ? `<h3 style="margin-top:14px">How to stop them</h3><ol class="steps">${x.protect.map((st) => `<li>${esc(st)}</li>`).join("")}</ol>` : ""}
     ${cover ? `<div class="checkbox"><b>${cover}</b>${x.uncover ? `<div>🙌 <b>When to uncover:</b> ${esc(x.uncover)}</div>` : ""}</div>` : ""}</div>`;
+}
+
+// What soil it likes, and gentle, garden-safe things to add for a bigger crop
+function soilCard(p) {
+  const x = p.soil;
+  return `<div class="card tint-soil"><h3>🟫 Soil & feeding</h3>
+    <p style="margin:0 0 6px"><b>Likes:</b> ${esc(x.likes)}</p>
+    <p class="small" style="margin:0 0 10px">${esc(x.how)}</p>
+    <div class="nbs">${x.add.map((a) => `<div class="nb"><span class="e">${a.emoji}</span><span><b>${esc(a.name)}</b><small>${esc(a.what)}</small></span></div>`).join("")}</div>
+    <div class="checkbox"><div>🏆 <b>For a bigger crop:</b> ${esc(x.bigger)}</div></div></div>`;
 }
 
 function storeCard(p) {
@@ -760,7 +825,12 @@ function openPlant(id, spaceId, startMethod, after) {
   const fits = S.g.spaces.filter((s) => p.where.includes(s.kind === "pot" ? "pot" : "bed"));
   const already = activeCrops().filter((c) => c.plant_id === id);
   let method = p.methods.includes(startMethod) ? startMethod : p.methods[0];
-  let qty = p.default_qty;
+  let qty = p.default_qty, batches = 1, every = p.succession || 2;
+  const rowsHtml = () => p.succession && method !== "plants" ? `<label class="field">How many rows? <span class="muted small">(sowing a row every few weeks gives a steady supply)</span></label>
+      <div class="chips">${[1, 2, 3, 4].map((n) => `<button class="btn small ${n === batches ? "primary" : ""}" data-rows="${n}">${n === 1 ? "Just 1" : n + " rows"}</button>`).join("")}</div>
+      ${batches > 1 ? `<label class="field">How far apart?</label>
+      <div class="chips">${[2, 3, 4].map((n) => `<button class="btn small ${n === every ? "primary" : ""}" data-every="${n}">Every ${n} weeks${n === p.succession ? " ⭐" : ""}</button>`).join("")}</div>
+      <p class="small muted" style="margin:6px 0 0">Each row gets its own sowing and picking dates, so you can tell them apart. "How many" is per row. ⭐ = what we'd suggest.</p>` : ""}` : "";
   const methodOpts = () => p.methods.map((m) => {
     const w = p.next[m];
     const when = after ? "" : w ? (daysBetween(today(), d(w[0])) <= 0 ? "You can do this now, until " + fmt(w[1]) : "Next chance: " + fmt(w[0]) + " to " + fmt(w[1])) : "";
@@ -784,6 +854,7 @@ function openPlant(id, spaceId, startMethod, after) {
     ${roomCard(p)}
     ${p.prep.map((x) => `<div class="card tint-soil"><h3>🪜 Before you plant: ${esc(x.title.charAt(0).toLowerCase() + x.title.slice(1))}</h3><ol class="steps">${x.steps.map((st) => `<li>${esc(st)}</li>`).join("")}</ol></div>`).join("")}
     ${steps ? `<div class="card"><h3>👣 How to plant</h3><ol class="steps">${steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></div>` : ""}
+    ${soilCard(p)}
     ${neighboursCard(p)}
     ${pestsCard(p)}
     <div class="card tint-leaf"><h3>🧺 Picking</h3><p style="margin:0">${esc(p.harvest_tip)}</p></div>
@@ -797,6 +868,7 @@ function openPlant(id, spaceId, startMethod, after) {
       <div id="methods">${methodOpts()}</div>
       <label class="field" for="qty">How many ${esc(p.unit)}?</label>
       <div class="counter qty"><button class="btn small" data-q="-1" aria-label="Fewer">−</button><input id="qty" type="number" inputmode="numeric" min="1" max="5000" value="${qty}"><button class="btn small" data-q="1" aria-label="More">+</button></div>
+      <div id="rows">${rowsHtml()}</div>
       ${fits.length ? `<label class="field" for="sp">Where?</label><select id="sp">${fits.map((s) => `<option value="${s.id}" ${s.id === spaceId ? "selected" : ""}>${SPACE_KINDS[s.kind].emoji} ${esc(s.name)}</option>`).join("")}</select>`
         : `<p class="small muted">${p.where.includes("pot") ? "" : "This one needs a bed - it's too big for pots. "}Add a ${p.where.includes("pot") ? "bed or pot" : "bed"} in My garden to place it.</p>`}
       <div id="check" class="check-box" aria-live="polite"></div>
@@ -816,7 +888,13 @@ function openPlant(id, spaceId, startMethod, after) {
       } catch (e) { /* the check is a nicety; adding still works */ }
     }, 250);
   };
-  $("#methods").onchange = (e) => { method = e.target.value; $("#methods").innerHTML = methodOpts(); runCheck(); };
+  $("#methods").onchange = (e) => { method = e.target.value; $("#methods").innerHTML = methodOpts(); $("#rows").innerHTML = rowsHtml(); runCheck(); };
+  $("#rows").onclick = (e) => {
+    const b = e.target.closest("[data-rows]"), ev = e.target.closest("[data-every]");
+    if (b) batches = Number(b.dataset.rows);
+    if (ev) every = Number(ev.dataset.every);
+    if (b || ev) $("#rows").innerHTML = rowsHtml();
+  };
   $("#qty").oninput = (e) => { qty = Math.max(1, Math.min(5000, Number(e.target.value) || 1)); runCheck(); };
   document.querySelectorAll("[data-q]").forEach((b) => (b.onclick = () => {
     const step = qty >= 50 ? 10 : qty >= 20 ? 5 : 1;
@@ -826,7 +904,9 @@ function openPlant(id, spaceId, startMethod, after) {
   runCheck();
   $("#add").onclick = async () => {
     const sp = $("#sp");
-    if (await change("POST", "/api/crops", { plant_id: p.id, method, quantity: qty, after: after || null, space_id: sp ? Number(sp.value) : null }, `${p.name} added to your plan! 🌱`)) closeSheet();
+    const many = batches > 1 && p.succession && method !== "plants";
+    if (await change("POST", "/api/crops", { plant_id: p.id, method, quantity: qty, after: after || null, space_id: sp ? Number(sp.value) : null,
+      batches: many ? batches : 1, every_weeks: every }, many ? `${batches} rows of ${p.name.toLowerCase()} planned 🌱` : `${p.name} added to your plan! 🌱`)) closeSheet();
   };
 }
 
@@ -866,8 +946,44 @@ function checkHtml(p, r) {
 
 // ---- calendar --------------------------------------------------------------------------------------
 
-let calMonth = null;
+let calMonth = null, calTab = "mine", allFilter = "all";
+const CAL_COLOUR = { sow_in: "var(--sky)", sow_out: "var(--leaf)", plant_out: "var(--soil)", harvest: "var(--marigold)" };
+function calTabs() {
+  return `<div class="seg" role="tablist">
+    <button role="tab" data-caltab="mine" class="${calTab === "mine" ? "on" : ""}">🪴 My calendar</button>
+    <button role="tab" data-caltab="all" class="${calTab === "all" ? "on" : ""}">📖 All plants</button></div>`;
+}
+function wireCalTabs(extra) {
+  view.onclick = (e) => {
+    const tab = e.target.closest("[data-caltab]");
+    if (tab) { calTab = tab.dataset.caltab; calendarPage(); return; }
+    if (extra) extra(e);
+  };
+}
+
+// Every plant in the app on one year chart - just for looking. Tap one to read about it and add it to a bed.
+function allPlantsCalendar() {
+  const nowM = today().getMonth();
+  const have = new Set(activeCrops().map((c) => c.plant_id));
+  const list = filteredPlants(allFilter);
+  const cell = (p, m) => {
+    const kinds = ["sow_in", "sow_out", "plant_out", "harvest"].filter((k) => p.months[k].includes(m + 1));
+    if (!kinds.length) return `<span class="cell ${m === nowM ? "nowcol" : ""}"></span>`;
+    if (kinds.length === 1) return `<span class="cell ${kinds[0]}"></span>`;
+    return `<span class="cell split" style="--c1:${CAL_COLOUR[kinds[0]]};--c2:${CAL_COLOUR[kinds[kinds.length - 1]]}"></span>`;
+  };
+  view.innerHTML = `<h1>📅 Growing calendar</h1>${calTabs()}
+    <p class="muted">When to sow, plant and pick everything in the app, for ${esc(S.me.region.short)}. Just for looking - tap a plant you like to add it to one of your beds.</p>
+    ${filterBar(allFilter)}
+    <div class="card planner"><div class="months">
+      <span></span>${MONTHS.map((mm, i) => `<span class="m ${i === nowM ? "now" : ""}"><span class="long">${mm}</span><span class="short">${mm[0]}</span></span>`).join("")}
+      ${list.map((p) => `<span class="lab" data-open-plant="${p.id}" style="cursor:pointer">${p.emoji} ${esc(p.name)}${have.has(p.id) ? " 🌱" : ""}</span>${MONTHS.map((_, m) => cell(p, m)).join("")}`).join("")}</div>
+      <div class="legend"><span><i style="background:var(--sky)"></i>Sow indoors</span><span><i style="background:var(--leaf)"></i>Sow outside</span><span><i style="background:var(--soil)"></i>Plant out</span><span><i style="background:var(--marigold)"></i>Pick</span><span>🌱 = in your garden</span></div></div>`;
+  wireCalTabs((e) => { const f = e.target.closest("[data-filter]"); if (f) { allFilter = f.dataset.filter; calendarPage(); } });
+}
+
 function calendarPage() {
+  if (calTab === "all") { allPlantsCalendar(); return; }
   const t = today();
   const months = Array.from({ length: 12 }, (_, i) => new Date(t.getFullYear(), t.getMonth() + i, 1));
   const colour = { sow_in: "var(--sky)", sow_out: "var(--leaf)", plant_out: "var(--soil)", harvest: "var(--marigold)" };
@@ -894,7 +1010,7 @@ function calendarPage() {
   const monthJobs = crops.flatMap((c) => c.jobs).filter((j) => j.kind !== "eat" && j.kind !== "buy" && d(j.start) <= mEnd && d(j.end) >= m && (j.status !== "missed"))
     .sort((a, b) => a.start.localeCompare(b.start));
   const calUrl = location.origin + S.me.calendar_path;
-  view.innerHTML = `<h1>📅 Your growing calendar</h1>
+  view.innerHTML = `<h1>📅 Growing calendar</h1>${calTabs()}
     <p class="muted">When to sow, plant and pick everything you're growing, for the next 12 months.</p>
     ${crops.length ? `<div class="card planner"><div class="months">
       <span></span>${months.map((mm, i) => `<span class="m ${i === 0 ? "now" : ""}"><span class="long">${MONTHS[mm.getMonth()]}</span><span class="short">${MONTHS[mm.getMonth()][0]}</span></span>`).join("")}
@@ -909,7 +1025,7 @@ function calendarPage() {
       <div class="row"><a class="btn small" href="${esc(calUrl.replace(/^https?:/, "webcal:"))}">🍏 Apple Calendar</a>
       <a class="btn small" href="https://calendar.google.com/calendar/r?cid=${encodeURIComponent(calUrl.replace(/^https?:/, "webcal:"))}" target="_blank" rel="noopener">📆 Google Calendar</a>
       <button class="btn small ghost" id="copycal">Copy link</button></div></div>`;
-  view.onclick = (e) => { const b = e.target.closest("[data-cal]"); if (b) { calMonth = Number(b.dataset.cal); calendarPage(); } };
+  wireCalTabs((e) => { const b = e.target.closest("[data-cal]"); if (b) { calMonth = Number(b.dataset.cal); calendarPage(); } });
   $("#copycal").onclick = () => navigator.clipboard.writeText(calUrl).then(() => toast("Link copied 📋"), () => toast(calUrl));
 }
 
@@ -930,12 +1046,19 @@ function mePage() {
   view.innerHTML = `<h1>🏅 ${esc(S.me.name)}'s badges</h1>
     <p class="muted">${got} of ${S.g.badges.length} earned. Keep growing!</p>
     <div class="badges">${S.g.badges.map((b) => `<div class="badge ${b.earned_on ? "got" : "locked"}"><span class="e">${b.emoji}</span><b>${esc(b.name)}</b><small>${esc(b.text)}</small></div>`).join("")}</div>
-    <div class="section-title"><h2>⚙️ Settings</h2></div>
+    <div class="section-title"><h2>⚙️ My account</h2></div>
+    ${S.me.is_admin ? `<a class="card tint-plum row" href="#/admin" style="justify-content:space-between;text-decoration:none;color:inherit"><b>🛠️ Admin: accounts & password resets</b><span class="btn small">Open 👉</span></a>` : ""}
     <div class="card">
       <label class="field" for="nm">Name</label><input id="nm" type="text" maxlength="40" value="${esc(S.me.name)}">
+      <label class="field" for="em">Email <span class="muted small">(you log in with this)</span></label><input id="em" type="email" value="${esc(S.me.email)}" autocomplete="email">
       <label class="field" for="pc">Postcode</label><input id="pc" type="text" value="${esc(S.me.outcode || "")}" placeholder="e.g. LS6">
       <p class="small muted" style="margin-top:6px">📍 ${esc(S.me.region.name)} - last frost usually ${esc(S.me.region.last_frost)}.</p>
       <button class="btn primary" id="save">Save</button>
+    </div>
+    <div class="card"><h3>🔑 Change password</h3>
+      <label class="field" for="pw0">Current password</label><input id="pw0" type="password" autocomplete="current-password">
+      <label class="field" for="pw1">New password <span class="muted small">(8 or more letters)</span></label><input id="pw1" type="password" autocomplete="new-password" minlength="8">
+      <button class="btn" id="pwsave" style="margin-top:12px">Change password</button>
     </div>
     <div class="card"><h3>🔔 Reminders</h3>
       ${S.g.has_push ? `<p class="small">Reminders are on. We'll only send them between 8am and 8pm.</p>
@@ -943,10 +1066,20 @@ function mePage() {
       : pushBanner() || `<p class="small muted">This browser can't do reminders. Try the app on your phone.</p>`}
     </div>
     ${S.installPrompt ? `<div class="card tint-leaf"><h3>📲 Install the app</h3><button class="btn primary" id="install">Add to my home screen</button></div>` : ""}
-    <div class="row"><button class="btn" id="logout">Log out</button><button class="btn ghost small" id="delete">Delete my account</button></div>`;
+    <div class="row"><button class="btn" id="logout">Log out</button></div>
+    <details class="card" style="margin-top:14px"><summary><b>🗑️ Delete my account</b></summary>
+      <p class="small">This deletes your account and your whole garden plan, for ever. It can't be undone.</p>
+      <label class="field" for="delpw">Type your password to confirm</label><input id="delpw" type="password" autocomplete="current-password">
+      <button class="btn danger" id="delete" style="margin-top:12px">Delete everything</button></details>`;
   wirePush();
   $("#save").onclick = async () => {
-    try { S.me = await api("PATCH", "/api/me", { name: $("#nm").value, postcode: $("#pc").value }); S.cat = await api("GET", "/api/plants"); S.g = await api("GET", "/api/garden"); render(); toast("Saved ✅"); }
+    try {
+      S.me = await api("PATCH", "/api/me", { name: $("#nm").value, email: $("#em").value, postcode: $("#pc").value });
+      S.cat = await api("GET", "/api/plants"); S.g = await api("GET", "/api/garden"); render(); toast("Saved ✅");
+    } catch (e) { toast(e.message); }
+  };
+  $("#pwsave").onclick = async () => {
+    try { await api("POST", "/api/me/password", { current: $("#pw0").value, new: $("#pw1").value }); $("#pw0").value = $("#pw1").value = ""; toast("Password changed 🔑"); }
     catch (e) { toast(e.message); }
   };
   const pt = $("#ptest"); if (pt) pt.onclick = () => api("POST", "/api/push/test").then(() => toast("Sent! Check your phone 📱"), (e) => toast(e.message));
@@ -954,10 +1087,68 @@ function mePage() {
   const ins = $("#install"); if (ins) ins.onclick = async () => { S.installPrompt.prompt(); S.installPrompt = null; render(); };
   $("#logout").onclick = async () => { await api("POST", "/api/logout"); S.me = S.g = null; go("#/welcome"); };
   $("#delete").onclick = async () => {
-    const pw = prompt("This deletes your account and your whole garden plan, for ever. Type your password to confirm:");
-    if (!pw) return;
-    try { await api("POST", "/api/me/delete", { password: pw }); S.me = S.g = null; go("#/welcome"); toast("Account deleted"); }
+    if (!$("#delpw").value) { toast("Type your password first"); return; }
+    if (!confirm("Really delete your account and garden plan for ever?")) return;
+    try { await api("POST", "/api/me/delete", { password: $("#delpw").value }); S.me = S.g = null; go("#/welcome"); toast("Account deleted"); }
     catch (e) { toast(e.message); }
+  };
+}
+
+// ---- admin (like the Training Tracker: accounts, one-time reset links, admins) ------------------------
+
+async function adminPage() {
+  if (!S.me.is_admin) { go("#/me"); return; }
+  view.innerHTML = `<h1>🛠️ Admin</h1><p class="muted">Loading…</p>`;
+  let data;
+  try { data = await api("GET", "/api/admin"); } catch (e) { view.innerHTML = `<h1>🛠️ Admin</h1><div class="error">${esc(e.message)}</div>`; return; }
+  drawAdmin(data);
+}
+
+function drawAdmin(data) {
+  const ago = (iso) => { if (!iso) return "never"; const n = daysBetween(d(iso.slice(0, 10)), today()); return n <= 0 ? "today" : n === 1 ? "yesterday" : n + " days ago"; };
+  view.innerHTML = `<h1>🛠️ Admin</h1>
+    <div class="card ${data.on_volume ? "tint-leaf" : "tint-tomato"}"><b>${data.on_volume ? "✅ Accounts are saved safely" : "⚠️ Accounts are NOT on permanent storage"}</b>
+      <p class="small" style="margin:4px 0 0">${data.on_volume ? "The database is on a Railway volume, so it survives updates and restarts."
+        : "On Railway: open the service → Settings → Volumes → Add volume, mount path /data. Until then, accounts are wiped whenever the app updates. (On your own computer this is normal.)"}</p></div>
+    <p class="muted">${data.users.length} account${data.users.length === 1 ? "" : "s"}. There's no email sending yet, so to reset someone's password, make a link and send it to them yourself - it works once, for 48 hours.</p>
+    ${data.users.map((u) => `<div class="card">
+      <div class="row" style="justify-content:space-between"><div><b>${esc(u.name)}</b> ${u.is_admin ? `<span class="chip">🛠️ Admin</span>` : ""}${u.id === data.me ? ` <span class="chip grey">You</span>` : ""}
+        <div class="small muted">${esc(u.email)}${u.outcode ? " · " + esc(u.outcode) : ""}</div>
+        <div class="small muted">Joined ${fmt(u.created_at.slice(0, 10))} · last active ${ago(u.last_active)} · ${u.crops} crop${u.crops === 1 ? "" : "s"} · ${u.devices ? "🔔 reminders on" : "no reminders"}</div></div></div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn small" data-reset="${u.id}">🔑 Password reset link</button>
+        ${u.id === data.me ? "" : `<button class="btn small ghost" data-admin="${u.id}" data-to="${u.is_admin ? 0 : 1}">${u.is_admin ? "Remove admin" : "Make admin"}</button>
+        <button class="btn small danger" data-del="${u.id}" data-name="${esc(u.name)}">Delete</button>`}</div>
+      <div id="link-${u.id}"></div></div>`).join("")}`;
+  view.onclick = async (e) => {
+    const r = e.target.closest("[data-reset]"), m = e.target.closest("[data-admin]"), x = e.target.closest("[data-del]");
+    try {
+      if (r) {
+        const out = await api("POST", `/api/admin/users/${r.dataset.reset}/reset`);
+        $("#link-" + r.dataset.reset).innerHTML = `<div class="checkbox"><b>Send this link to them</b> (works once, for ${out.hours} hours):
+          <input type="text" readonly value="${esc(out.link)}" onclick="this.select()"><button class="btn small" data-copy="${esc(out.link)}">📋 Copy</button></div>`;
+      }
+      if (m) drawAdmin(await api("POST", `/api/admin/users/${m.dataset.admin}/admin`, { is_admin: m.dataset.to === "1" }));
+      if (x && confirm(`Delete ${x.dataset.name}'s account and garden for ever?`)) drawAdmin(await api("DELETE", `/api/admin/users/${x.dataset.del}`));
+      const c = e.target.closest("[data-copy]");
+      if (c) navigator.clipboard.writeText(c.dataset.copy).then(() => toast("Link copied 📋"), () => toast("Select the link and copy it"));
+    } catch (err) { toast(err.message); }
+  };
+}
+
+// A one-time link from an admin: set a new password and carry on
+function resetPage() {
+  const token = new URLSearchParams(location.hash.split("?")[1] || "").get("token") || "";
+  view.innerHTML = `<div class="auth-card"><div class="hero" style="padding-bottom:0"><div class="big">🔑</div><h1>Set a new password</h1></div>
+  <form class="card" id="f">
+    <label class="field" for="pw1">New password <span class="muted small">(8 or more letters)</span></label><input id="pw1" type="password" autocomplete="new-password" minlength="8" required>
+    <label class="field" for="pw2">Type it again</label><input id="pw2" type="password" autocomplete="new-password" minlength="8" required>
+    <div id="err"></div><button class="btn primary wide" style="margin-top:16px">Save and log in</button></form></div>`;
+  $("#f").onsubmit = async (e) => {
+    e.preventDefault();
+    if ($("#pw1").value !== $("#pw2").value) { $("#err").innerHTML = `<div class="error">Those two passwords don't match.</div>`; return; }
+    try { S.me = await api("POST", "/api/reset", { token, password: $("#pw1").value }); await boot("#/"); toast("Password changed - welcome back! 🌱"); }
+    catch (err) { $("#err").innerHTML = `<div class="error">${esc(err.message)}</div>`; }
   };
 }
 

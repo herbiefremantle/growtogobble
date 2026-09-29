@@ -282,7 +282,8 @@ details.how[open] summary::before { content: "👇 "; }
 .pip ul { margin: 0; padding-left: 18px; }
 
 /* ---- year planner ---- */
-.planner .months { grid-template-columns: minmax(84px, 1.4fr) repeat(12, minmax(15px, 1fr)); gap: 2px; }
+.planner .months { grid-template-columns: minmax(104px, 1.6fr) repeat(12, minmax(14px, 1fr)); gap: 2px; }
+.planner .lab { font-size: 13px !important; white-space: normal; line-height: 1.15; }
 .planner .lab { font-size: 14px; color: var(--ink); font-weight: 800; }
 .planner .m .long { display: none; }
 @media (min-width: 560px) { .planner .months { gap: 3px; } .planner .m .long { display: inline; } .planner .m .short { display: none; } }
@@ -369,3 +370,28 @@ details.how[open] summary::before { content: "👇 "; }
 .suggest button.full { border-color: var(--line); color: var(--muted); }
 .k-prep { background: var(--soil-soft); }
 .k-protect { background: var(--sky-soft); }
+
+/* two-way switch (calendar tabs) */
+.seg { display: flex; gap: 4px; padding: 4px; background: var(--bg-2); border-radius: 16px; margin: 4px 0 12px; }
+.seg button { flex: 1; border: 0; background: transparent; font: inherit; font-weight: 800; font-size: 15px; color: var(--muted); padding: 10px 8px; border-radius: 12px; cursor: pointer; }
+.seg button.on { background: var(--card); color: var(--forest); box-shadow: var(--shadow); }
+.daterow { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; font-weight: 800; }
+.daterow input { width: auto; font: inherit; padding: 8px 10px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); color: var(--ink); }
+
+/* bed details form */
+.kinds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.kind { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; padding: 12px 6px; border: 2px solid var(--line); border-radius: 16px; background: var(--card); cursor: pointer; font-size: 14px; }
+.kind .e { font-size: 30px; }
+.kind input, .soilopt input { position: absolute; opacity: 0; pointer-events: none; }
+.kind.on, .soilopt.on { border-color: var(--leaf); background: var(--sage); }
+.size-row { display: flex; align-items: flex-end; gap: 10px; }
+.times { font-size: 28px; font-weight: 800; color: var(--muted); padding-bottom: 14px; }
+.big-num { flex: 1; display: block; position: relative; }
+.big-num span { display: block; font-weight: 800; font-size: 14px; color: var(--muted); margin-bottom: 4px; }
+.big-num input { width: 100%; font-family: var(--display); font-size: 34px; padding: 14px 40px 14px 16px; border-radius: 18px; border: 2px solid var(--line); background: var(--card); color: var(--ink); text-align: center; }
+.big-num input:focus { outline: none; border-color: var(--leaf); }
+.big-num em { position: absolute; right: 16px; bottom: 20px; font-style: normal; font-weight: 800; color: var(--muted); font-size: 18px; }
+.area { margin: 10px 0 0; font-size: 18px; color: var(--forest); min-height: 1em; }
+.soils { display: flex; flex-wrap: wrap; gap: 8px; }
+.soilopt { position: relative; padding: 8px 12px; border: 2px solid var(--line); border-radius: 999px; background: var(--card); cursor: pointer; font-weight: 800; font-size: 14px; }
+.checkbox input[type=text] { font-size: 14px; padding: 8px 10px; margin: 6px 0; }
