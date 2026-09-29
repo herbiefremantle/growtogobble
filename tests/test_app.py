@@ -432,3 +432,12 @@ def test_built_bed_counts_as_built(client):
     _join(client)
     g = client.post("/api/spaces", json={"name": "Plot", "kind": "bed", "built": True}).json()
     assert g["spaces"][0]["built"] == 1 and "builder" in [b["id"] for b in g["new_badges"]]
+
+
+def test_take_a_crop_out_of_its_bed(client):
+    _join(client)
+    sid = client.post("/api/spaces", json={"name": "Bed 1", "kind": "bed"}).json()["spaces"][0]["id"]
+    c = client.post("/api/crops", json={"plant_id": "peas", "space_id": sid}).json()["crops"][0]
+    assert c["space_id"] == sid
+    g = client.patch("/api/crops/%d" % c["id"], json={"plant_id": "peas", "clear_space": True}).json()
+    assert g["crops"][0]["space_id"] is None

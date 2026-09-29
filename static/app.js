@@ -352,6 +352,21 @@ const CHEERS = { sow: "Brilliant! Seeds sown 🌱", plant: "Nice planting! 🌿"
 
 // one click handler for every job button, wherever it appears
 document.addEventListener("click", async (e) => {
+  const out = e.target.closest("[data-unplace]");
+  if (out) {
+    e.stopPropagation();
+    const c = crop(Number(out.dataset.unplace));
+    await change("PATCH", `/api/crops/${c.id}`, { plant_id: c.plant_id, clear_space: true }, `${plant(c.plant_id).name} taken out - it's under Not placed yet 📍`);
+    return;
+  }
+  const empty = e.target.closest("[data-empty]");
+  if (empty) {
+    const sp = space(Number(empty.dataset.empty));
+    const ids = activeCrops().filter((c) => c.space_id === sp.id).map((c) => c.id);
+    if (!confirm(`Take all ${ids.length} plants out of ${sp.name}? They stay in your plan under "Not placed yet".`)) return;
+    await change("POST", "/api/layout", { moves: ids.map((id) => ({ crop_id: id, space_id: null })) }, `${sp.name} emptied 📤`);
+    return;
+  }
   const tick = e.target.closest("[data-tick]");
   if (tick) {
     const key = tick.dataset.tick, undo = !!tick.dataset.undo;
@@ -547,15 +562,17 @@ function rowLabel(c) {
   return same.length > 1 && !c.finished_on ? "Row " + (same.findIndex((x) => x.id === c.id) + 1) : "";
 }
 
-function cropRow(c) {
+function cropRow(c, opts = {}) {
   const p = plant(c.plant_id), j = nextJob(c), row = rowLabel(c);
   const when = c.sown_on ? "sown " + fmt(c.sown_on) : c.planted_on ? "planted " + fmt(c.planted_on) : "";
   return `<div class="crop-row" data-open-crop="${c.id}">
     <span class="e">${p.emoji}</span>
     <div class="n">${esc(p.name)}${row ? ` <span class="chip grey">${row}${when ? " · " + when : ""}</span>` : ""}<div class="small muted" style="font-weight:600">${j ? esc(j.title) + " · " + whenText(j) : c.finished_on ? "Finished" : "All done 🎉"}</div></div>
     <div class="stage" aria-label="Stage ${c.stage + 1} of 5">${STAGES.map((e, i) => `<span class="${i <= c.stage ? "on" : ""}">${e}</span>`).join("")}</div>
+    ${opts.unplace && c.space_id ? `<button class="unplace" data-unplace="${c.id}" aria-label="Take ${esc(p.name)} out of this bed" title="Take out of this bed">✕</button>` : ""}
   </div>`;
 }
+const inBedRow = (c) => cropRow(c, { unplace: true });
 
 function gardenPage() {
   const unplaced = activeCrops().filter((c) => !c.space_id);
@@ -570,7 +587,7 @@ function gardenPage() {
         ${s.kind !== "pot" && s.built === 0 && built < total ? `<div class="progress" title="No-dig bed ${built} of ${total}"><i style="width:${(100 * built) / total}%"></i></div>` : ""}
         ${usageBar(s)}
         ${s.clashes.map((x) => `<div class="checkbox warn small" style="margin-top:8px">🙅 ${plant(x.a).emoji} ${esc(plant(x.a).name)} and ${plant(x.b).emoji} ${esc(plant(x.b).name)} don't like sharing: ${esc(x.why)}.</div>`).join("")}
-        ${crops.map(cropRow).join("") || `<p class="small muted" style="margin:8px 0 0">Nothing growing here yet.</p>`}
+        ${crops.map(inBedRow).join("") || `<p class="small muted" style="margin:8px 0 0">Nothing growing here yet.</p>`}
         ${s.suggestion && s.suggestion.plants.length ? `<div class="suggest">${s.suggestion.plants.map((x) => suggestChip(x, `data-open-plant="${x.plant_id}" data-space="${s.id}"`, "+ ")).join("")}</div>` : ""}
       </div>`;
     }).join("")}
@@ -669,8 +686,10 @@ function drawSpace(id) {
       <div class="row" style="margin-top:8px"><button class="btn small primary" data-setbuilt="${s.id}" data-v="1">✅ Yes, it's ready</button><button class="btn small" data-setbuilt="${s.id}" data-v="0">🛠️ Not yet - show me how</button></div></div>`;
   openSheet(`<div class="plant-head"><span class="e">${SPACE_KINDS[s.kind].emoji}</span><div><h2 style="margin:0">${esc(s.name)}</h2>
       <div class="muted">${pot ? "Growing in pots" : s.built === 1 ? "Built and ready to plant ✅" : s.built === 0 ? "Let's build it" : "Your bed"}</div></div></div>
-    <div class="card"><h3>🌱 Growing here</h3>${here.map(cropRow).join("") || `<p class="small muted" style="margin:0">Nothing yet.</p>`}
-      <div class="row" style="margin-top:10px"><a class="btn small" href="#/plants" data-close>➕ Add plants</a><button class="btn small" data-layout="all">🧩 Suggest a layout</button></div></div>
+    <div class="card"><h3>🌱 Growing here</h3>${here.map(inBedRow).join("") || `<p class="small muted" style="margin:0">Nothing yet.</p>`}
+      <div class="row" style="margin-top:10px"><a class="btn small" href="#/plants" data-close>➕ Add plants</a><button class="btn small" data-layout="all">🧩 Suggest a layout</button>
+      ${here.length ? `<button class="btn small ghost" data-empty="${s.id}">📤 Take everything out</button>` : ""}</div>
+      ${here.length ? `<p class="small muted" style="margin:8px 0 0">✕ takes a plant out of this bed - it stays in your plan under "Not placed yet".</p>` : ""}</div>
     <details class="card" data-key="about-${s.id}" ${s.width_m || s.built !== null ? "" : "open"}><summary><b>✏️ About this ${pot ? "space" : "bed"}</b> <span class="small muted">name, size, soil${pot ? "" : ", built?"}</span></summary>${spaceForm(s)}
       <div class="row" style="margin-top:14px"><button class="btn primary" id="save">Save</button><button class="btn danger small" id="del">🗑️ Delete</button></div></details>
     ${build}`);
@@ -734,8 +753,7 @@ function drawCrop(id) {
   openSheet(`<div class="plant-head"><span class="blob l${p.level}">${p.emoji}</span><div><h2 style="margin:0">${esc(p.name)}${row ? ` <span class="chip grey" style="vertical-align:middle">${row}</span>` : ""}</h2>
       <div class="stage" style="font-size:20px;margin-top:4px">${STAGES.map((e, i) => `<span class="${i <= c.stage ? "on" : ""}">${e}</span>`).join("")}</div></div></div>
     <div class="row" style="margin-bottom:12px">
-      <select id="cs" aria-label="Where it grows" style="flex:1">${fits.map((s) => `<option value="${s.id}" ${s.id === c.space_id ? "selected" : ""}>${SPACE_KINDS[s.kind].emoji} ${esc(s.name)}</option>`).join("")}
-        ${c.space_id ? "" : `<option selected disabled>📍 Choose where it grows</option>`}</select>
+      <select id="cs" aria-label="Where it grows" style="flex:1"><option value="" ${c.space_id ? "" : "selected"}>📍 Not in a bed (decide later)</option>${fits.map((s) => `<option value="${s.id}" ${s.id === c.space_id ? "selected" : ""}>${SPACE_KINDS[s.kind].emoji} ${esc(s.name)}</option>`).join("")}</select>
     </div>
     ${!started && p.methods.length > 1 ? `<div class="chips" style="margin-bottom:12px">${p.methods.map((m) => `<button class="btn small ${m === c.method ? "primary" : ""}" data-crop-method="${m}">${S.cat.methods[m].emoji} ${esc(S.cat.methods[m].label)}</button>`).join("")}</div>` : ""}
     <div class="card tint-sky"><div class="row" style="justify-content:space-between">
@@ -751,7 +769,9 @@ function drawCrop(id) {
     <div class="row" style="margin-top:10px">
       ${c.finished_on ? "" : `<button class="btn" id="finish">🧹 All finished, clear it</button>`}
       <button class="btn danger" id="remove">🗑️ Remove</button></div>`);
-  $("#cs").onchange = (e) => change("PATCH", `/api/crops/${c.id}`, { plant_id: c.plant_id, space_id: Number(e.target.value) }, "Moved");
+  $("#cs").onchange = (e) => change("PATCH", `/api/crops/${c.id}`, e.target.value
+    ? { plant_id: c.plant_id, space_id: Number(e.target.value) } : { plant_id: c.plant_id, clear_space: true },
+    e.target.value ? "Moved" : "Taken out of the bed - it's under Not placed yet 📍");
   document.querySelectorAll("[data-date]").forEach((inp) => (inp.onchange = () => change("PATCH", `/api/crops/${c.id}`,
     { plant_id: c.plant_id, [inp.dataset.date]: inp.value || "" }, inp.value ? "Date saved - plan updated 📅" : "Date cleared")));
   document.querySelectorAll("[data-second]").forEach((b) => (b.onclick = () => change("POST", "/api/crops", {

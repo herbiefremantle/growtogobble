@@ -379,6 +379,7 @@ class CropIn(BaseModel):
     after: Optional[str] = None       # a follow-on crop: not before this date (when the space is free)
     batches: Optional[int] = None     # sow several rows a few weeks apart, each tracked on its own
     every_weeks: Optional[int] = None
+    clear_space: bool = False         # take it out of its bed ("not placed yet")
     sown_on: Optional[str] = None     # correcting when it really happened
     planted_on: Optional[str] = None
     harvested_on: Optional[str] = None
@@ -535,6 +536,8 @@ def edit_crop(crop_id: int, body: CropIn, user=Depends(auth.current_user)):
         if body.space_id is not None:
             _own(conn, "spaces", body.space_id, user)
             conn.execute("UPDATE crops SET space_id = ? WHERE id = ?", (body.space_id, crop_id))
+        elif body.clear_space:
+            conn.execute("UPDATE crops SET space_id = NULL WHERE id = ?", (crop_id,))
         if body.quantity is not None:
             conn.execute("UPDATE crops SET quantity = ? WHERE id = ?", (_qty(body.quantity), crop_id))
         for field in ("sown_on", "planted_on", "harvested_on"):

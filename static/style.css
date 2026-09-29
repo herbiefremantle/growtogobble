@@ -404,3 +404,5 @@ details.card[open] > summary::before { content: "▾ "; }
 .lay-row:first-of-type { border-top: 0; }
 .lay-row .e { font-size: 26px; width: 38px; text-align: center; }
 .lay-row select { width: auto; max-width: 44%; font-size: 14px; padding: 8px; }
+.unplace { flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--card); color: var(--muted); font-size: 15px; font-weight: 900; cursor: pointer; }
+.unplace:hover { border-color: var(--terra); color: var(--terra); }
