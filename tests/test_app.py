@@ -467,3 +467,16 @@ def test_invites_are_counted_and_joins_credited(client, monkeypatch):
     alex = next(u for u in admin["users"] if u["name"] == "Alex")
     assert alex["invited_by_name"] == "Sam"
     assert next(u for u in admin["users"] if u["name"] == "Sam")["invites_joined"] == 1
+
+
+def test_admin_can_correct_who_invited_someone(client, monkeypatch):
+    monkeypatch.setenv("ADMIN_EMAIL", "boss@example.com")
+    _join(client, "friend@example.com")
+    client.post("/api/logout")
+    _join(client, "boss@example.com")
+    users = client.get("/api/admin").json()["users"]
+    friend = next(u for u in users if u["email"] == "friend@example.com")
+    boss = next(u for u in users if u["email"] == "boss@example.com")
+    out = client.post("/api/admin/users/%d/invited_by" % friend["id"], json={"inviter_id": boss["id"]}).json()
+    assert next(u for u in out["users"] if u["id"] == friend["id"])["invited_by_name"] == "Sam"
+    assert next(u for u in out["users"] if u["id"] == boss["id"])["invites_joined"] == 1

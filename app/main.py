@@ -335,6 +335,23 @@ def admin_set_admin(user_id: int, body: AdminFlag, admin=Depends(auth.current_ad
     return admin_overview(admin)
 
 
+class InvitedBy(BaseModel):
+    inviter_id: Optional[int] = None
+
+
+@app.post("/api/admin/users/{user_id}/invited_by")
+def admin_set_inviter(user_id: int, body: InvitedBy, admin=Depends(auth.current_admin)):
+    """Correct who invited someone (e.g. they signed up without using the link)."""
+    if body.inviter_id == user_id:
+        raise HTTPException(400, "Nobody can invite themselves.")
+    with db.connect() as conn:
+        for uid in (user_id, body.inviter_id):
+            if uid is not None and not conn.execute("SELECT 1 FROM users WHERE id = ?", (uid,)).fetchone():
+                raise HTTPException(404, "No such account")
+        conn.execute("UPDATE users SET invited_by = ? WHERE id = ?", (body.inviter_id, user_id))
+    return admin_overview(admin)
+
+
 @app.delete("/api/admin/users/{user_id}")
 def admin_delete(user_id: int, admin=Depends(auth.current_admin)):
     if user_id == admin["id"]:

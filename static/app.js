@@ -64,7 +64,10 @@ async function api(method, path, body) {
     body: body ? JSON.stringify(body) : undefined,
   });
   if (res.status === 401 && !path.startsWith("/api/login") && !path.startsWith("/api/register")) {
-    S.me = null; S.g = null; go("#/welcome"); throw new Error("Please log in");
+    S.me = null; S.g = null;
+    const route = location.hash.replace(/^#\/?/, "").split("?")[0];
+    if (!PUBLIC[route]) go("#/welcome");  // keep sign-up links (and their invite code) where they are
+    throw new Error("Please log in");
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.detail || "Something went wrong. Try again?");
@@ -130,8 +133,23 @@ window.addEventListener("hashchange", render);
 const PAGES = { "": home, garden: gardenPage, calendar: calendarPage, plants: plantsPage, me: mePage, shop: shopPage, start: onboarding, admin: adminPage };
 const PUBLIC = { welcome, login: loginPage, join: joinPage, reset: resetPage };
 
+// The invite code from a friend's link, kept on this phone until they sign up
+function inviteCode(fromLink) {
+  try {
+    if (fromLink) localStorage.setItem("gtg-invite", fromLink);
+    return fromLink || localStorage.getItem("gtg-invite");
+  } catch (e) { return fromLink || null; }
+}
+function forgetInvite() { try { localStorage.removeItem("gtg-invite"); } catch (e) { /* private mode */ } }
+function showInviter(el) {
+  const code = inviteCode();
+  if (code && el) api("GET", "/api/invites/" + encodeURIComponent(code)).then((r) => { el.textContent = `💌 ${r.name} invited you!`; el.hidden = false; }, () => {});
+}
+
 function render() {
   const [route, query] = location.hash.replace(/^#\/?/, "").split("?");
+  const linkInvite = new URLSearchParams(query || "").get("invite");
+  if (linkInvite) inviteCode(linkInvite);
   if (route === "plants" && query === "now") { plantFilter = "now"; history.replaceState(null, "", "#/plants"); }
   const loggedIn = !!(S.me && S.g);
   $("#topbar").hidden = $("#tabs").hidden = !loggedIn || route === "start";
@@ -158,9 +176,12 @@ function welcome() {
     <div class="journey">
       <div class="on"><b>📦</b>Make a bed</div><div class="on"><b>🌱</b>Sow</div><div class="on"><b>🌿</b>Grow</div><div class="on"><b>🧺</b>Pick</div><div class="on"><b>😋</b>Eat</div>
     </div>
+    <p id="invited" hidden style="font-weight:800;color:var(--forest);margin:0 0 12px"></p>
     <div class="stack" style="max-width:360px;margin:0 auto">
       <a class="btn primary wide" href="#/join">Start growing - it's free</a>
       <a class="btn wide" href="#/login">I already have an account</a>
+      <button class="btn ghost wide" id="share-app">📤 Share Grow to Gobble</button>
+      <div id="share-out"></div>
     </div>
   </section>
   <div class="card tint-sun" style="margin-top:24px">
@@ -169,6 +190,24 @@ function welcome() {
   </div>
   <div class="card tint-leaf"><h3>📦 No digging needed</h3><p class="muted" style="margin:0">Build a no-dig bed with cardboard and compost, or grow in pots on a patio.</p></div>
   <div class="card tint-sky"><h3>🔔 We'll remind you</h3><p class="muted" style="margin:0">Your phone gets a nudge when it's time to sow, plant, water, pick and protect from frost, with dates for where you live.</p></div>`;
+  $("#share-app").onclick = () => shareApp($("#share-out"));
+  showInviter($("#invited"));
+}
+
+// Share the app itself (not a personal invite) - the phone's share menu, or copy / WhatsApp / email / text
+async function shareApp(outEl) {
+  const url = location.origin + "/";
+  const text = "Grow to Gobble - grow the food you love to eat, step by step. Simple enough for kids 🌱";
+  if (navigator.share) {
+    try { await navigator.share({ title: "Grow to Gobble", text, url }); return; } catch (e) { if (e.name === "AbortError") return; }
+  }
+  const msg = encodeURIComponent(text + " " + url);
+  outEl.innerHTML = `<div class="checkbox" style="text-align:left"><input type="text" readonly value="${esc(url)}" onclick="this.select()">
+    <div class="row"><button class="btn small" data-copy="${esc(url)}">📋 Copy</button>
+    <a class="btn small" href="https://wa.me/?text=${msg}" target="_blank" rel="noopener">💬 WhatsApp</a>
+    <a class="btn small" href="mailto:?subject=${encodeURIComponent("Grow to Gobble")}&body=${msg}">✉️ Email</a>
+    <a class="btn small" href="sms:?&body=${msg}">📱 Text</a></div></div>`;
+  outEl.onclick = (e) => { const c = e.target.closest("[data-copy]"); if (c) navigator.clipboard.writeText(c.dataset.copy).then(() => toast("Link copied 📋"), () => toast("Select the link and copy it")); };
 }
 
 function loginPage() {
@@ -188,8 +227,7 @@ function loginPage() {
 }
 
 function joinPage() {
-  const invite = new URLSearchParams(location.hash.split("?")[1] || "").get("invite");
-  if (invite) api("GET", "/api/invites/" + encodeURIComponent(invite)).then((r) => { const el = $("#invited"); if (el) el.textContent = `💌 ${r.name} invited you!`; }, () => {});
+  const invite = inviteCode();
   view.innerHTML = `<div class="auth-card"><div class="hero" style="padding-bottom:0"><div class="big">🌱</div><h1>Let's get growing</h1><p id="invited" style="margin:0;font-weight:800;color:var(--forest)"></p></div>
   <form class="card" id="f">
     <label class="field" for="name">Your first name</label><input id="name" type="text" autocomplete="given-name" maxlength="40" required>
@@ -201,10 +239,12 @@ function joinPage() {
     <div id="err"></div>
     <button class="btn primary wide" style="margin-top:16px">Create my garden</button>
   </form><p class="small muted" style="text-align:center"><a href="#/login">Already have an account? Log in</a></p></div>`;
+  showInviter($("#invited"));
   $("#f").onsubmit = async (e) => {
     e.preventDefault();
     try {
       S.me = await api("POST", "/api/register", { name: $("#name").value, email: $("#email").value, password: $("#pw").value, postcode: $("#pc").value, age_ok: $("#age").checked, invite });
+      forgetInvite();
       await boot("#/start");
     } catch (err) { $("#err").innerHTML = `<div class="error">${esc(err.message)}</div>`; }
   };
@@ -1251,12 +1291,21 @@ function drawAdmin(data) {
       <div class="row" style="justify-content:space-between"><div><b>${esc(u.name)}</b> ${u.is_admin ? `<span class="chip">🛠️ Admin</span>` : ""}${u.id === data.me ? ` <span class="chip grey">You</span>` : ""}
         <div class="small muted">${esc(u.email)}${u.outcode ? " · " + esc(u.outcode) : ""}</div>
         <div class="small muted">Joined ${fmt(u.created_at.slice(0, 10))} · last active ${ago(u.last_active)} · ${u.crops} crop${u.crops === 1 ? "" : "s"} · ${u.devices ? "🔔 reminders on" : "no reminders"}</div>
-        <div class="small muted">💌 ${u.invited_by_name ? `Invited by ${esc(u.invited_by_name)}` : "Signed up on their own"} · sent ${u.invites_sent} invite${u.invites_sent === 1 ? "" : "s"}, ${u.invites_joined} joined</div></div></div>
+        <div class="small muted">💌 sent ${u.invites_sent} invite${u.invites_sent === 1 ? "" : "s"}, ${u.invites_joined} joined</div>
+        <label class="small muted" style="display:flex;gap:6px;align-items:center;margin-top:4px">Invited by
+          <select data-inviter="${u.id}" style="width:auto;font-size:14px;padding:6px 8px"><option value="">nobody - signed up on their own</option>
+          ${data.users.filter((o) => o.id !== u.id).map((o) => `<option value="${o.id}" ${o.name === u.invited_by_name && u.invited_by_name ? "selected" : ""}>${esc(o.name)}</option>`).join("")}</select></label></div></div>
       <div class="row" style="margin-top:10px">
         <button class="btn small" data-reset="${u.id}">🔑 Password reset link</button>
         ${u.id === data.me ? "" : `<button class="btn small ghost" data-admin="${u.id}" data-to="${u.is_admin ? 0 : 1}">${u.is_admin ? "Remove admin" : "Make admin"}</button>
         <button class="btn small danger" data-del="${u.id}" data-name="${esc(u.name)}">Delete</button>`}</div>
       <div id="link-${u.id}"></div></div>`).join("")}`;
+  view.onchange = async (e) => {
+    const sel = e.target.closest("[data-inviter]");
+    if (!sel) return;
+    try { drawAdmin(await api("POST", `/api/admin/users/${sel.dataset.inviter}/invited_by`, { inviter_id: sel.value ? Number(sel.value) : null })); toast("Saved 💌"); }
+    catch (err) { toast(err.message); }
+  };
   view.onclick = async (e) => {
     const r = e.target.closest("[data-reset]"), m = e.target.closest("[data-admin]"), x = e.target.closest("[data-del]");
     try {
