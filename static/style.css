@@ -543,3 +543,16 @@ svg.plot.withsat .gridline { stroke: rgba(255,255,255,.18); }
 .fdiagram .fd-z0 { fill: #6f8f4e; } .fdiagram .fd-z1 { fill: #86a85e; } .fdiagram .fd-z2 { fill: #a3c27a; }
 .fdiagram .fd-lab { fill: var(--muted); font-weight: 800; }
 .tile .when { font-size: 12px; }
+
+/* varieties and sowing together */
+.varieties { display: grid; gap: 6px; margin-top: 6px; }
+.variety { display: block; text-align: left; padding: 8px 12px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--card);
+  color: inherit; font: inherit; cursor: pointer; }
+.variety.on { border-color: var(--leaf); background: var(--sage); }
+.variety b { margin-right: 6px; }
+.variety small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+.vt { display: inline-block; font-size: 11px; font-weight: 800; padding: 1px 7px; margin: 0 3px 2px 0; border-radius: 999px; background: var(--sage); color: var(--forest); }
+.vname { font-weight: 700; color: var(--muted); font-size: .9em; }
+.mix-step { display: flex; gap: 10px; align-items: center; padding: 6px 0; }
+.mix-step .e { font-size: 28px; }
+.mix-step + .mix-step { border-top: 1px dashed var(--line); }

@@ -471,9 +471,11 @@ PLANTS = [
 ]
 
 # Fruit & veg first; companion plants (flowers that help the veg) and the flower garden are kept apart - see flowers.py
+from . import extras as _extras  # noqa: E402
 from . import flowers as _flowers  # noqa: E402
+PLANTS += [dict(_p) for _p in _extras.HERBS]
 for _p in PLANTS:
-    _p["group"] = "veg"
+    _p["group"] = "herb" if _p["id"] in _extras.HERB_IDS else "veg"
 _nas = next(_p for _p in PLANTS if _p["id"] == "nasturtium")
 _nas.update(group="companion", sun=["sun", "part"], height_cm=30, kind="annual")
 PLANTS += [dict(_p, group="companion") for _p in _flowers.COMPANIONS] + [dict(_p, group="flower") for _p in _flowers.FLOWERS]
@@ -598,6 +600,8 @@ GROUPS = {"cabbage": "cabbage family", "onion": "onion family", "bean": "pea & b
           "potato": "tomato & potato family", "squash": "squash family", "carrot": "carrot family", "beet": "beet family"}
 
 GROW.update({k: (sp, row, unit, None, None, "flower") for k, (sp, row, unit) in _flowers.GROW.items()})
+GROW.update({k: (sp, row, unit, None, None, "herb") for k, (sp, row, unit) in _extras.HERB_GROW.items()})
+YIELD_TEXT.update(_extras.HERB_YIELD)
 for _p in PLANTS:
     _sp, _row, _unit, _yield, _pick, _family = GROW[_p["id"]]
     _p.update(sp_cm=_sp, row_cm=_row, unit=_unit, yield_each=_yield, pick_weeks=_pick, family=_family,
@@ -794,6 +798,7 @@ CURE = {
     "pumpkin": (1, "Dry your pumpkins", ["Put them somewhere sunny and dry - a windowsill or greenhouse ☀️",
                 "Leave for 1-2 weeks until the skin is hard and sounds hollow when you knock", "Then store them somewhere cool indoors 🎃"]),
 }
+STORE.update(_extras.HERB_STORE)
 for _p in PLANTS:
     if _p["id"] in STORE:  # flowers aren't stored
         _keeps, _how, _freeze = STORE[_p["id"]]
@@ -928,6 +933,7 @@ PESTS = {
     "chives": ([], [], 0, ""), "mint": ([], [], 0, ""), "rhubarb": (["slugs"], ["Slugs sometimes nibble new shoots in spring - hunt them at dusk"], 0, ""),
 }
 PESTS.update(_flowers.PESTS)
+PESTS.update(_extras.HERB_PESTS)
 for _p in PLANTS:
     _who, _how, _cover, _uncover = PESTS.get(_p["id"], ([], [], 0, ""))
     _p["pests"] = {"who": [dict(zip(("emoji", "name", "what"), PESTS_WHO[w])) for w in _who],
@@ -1022,7 +1028,7 @@ SOIL_OF = {
     "strawberries": "berries", "raspberries": "berries", "blueberries": "blueberries", "sweet_potatoes": "sweet_potato",
 }
 for _p in PLANTS:
-    _likes, _add, _how, _bigger = SOIL_PROFILES[SOIL_OF.get(_p["id"], "flowers")]
+    _likes, _add, _how, _bigger = SOIL_PROFILES[SOIL_OF.get(_p["id"], "herbs" if _p["group"] == "herb" else "flowers")]
     _p["soil"] = {"likes": _likes, "how": _how, "bigger": _bigger,
                   "add": [dict(zip(("emoji", "name", "what"), IMPROVERS[a])) for a in _add]}
 
@@ -1090,6 +1096,12 @@ PACKS = {
     "sweet_potatoes": ("slips", 1, 1.0, "usually sold in packs of 5"),
 }
 PACKS.update(_flowers.PACKS)
+PACKS.update(_extras.HERB_PACKS)
+MIXES, WEED_TIPS = _extras.MIXES, _extras.WEED_TIPS
+for _p in PLANTS:
+    _p["varieties"] = [{"name": n, "tags": t, "why": w} for n, t, w in _extras.VARIETIES.get(_p["id"], [])]
+    _p["seedling"] = _extras.SEEDLINGS.get(_p["id"])
+    _p["mixes"] = [m["id"] for m in MIXES if any(x["plant_id"] == _p["id"] for x in m["plants"])]
 COMBOS, SUN_SPOTS, HELPS = _flowers.COMBOS, _flowers.SUN_SPOTS, _flowers.HELPS
 
 
@@ -1237,4 +1249,6 @@ FRUIT = [
      "examples": "", "pick": [], "pick_text": "", "ripe": "", "keep": "",
      "care": ["Great for bees and birds - and it can shelter veg beds from wind"], "pests": ""},
 ]
+for _f in FRUIT:
+    _f["kinds"] = [{"name": n, "tags": t, "why": w} for n, t, w in _extras.FRUIT_KINDS.get(_f["id"], [])]
 FRUIT_BY_ID = {f["id"]: f for f in FRUIT}

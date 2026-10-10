@@ -665,6 +665,7 @@ class FeatureIn(BaseModel):
     h: Optional[float] = None
     angle: Optional[float] = None
     variety: Optional[str] = None     # trees & bushes: which fruit (or "tree_plain"/"bush_plain")
+    cultivar: Optional[str] = None    # ...and which variety of it, e.g. 'Bramley' ("" clears it)
 
 
 @app.post("/api/features")
@@ -685,6 +686,8 @@ def edit_feature(feature_id: int, body: FeatureIn, user=Depends(auth.current_use
         f = _own(conn, "features", feature_id, user)
         if body.variety is not None:
             conn.execute("UPDATE features SET variety = ? WHERE id = ?", (_variety(body.variety, f["kind"]), feature_id))
+        if body.cultivar is not None:
+            conn.execute("UPDATE features SET cultivar = ? WHERE id = ?", (_variety_name(body.cultivar), feature_id))
         conn.execute("UPDATE features SET name = ?, x = ?, y = ?, w = ?, h = ?, angle = ? WHERE id = ?", (
             (body.name or f["name"]).strip()[:40] or f["name"],
             _metres(body.x) if body.x is not None else f["x"], _metres(body.y) if body.y is not None else f["y"],
@@ -722,6 +725,11 @@ class CropIn(BaseModel):
     sown_on: Optional[str] = None     # correcting when it really happened
     planted_on: Optional[str] = None
     harvested_on: Optional[str] = None
+    variety: Optional[str] = None     # e.g. 'Nantes 2' - "" clears it
+
+
+def _variety_name(v):
+    return (v or "").strip()[:40] or None
 
 
 def _qty(n):
@@ -742,7 +750,7 @@ def _after(value):
         raise HTTPException(400, "Bad date")
 
 
-def _new_crop(conn, user, plant_id, space_id, method, today=None, quantity=None, after=None):
+def _new_crop(conn, user, plant_id, space_id, method, today=None, quantity=None, after=None, variety=None):
     plant = catalogue.BY_ID.get(plant_id)
     if not plant:
         raise HTTPException(400, "Unknown plant")
@@ -755,10 +763,10 @@ def _new_crop(conn, user, plant_id, space_id, method, today=None, quantity=None,
     today = today or clock.today()
     start, end = planner.plan_anchor(plant, method, today, garden.shift_for(user), not_before=after)
     cur = conn.execute(
-        "INSERT INTO crops (user_id, plant_id, space_id, method, quantity, bed_free_on, anchor, anchor_end, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO crops (user_id, plant_id, space_id, method, quantity, bed_free_on, anchor, anchor_end, variety, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (user["id"], plant_id, space_id, method, _qty(quantity), after.isoformat() if after else None,
-         start.isoformat(), end.isoformat(), clock.now().isoformat()))
+         start.isoformat(), end.isoformat(), _variety_name(variety), clock.now().isoformat()))
     return cur.lastrowid
 
 
@@ -768,7 +776,8 @@ def add_crop(body: CropIn, user=Depends(auth.current_user)):
     batches = max(1, min(body.batches or 1, 8))
     every = max(1, min(body.every_weeks or 2, 8))
     with db.connect() as conn:
-        first = _new_crop(conn, user, body.plant_id, body.space_id, body.method, quantity=body.quantity, after=_after(body.after))
+        first = _new_crop(conn, user, body.plant_id, body.space_id, body.method, quantity=body.quantity, after=_after(body.after),
+                          variety=body.variety)
         start = date.fromisoformat(conn.execute("SELECT anchor FROM crops WHERE id = ?", (first,)).fetchone()["anchor"])
         plant = catalogue.BY_ID[body.plant_id]
         method = conn.execute("SELECT method FROM crops WHERE id = ?", (first,)).fetchone()["method"]
@@ -777,7 +786,7 @@ def add_crop(body: CropIn, user=Depends(auth.current_user)):
             win = planner.next_window(planner.first_window(plant, method), when, garden.shift_for(user))
             if not win or win[0] > when + planner.WEEK:  # past the end of this sowing season
                 break
-            _new_crop(conn, user, body.plant_id, body.space_id, method, quantity=body.quantity, after=when)
+            _new_crop(conn, user, body.plant_id, body.space_id, method, quantity=body.quantity, after=when, variety=body.variety)
         return garden.payload(conn, user)
 
 
@@ -884,6 +893,8 @@ def edit_crop(crop_id: int, body: CropIn, user=Depends(auth.current_user)):
             conn.execute("UPDATE crops SET space_id = NULL WHERE id = ?", (crop_id,))
         if body.quantity is not None:
             conn.execute("UPDATE crops SET quantity = ? WHERE id = ?", (_qty(body.quantity), crop_id))
+        if body.variety is not None:
+            conn.execute("UPDATE crops SET variety = ? WHERE id = ?", (_variety_name(body.variety), crop_id))
         for field in ("sown_on", "planted_on", "harvested_on"):
             value = getattr(body, field)
             if value is not None:

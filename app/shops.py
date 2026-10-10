@@ -35,5 +35,11 @@ def links(plant, method):
     return [{"shop": s["name"], "url": _wrap(s, s["search"].format(q=query))} for s in SHOPS]
 
 
+def search_links(text):
+    """Buy links searching for any text, e.g. a variety: 'Nantes 2 Carrots seeds'."""
+    query = quote_plus(text)
+    return [{"shop": s["name"], "url": _wrap(s, s["search"].format(q=query))} for s in SHOPS]
+
+
 def is_affiliate():
     return bool(os.environ.get("AMAZON_TAG") or os.environ.get("AWIN_ID"))

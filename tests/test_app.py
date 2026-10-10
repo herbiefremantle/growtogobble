@@ -659,3 +659,28 @@ def test_bed_shapes_and_flower_plans(client):
     adds = [{"plant_id": p["plant_id"], "quantity": p["qty"]} for z in shady["zones"] for p in z["plants"]]
     g = client.post("/api/crops/bulk", json={"crops": adds, "space_id": s["id"]}).json()
     assert len([c for c in g["crops"] if c["space_id"] == s["id"]]) == len(adds)
+
+
+def test_herbs_mixes_and_varieties(client):
+    _join(client)
+    cat = client.get("/api/plants").json()
+    groups = {p["id"]: p["group"] for p in cat["plants"]}
+    assert groups["basil"] == "herb" and groups["parsley"] == "herb" and groups["carrots"] == "veg"
+    assert sum(1 for g in groups.values() if g == "flower") == 50
+    carrots = next(p for p in cat["plants"] if p["id"] == "carrots")
+    assert "row_markers" in carrots["mixes"] and carrots["seedling"]
+    nantes = next(v for v in carrots["varieties"] if v["name"] == "Nantes 2")
+    assert len(nantes["links"]) == 3 and "Nantes" in nantes["links"][0]["url"]
+    mix = next(m for m in cat["mixes"] if m["id"] == "row_markers")
+    assert [x["plant_id"] for x in sorted(mix["plants"], key=lambda x: x["ready"])] == ["radish", "salad", "carrots"]
+    apple = next(f for f in cat["fruit"] if f["id"] == "apple_eating")
+    assert any(k["name"] == "Gala" for k in apple["kinds"])
+    # a crop remembers its variety; a fruit tree remembers which apple it is
+    g = client.post("/api/crops", json={"plant_id": "carrots", "variety": "Nantes 2"}).json()
+    c = g["crops"][0]
+    assert c["variety"] == "Nantes 2"
+    g = client.patch("/api/crops/%d" % c["id"], json={"plant_id": "carrots", "variety": "Flyaway"}).json()
+    assert g["crops"][0]["variety"] == "Flyaway"
+    tree = client.post("/api/features", json={"kind": "tree", "variety": "apple_eating"}).json()["garden"]["features"][0]
+    g = client.patch("/api/features/%d" % tree["id"], json={"cultivar": "Gala"}).json()
+    assert g["garden"]["features"][0]["cultivar"] == "Gala"

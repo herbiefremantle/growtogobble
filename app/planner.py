@@ -485,7 +485,7 @@ def follow_ons(free_from, kind, liked, shift, not_families=(), limit=6, today=No
     plant within 3 weeks. Skips perennials (they'd move in for good) and the families that were just there."""
     picks = []
     for plant in catalogue.PLANTS:
-        if kind not in plant["where"] or plant.get("perennial") or plant["family"] in not_families or plant["group"] != "veg":
+        if kind not in plant["where"] or plant.get("perennial") or plant["family"] in not_families or plant["group"] not in ("veg", "herb"):
             continue
         if head_start_ok(plant, free_from, today):
             sow = next_window(plant["sow_in"], free_from - plant.get("grow_on", 5) * WEEK - 14 * DAY, shift)

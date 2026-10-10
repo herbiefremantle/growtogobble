@@ -100,7 +100,7 @@ def payload(conn, user):
             starts=starts.isoformat() if starts else None, finishes=finishes.isoformat() if finishes else None,
             qty=qty, area=round(qty * planner.area_each(plant), 2), harvest=planner.harvest_estimate(plant, qty),
             buy=planner.buy_estimate(plant, qty, crop["method"]),
-            then=None if crop.get("finished_on") or plant["group"] != "veg" else mark_duplicates(planner.next_in_space(
+            then=None if crop.get("finished_on") or plant["group"] not in ("veg", "herb") else mark_duplicates(planner.next_in_space(
                 crop, jobs, kinds.get(crop["space_id"], "bed"), state["liked"], state["shift"], today), state, space_names),
             second=None if crop.get("finished_on") else second_season(state, crop)))
 
@@ -129,7 +129,7 @@ def payload(conn, user):
         "garden": {"w": user.get("garden_w"), "h": user.get("garden_h"),
                    "shape": json.loads(user["garden_shape"]) if user.get("garden_shape") else None,
                    "path_w": user.get("path_w") if user.get("path_w") is not None else 0.5,
-                   "features": rows(conn, "SELECT id, kind, name, x, y, w, h, angle, grp, variety FROM features WHERE user_id = ? ORDER BY id", user["id"])},
+                   "features": rows(conn, "SELECT id, kind, name, x, y, w, h, angle, grp, variety, cultivar FROM features WHERE user_id = ? ORDER BY id", user["id"])},
         "spaces": spaces_out,
         "crops": crops_out,
         "shopping": shopping,
@@ -163,18 +163,20 @@ def catalogue_payload(user=None):
         # what could follow it in the same bed, after this year's picking
         then = None
         harvest = planner.next_window(plant["harvest"], today, shift)
-        if harvest and not plant.get("perennial") and plant["group"] == "veg":
+        if harvest and not plant.get("perennial") and plant["group"] in ("veg", "herb"):
             free = min(harvest[1], harvest[0] + (plant.get("pick_weeks") or 99) * planner.WEEK)
             then = {"free_from": free.isoformat(),
                     "plants": planner.follow_ons(free, "bed", set(), shift, not_families=(plant["family"],), today=today)}
-        out.append(dict(plant, months=windows, methods=methods, next=next_by_method,
+        varieties = [dict(v, links=shops.search_links("%s %s %s" % (v["name"], plant["name"], plant.get("buy_word") or "seeds")))
+                     for v in plant["varieties"]]
+        out.append(dict(plant, varieties=varieties, months=windows, methods=methods, next=next_by_method,
                         links={m: shops.links(plant, m) for m in methods},
                         area_each=round(planner.area_each(plant), 4), default_qty=planner.default_quantity(plant),
                         pot_advice=planner.pot_advice(plant), family_name=catalogue.GROUPS.get(plant["family"]), then=then))
     return {
         "plants": out, "levels": catalogue.LEVELS, "methods": planner.METHODS,
         "nodig_steps": catalogue.NODIG_STEPS, "pot_steps": catalogue.POT_STEPS,
-        "nodig_planting": catalogue.NODIG_PLANTING, "soil_types": catalogue.SOIL_TYPES, "fruit": catalogue.FRUIT,
+        "nodig_planting": catalogue.NODIG_PLANTING, "soil_types": catalogue.SOIL_TYPES, "fruit": catalogue.FRUIT, "mixes": catalogue.MIXES, "weed_tips": catalogue.WEED_TIPS,
         "combos": catalogue.COMBOS, "sun_spots": catalogue.SUN_SPOTS,
         "affiliate": shops.is_affiliate(),
     }
