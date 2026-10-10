@@ -214,7 +214,15 @@ def crop_jobs(crop, shift, done_keys, today):
         w0, w1 = window_dates(["10-01", "10-25"], year, shift)
         if w1 > h_start:
             add("winter", "overwinter", "❄️", "Keep your %s over winter?" % name.lower(), w0, w1,
-                steps=["You can keep it for " + plant["overwinter"]["years"]] + plant["overwinter"]["steps"], waiting=not in_ground)
+                steps=["You can keep it for " + plant["overwinter"]["years"]] + plant["overwinter"]["steps"]
+                + ["Tick this if you've brought it in, and we'll remind you to wake it up in spring 🌱"], waiting=not in_ground)
+    # ...and once it's been brought in (that job's ticked), a nudge to wake it up in spring
+    from . import extras
+    wake = extras.WAKE_UP.get(plant["id"])
+    if wake and ("c%d:winter" % cid in done_keys or (plant["id"] == "dahlia" and "c%d:harvest" % cid in done_keys)):
+        year = (h_end.year if h_end.month >= 8 else h_end.year - 1) + 1
+        s0, s1 = window_dates(wake[0], year, shift)
+        add("wake", "overwinter", "🌱", wake[1], s0, s1, steps=wake[2])
 
     # 4. another batch, for a steady supply
     if plant.get("succession") and method != "plants" and sown:

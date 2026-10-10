@@ -605,3 +605,38 @@ POT_OVERRIDE = {
     "tomatoes": {"p50": 2, "barrel": 3},
     "tomatoes_big": {"barrel": 2},
 }
+
+# ...and waking them up again in spring: (window, title, steps)
+WAKE_UP = {
+    "chillies": (["03-01", "03-31"], "Wake up your overwintered chillies", [
+        "Move the plant somewhere warmer and brighter - a sunny windowsill is perfect ☀️",
+        "Tip it out of its pot, tease off some old compost and repot it in fresh compost, one pot size bigger",
+        "Start watering a bit more as new leaves appear - little and often",
+        "Once it's growing well, feed it with tomato food every week",
+        "Move it outside in late May or June, after the last frost - you'll get chillies weeks earlier than from seed 🌶️"]),
+    "peppers": (["03-01", "03-31"], "Wake up your overwintered peppers", [
+        "Move it somewhere warm and bright", "Repot it in fresh compost", "Water a little more as it grows, then feed weekly with tomato food",
+        "Put it outside after the last frost"]),
+    "aubergine": (["03-15", "04-15"], "Wake up your overwintered aubergine", [
+        "Move it somewhere warm (above 15°C) and bright", "Repot in fresh compost and water a little more", "Feed weekly once it's growing"]),
+    "bedding_geranium": (["03-15", "04-15"], "Wake up your overwintered geraniums", [
+        "Cut back any long, leggy stems by half", "Repot in fresh compost and start watering a bit more",
+        "Pinch out the tips for bushier plants - and root the bits you pinch off for free extra plants!",
+        "Put them outside after the last frost"]),
+    "fuchsia": (["03-15", "04-15"], "Wake up your fuchsias", [
+        "Cut each stem back to a pair of fat buds", "Repot pots in fresh compost and water a little more",
+        "Move them outside after the last frost"]),
+    "begonia": (["03-01", "03-31"], "Start your begonia tubers again", [
+        "Press each tuber, hollow side up, into a pot of damp compost - don't bury the top",
+        "Keep it on a warm windowsill and water lightly", "Put it outside after the last frost"]),
+    "basil": (["03-15", "04-30"], "Pot on your windowsill basil", [
+        "Move it into a bigger pot of fresh compost", "Keep pinching the tips - and root the tips in water for more plants"]),
+    "tomatoes": (["03-15", "04-15"], "Pot on your overwintered tomato", [
+        "Move it into a bigger pot of fresh compost on a warm windowsill",
+        "Take side-shoot cuttings from it and root them in water - lots of free plants",
+        "Plant out after the last frost"]),
+    "dahlia": (["04-01", "04-30"], "Wake up your dahlia tubers", [
+        "Pot the tubers into compost in a greenhouse or on a windowsill, with the old stem just showing",
+        "Water lightly - shoots appear in a few weeks", "Big clumps can be split into pieces, each with a bit of old stem",
+        "Plant out after the last frost (late May)"]),
+}

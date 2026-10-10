@@ -745,3 +745,28 @@ def test_pot_sizes_and_overwintering(client):
     assert check["space"]["fits"] is False  # a courgette needs a much bigger pot
     g = client.patch("/api/spaces/%d" % pots["id"], json={"name": "Patio pots", "kind": "pot", "pot_size": "p50", "pot_count": 1}).json()
     assert g["spaces"][0]["pot_size"] == "p50" and g["spaces"][0]["usage"]["area"] == 1
+
+
+def test_spring_wake_up_after_overwintering(client):
+    _join(client)
+    g = client.post("/api/crops", json={"plant_id": "chillies", "method": "plants"}).json()
+    chilli = g["crops"][0]
+    assert not any(j["key"].endswith(":wake") for j in chilli["jobs"])  # only once it's been brought in
+    winter = next(j for j in chilli["jobs"] if j["key"].endswith(":winter"))
+    client.post("/api/done", json={"key": winter["key"]})
+    g = client.get("/api/garden").json()
+    wake = next(j for j in g["crops"][0]["jobs"] if j["key"].endswith(":wake"))
+    assert wake["title"] == "Wake up your overwintered chillies" and wake["start"][5:7] == "03"
+    assert int(wake["start"][:4]) == int(winter["start"][:4]) + 1
+
+
+def test_every_kind_of_job_can_be_ticked(client):
+    _join(client)
+    for pid in ("peas", "chillies", "tomatoes", "garlic", "carrots", "sweet_pea", "dahlia"):
+        client.post("/api/crops", json={"plant_id": pid})
+    g = client.get("/api/garden").json()
+    for c in g["crops"]:
+        for j in c["jobs"]:
+            if j["action"] == "batch":
+                continue
+            assert client.post("/api/done", json={"key": j["key"]}).status_code == 200, j["key"]
