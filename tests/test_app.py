@@ -572,3 +572,14 @@ def test_new_bed_can_be_placed_and_angled(client):
                                          "pos_x": 3.1, "pos_y": 0.6, "angle": 20, "soil": "clay", "built": True}).json()
     s = g["spaces"][0]
     assert (s["pos_x"], s["pos_y"], s["angle"], s["soil"], s["built"]) == (3.1, 0.6, 20, "clay", 1)
+
+
+def test_editing_the_outline_keeps_beds_in_place(client):
+    _join(client)
+    sid = client.post("/api/spaces", json={"name": "Bed", "kind": "bed", "pos_x": 3, "pos_y": 2}).json()["spaces"][0]["id"]
+    client.post("/api/garden/shape", json={"points": [[0, 0], [10, 0], [10, 8], [0, 8]]})
+    # drag the top-left corner up and left by 1m: the outline now starts at -1, -1
+    g = client.post("/api/garden/shape", json={"points": [[-1, -1], [10, 0], [10, 8], [0, 8]], "keep_beds": True}).json()
+    assert g["garden"]["shape"][0] == [0, 0] and (g["garden"]["w"], g["garden"]["h"]) == (11, 9)
+    bed = g["spaces"][0]
+    assert (bed["pos_x"], bed["pos_y"]) == (4, 3)   # moved with the outline, so it's in the same real spot

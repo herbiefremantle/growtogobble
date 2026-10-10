@@ -702,6 +702,7 @@ function localOf(A, px, py) {
   const t = rad(A.a || 0), cx = A.x + A.w / 2, cy = A.y + A.h / 2, dx = px - cx, dy = py - cy;
   return { lx: dx * Math.cos(t) + dy * Math.sin(t), ly: -dx * Math.sin(t) + dy * Math.cos(t) };
 }
+let boundaryEdit = false, bSel = null;  // editing the garden's outline: which corner or side is picked
 let snapOn = true, showPaths = true, showSizes = false, plotScroll = { l: 0, t: 0 }, lastPlan = null;
 try {
   snapOn = localStorage.getItem("gtg-snap") !== "0";
@@ -739,11 +740,16 @@ function snapNextTo(M, items) {
   return best;
 }
 
-// A copy of a bed right next door: same size and angle, a path's width away, on the side asked for
+// A copy of a bed right next door: same size and angle, a path's width away. The arrow pressed means that way
+// ON SCREEN, so we use whichever of the bed's own four sides points most that way.
 function copySpot(it, dir) {
-  const gap = S.g.garden.path_w, t = rad(it.a || 0);
-  const [ox, oy] = { left: [-(it.w + gap), 0], right: [it.w + gap, 0], up: [0, -(it.h + gap)], down: [0, it.h + gap] }[dir];
-  const cx = it.x + it.w / 2 + ox * Math.cos(t) - oy * Math.sin(t), cy = it.y + it.h / 2 + ox * Math.sin(t) + oy * Math.cos(t);
+  const gap = S.g.garden.path_w, t = rad(it.a || 0), c = Math.cos(t), sn = Math.sin(t);
+  const want = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] }[dir];
+  const best = [[1, 0, it.w], [-1, 0, it.w], [0, 1, it.h], [0, -1, it.h]]
+    .map(([lx, ly, size]) => ({ lx, ly, size, dot: (lx * c - ly * sn) * want[0] + (lx * sn + ly * c) * want[1] }))
+    .sort((p, q) => q.dot - p.dot)[0];
+  const ox = best.lx * (best.size + gap), oy = best.ly * (best.size + gap);
+  const cx = it.x + it.w / 2 + ox * c - oy * sn, cy = it.y + it.h / 2 + ox * sn + oy * c;
   return { x: Math.round((cx - it.w / 2) * 100) / 100, y: Math.round((cy - it.h / 2) * 100) / 100 };
 }
 
@@ -786,9 +792,13 @@ function sizeMarks(i, ppm) {
     <text x="${i.x + i.w + gap}" y="${i.y + i.h / 2}" font-size="${fs}" text-anchor="middle" transform="rotate(90 ${i.x + i.w + gap} ${i.y + i.h / 2})">${m(i.h)}</text></g>`;
 }
 // Each edge of the garden's boundary, measured
+function outlinePoints() {
+  const g = S.g.garden;
+  return g.shape ? g.shape.map((p) => [...p]) : g.w ? [[0, 0], [g.w, 0], [g.w, g.h], [0, g.h]] : null;
+}
 function edgeMarks(ppm) {
   const g = S.g.garden;
-  if (!showSizes || !g.w) return "";
+  if ((!showSizes && !boundaryEdit) || !g.w) return "";
   const pts = g.shape || [[0, 0], [g.w, 0], [g.w, g.h], [0, g.h]];
   const fs = 11 / ppm, cx = pts.reduce((a, p) => a + p[0], 0) / pts.length, cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
   return `<g class="dims edge">${pts.map(([x1, y1], k) => {
@@ -805,7 +815,10 @@ function edgeMarks(ppm) {
 
 function planBounds(items) {
   const g = S.g.garden;
-  if (g.w && g.h) return { x0: -0.6, y0: -0.8, W: g.w + 1.2, H: g.h + 1.4, fenced: true };
+  if (g.w && g.h) {
+    const m = boundaryEdit ? 3 : 0;  // room to drag corners outwards
+    return { x0: -0.6 - m, y0: -0.8 - m, W: g.w + 1.2 + 2 * m, H: g.h + 1.4 + 2 * m, fenced: true };
+  }
   const maxX = Math.max(6, ...items.map((i) => box(i).x1)) + (plotEdit ? 3 : 0.6);
   const maxY = Math.max(4, ...items.map((i) => box(i).y1)) + (plotEdit ? 3 : 0.8);
   return { x0: 0, y0: 0, W: maxX, H: maxY, fenced: false };
@@ -898,7 +911,7 @@ function plotSvg() {
     <rect x="${b.x0}" y="${b.y0}" width="${b.W}" height="${b.H}" class="${b.fenced ? "outside" : "grass"}"/>
     ${b.fenced ? (shape ? `<polygon points="${shape}" class="grass"/>` : `<rect x="0" y="0" width="${S.g.garden.w}" height="${S.g.garden.h}" class="grass"/>`) : ""}
     <rect x="${b.x0}" y="${b.y0}" width="${b.W}" height="${b.H}" fill="url(#grid)"/>
-    ${fence}${showPaths ? pathsBetween(items) : ""}${features}${beds}${edgeMarks(ppm)}
+    ${fence}${showPaths ? pathsBetween(items) : ""}${features}${beds}${edgeMarks(ppm)}${boundaryEdit ? boundaryHandles(ppm) : ""}
     <g class="scalebar" style="stroke-width:${px(2)}"><path d="M ${b.x0 + px(12)} ${b.y0 + b.H - px(12)} h ${bar}"/><text x="${b.x0 + px(12) + bar / 2}" y="${b.y0 + b.H - px(17)}" font-size="${px(11)}" text-anchor="middle">${bar} m</text></g></svg>`;
 }
 
@@ -912,7 +925,8 @@ function plotPage() {
       <span class="toggles"><button class="btn small ${showSizes ? "primary" : ""}" id="t-sizes" aria-pressed="${showSizes}">📏</button><button class="btn small ${showPaths ? "primary" : ""}" id="t-paths" aria-pressed="${showPaths}" title="Paths between beds">🚶</button></span>
       <span class="zoom"><button class="btn small" data-zoom="-1" aria-label="Zoom out">➖</button><button class="btn small ghost" data-zoom="0" aria-label="Fit the whole garden">${Math.round(plotZoom * 100)}%</button><button class="btn small" data-zoom="1" aria-label="Zoom in">➕</button></span></div>
     ${plotEdit ? `<div class="card tint-sky small" style="margin-bottom:10px"><b>✏️ Editing:</b> drag anything to move it - zoom in for a finer grid (down to 50cm squares). Tap something to change, turn or remove it.</div>` : ""}
-    <div class="plot-wrap ${plotEdit ? "moving" : ""}"><div class="plot-inner">${plotSvg()}${plotEdit ? selToolbar() : ""}</div></div>
+    ${boundaryEdit ? `<div class="card tint-sun small row" style="justify-content:space-between;margin-bottom:10px"><span><b>📐 Editing the boundary:</b> drag a corner · tap ＋ to add a corner · tap a corner to remove it · tap a side to type its real length</span><button class="btn small primary" id="b-done">✅ Done</button></div>` : ""}
+    <div class="plot-wrap ${plotEdit ? "moving" : ""}"><div class="plot-inner">${plotSvg()}${plotEdit ? (boundaryEdit ? boundaryToolbar() : selToolbar()) : ""}</div></div>
     ${plotEdit ? editPanel() : `
     <div class="month-row"><b>📅 ${esc(label)}</b><input type="range" id="month" min="0" max="11" value="${plotMonth}" aria-label="Show the garden in a later month">
       ${plotMonth ? `<button class="btn small ghost" id="now">Today</button>` : ""}</div>
@@ -922,6 +936,37 @@ function plotPage() {
     ${activeCrops().length ? `<div class="row"><button class="btn small" data-layout="all">🧩 Suggest a layout</button></div>` : ""}`}`;
   wirePlot();
 }
+
+// Handles on the outline: a dot on each corner (drag it), a ＋ halfway along each side (add a corner),
+// and the sides themselves (tap to type the real length)
+function boundaryHandles(ppm) {
+  const P = outlinePoints();
+  if (!P) return "";
+  const px = (n) => n / ppm, n = P.length;
+  const edges = P.map(([x1, y1], k) => { const [x2, y2] = P[(k + 1) % n];
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="bedge ${bSel && bSel.type === "e" && bSel.k === k ? "on" : ""}" data-edge="${k}" style="stroke-width:${px(18)}"/>`; }).join("");
+  const mids = P.map(([x1, y1], k) => { const [x2, y2] = P[(k + 1) % n], mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    return `<g class="bmid" data-mid="${k}"><circle cx="${mx}" cy="${my}" r="${px(10)}"/><text x="${mx}" y="${my + px(5)}" font-size="${px(15)}" text-anchor="middle">+</text></g>`; }).join("");
+  const dots = P.map(([x, y], k) => `<circle cx="${x}" cy="${y}" r="${px(11)}" class="bvtx ${bSel && bSel.type === "v" && bSel.k === k ? "on" : ""}" data-vtx="${k}"/>`).join("");
+  return `<g class="bedit">${edges}${mids}${dots}</g>`;
+}
+function boundaryToolbar() {
+  const P = outlinePoints();
+  if (!bSel || !P || !lastPlan) return "";
+  const { ppm, b } = lastPlan, n = P.length;
+  let at, html;
+  if (bSel.type === "v") {
+    at = P[bSel.k];
+    html = n > 3 ? `<b>Corner ${bSel.k + 1}</b><button class="btn small danger" id="b-remove">🗑️ Remove corner</button>` : `<span class="small">An outline needs at least 3 corners.</span>`;
+  } else {
+    const [x1, y1] = P[bSel.k], [x2, y2] = P[(bSel.k + 1) % n], len = Math.hypot(x2 - x1, y2 - y1);
+    at = [(x1 + x2) / 2, (y1 + y2) / 2];
+    html = `<span class="small">This side is <b>${m(len)}</b>. Really:</span><input id="b-len" type="number" step="0.1" min="0.5" inputmode="decimal" value="${len.toFixed(2)}" aria-label="Real length in metres"><span class="small">m</span><button class="btn small primary" id="b-set">Set</button>`;
+  }
+  const W = b.W * ppm, tw = 280, left = Math.max(4, Math.min(W - tw - 4, (at[0] - b.x0) * ppm - tw / 2)), y = (at[1] - b.y0) * ppm;
+  return `<div class="seltools btools" style="left:${left}px;top:${y > 70 ? y - 62 : y + 18}px;width:${tw}px">${html}<button class="btn small ghost" id="b-close" aria-label="Close">✕</button></div>`;
+}
+const saveOutline = (P, message) => change("POST", "/api/garden/shape", { points: P.map(([x, y]) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100]), keep_beds: true }, message);
 
 // Turn buttons right next to whatever's selected, so you don't have to scroll down to them
 function selToolbar() {
@@ -940,9 +985,9 @@ function selToolbar() {
     <button class="btn small" data-rot="15" aria-label="Turn 15 degrees right">↻15°</button>
     <b id="angv">${Math.round(it.a)}°</b>
     <button class="btn small" data-rot="90" aria-label="Turn 90 degrees">↻90°</button>${it.a ? `<button class="btn small ghost" data-rot="0" aria-label="Straighten">⟲0</button>` : ""}
-    <button class="btn small ghost" id="seldetails" aria-label="More options">⋯</button>
-    ${it.type === "space" ? `<div class="copyrow"><span>⧉ Copy to:</span><button class="btn small" data-copy-bed="left" aria-label="Copy to this side">◀</button><button class="btn small" data-copy-bed="right" aria-label="Copy to that side">▶</button>
-      <button class="btn small" data-copy-bed="up" aria-label="Copy beyond this end">▲</button><button class="btn small" data-copy-bed="down" aria-label="Copy beyond that end">▼</button></div>` : ""}</div>`;
+    <button class="btn small ghost" id="seldetails" aria-label="More options">⋯</button><button class="btn small danger" id="seldel" aria-label="Delete">🗑️</button>
+    ${it.type === "space" ? `<div class="copyrow"><span>⧉ Copy to:</span><button class="btn small" data-copy-bed="left" aria-label="Copy to the left">◀</button><button class="btn small" data-copy-bed="right" aria-label="Copy to the right">▶</button>
+      <button class="btn small" data-copy-bed="up" aria-label="Copy above">▲</button><button class="btn small" data-copy-bed="down" aria-label="Copy below">▼</button></div>` : ""}</div>`;
 }
 
 // The edit tools: add things, set the garden's size, and change whatever is selected
@@ -985,7 +1030,8 @@ function editPanel() {
         ${Object.entries(FEATURES).map(([k, f]) => `<button class="btn small" data-addfeat="${k}">${f.emoji} ${f.name}</button>`).join("")}</div></div>
     <div class="card"><b>📐 Your whole garden or field</b>
       <p class="small muted" style="margin:4px 0 8px">Trace it on a satellite map, or type its size. The plan then shows its edge, so you can place everything where it really is.</p>
-      <button class="btn small primary" id="trace">🗺️ ${g.shape ? "Trace it again" : "Trace it on a satellite map"}</button>
+      <div class="row"><button class="btn small primary" id="trace">🗺️ ${g.shape ? "Trace it again" : "Trace it on a satellite map"}</button>
+      ${g.w ? `<button class="btn small" id="b-start">📐 Edit boundary corners</button>` : ""}</div>
       ${g.shape ? `<p class="small" style="margin:8px 0 0">✅ Outline from the map: about ${g.w} × ${g.h} m. <button class="btn small ghost" id="gclear2">Remove outline</button></p>` : ""}
       <p class="small muted" style="margin:12px 0 6px">Or type its size:</p>
       <div class="size-row"><label class="big-num"><span>Width</span><input id="gw" type="number" step="0.5" min="1" inputmode="decimal" value="${g.w || ""}" placeholder="e.g. 12"><em>m</em></label>
@@ -1002,7 +1048,7 @@ function wirePlot() {
     wrap.scrollLeft = plotScroll.l; wrap.scrollTop = plotScroll.t;
     wrap.onscroll = () => { plotScroll = { l: wrap.scrollLeft, t: wrap.scrollTop }; };
   }
-  $("#edit").onclick = () => { plotEdit = !plotEdit; placing = null; selected = null; plotPage(); };
+  $("#edit").onclick = () => { plotEdit = !plotEdit; placing = null; selected = null; boundaryEdit = false; bSel = null; plotPage(); };
   $("#t-sizes").onclick = () => { showSizes = !showSizes; remember("gtg-sizes", showSizes); redraw(); toast(showSizes ? "📏 Measurements on" : "Measurements off"); };
   $("#t-paths").onclick = () => { showPaths = !showPaths; remember("gtg-paths", showPaths); redraw(); toast(showPaths ? "🚶 Paths shown" : "Paths hidden"); };
   const more = $("#seldetails"); if (more) more.onclick = () => { const c = view.querySelector(".sel-card"); if (c) c.scrollIntoView({ behavior: "smooth", block: "center" }); };
@@ -1046,7 +1092,60 @@ function wirePlot() {
 }
 
 // Edit mode: drag anything; tap to select; add, change, turn and remove things
+function wireBoundary(svg, redraw) {
+  const done = $("#b-done"); if (done) done.onclick = () => { boundaryEdit = false; bSel = null; redraw(); };
+  const close = $("#b-close"); if (close) close.onclick = () => { bSel = null; redraw(); };
+  const P = outlinePoints();
+  if (!svg || !P) return;
+  const pt = (ev) => { const p = svg.createSVGPoint(); p.x = ev.clientX; p.y = ev.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); };
+  const rem = $("#b-remove");
+  if (rem) rem.onclick = () => { const k = bSel.k; bSel = null; P.splice(k, 1); saveOutline(P, "Corner removed"); };
+  const set = $("#b-set");
+  if (set) set.onclick = () => {
+    const k = bSel.k, n = P.length, [x1, y1] = P[k], [x2, y2] = P[(k + 1) % n], len = Math.hypot(x2 - x1, y2 - y1), want = Number($("#b-len").value);
+    if (!want || want < 0.5) { toast("Type the length in metres"); return; }
+    P[(k + 1) % n] = [x1 + ((x2 - x1) / len) * want, y1 + ((y2 - y1) / len) * want];  // move the far corner along the side
+    saveOutline(P, `Side set to ${m(want)} 📐`);
+  };
+  svg.querySelectorAll("[data-mid]").forEach((g) => (g.onpointerup = (ev) => {
+    ev.stopPropagation();
+    const k = Number(g.dataset.mid), [x1, y1] = P[k], [x2, y2] = P[(k + 1) % P.length];
+    P.splice(k + 1, 0, [(x1 + x2) / 2, (y1 + y2) / 2]);
+    bSel = { type: "v", k: k + 1 };
+    saveOutline(P, "Corner added - drag it into place");
+  }));
+  svg.querySelectorAll("[data-edge]").forEach((l) => (l.onpointerup = () => { bSel = { type: "e", k: Number(l.dataset.edge) }; redraw(); }));
+  svg.querySelectorAll("[data-vtx]").forEach((c) => {
+    c.onpointerdown = (ev) => {
+      ev.preventDefault(); ev.stopPropagation(); c.setPointerCapture(ev.pointerId);
+      const k = Number(c.dataset.vtx), start = pt(ev), [x0, y0] = P[k];
+      let moved = false;
+      const shapes = svg.querySelectorAll("polygon.fence, polygon.grass");
+      c.onpointermove = (mv) => {
+        const p = pt(mv), nx = x0 + p.x - start.x, ny = y0 + p.y - start.y;
+        if (Math.abs(p.x - start.x) + Math.abs(p.y - start.y) > 0.05) moved = true;
+        c.setAttribute("cx", nx); c.setAttribute("cy", ny);
+        const live = P.map((q, i) => (i === k ? [nx, ny] : q));
+        shapes.forEach((s2) => s2.setAttribute("points", live.map((q) => q.join(",")).join(" ")));
+      };
+      c.onpointerup = (up) => {
+        c.onpointermove = c.onpointerup = null;
+        if (!moved) { bSel = { type: "v", k }; redraw(); return; }
+        const p = pt(up);
+        P[k] = [Math.round((x0 + p.x - start.x) * 20) / 20, Math.round((y0 + p.y - start.y) * 20) / 20];
+        bSel = null; saveOutline(P);
+      };
+    };
+  });
+}
+
 function wireEdit(svg, redraw) {
+  const bs = $("#b-start");
+  if (bs) bs.onclick = () => { boundaryEdit = true; selected = null; bSel = null; window.scrollTo(0, 0); redraw(); };
+  if (boundaryEdit) {
+    if (svg) svg.addEventListener("click", (e) => e.stopPropagation(), true);  // editing the outline: don't open beds or crops
+    wireBoundary(svg, redraw); return;
+  }
   const save = async (moved, message) => {
     // pin every bed where it is now, so only what you dragged (or turned) moves
     const pos = plotPositions();
@@ -1068,6 +1167,17 @@ function wireEdit(svg, redraw) {
       const r = b.dataset.rot;
       setAngle(r === "0" ? 0 : r === "90" ? it.a + 90 : it.a + Number(r));
     }));
+    const del = $("#seldel");
+    if (del) del.onclick = async () => {
+      if (it.type === "space") {
+        const n = activeCrops().filter((c) => c.space_id === it.id).length;
+        if (!confirm(`Delete ${it.s.name}?${n ? ` The ${n} plant${n === 1 ? "" : "s"} in it go back to "Not placed yet".` : ""}`)) return;
+        selected = null; await change("DELETE", `/api/spaces/${it.id}`, null, `🗑️ ${it.s.name} deleted`);
+      } else {
+        if (!confirm(`Remove the ${it.f.name.toLowerCase()} from your plan?`)) return;
+        selected = null; await change("DELETE", `/api/features/${it.id}`, null, "Removed");
+      }
+    };
     view.querySelectorAll("[data-copy-bed]").forEach((b) => (b.onclick = async () => {
       const spot = copySpot(it, b.dataset.copyBed), items = planItems(), twin = { ...it, ...spot, id: -1 };
       const hit = items.find((o) => o.type === "space" && overlaps(twin, o));
@@ -1204,13 +1314,28 @@ async function openMapTrace() {
   const taps = [];
   const shape = L.polygon([], { color: "#f2b01e", weight: 3, fillColor: "#9fd88f", fillOpacity: 0.25 }).addTo(map);
   const dots = L.layerGroup().addTo(map);
-  const draw = () => {
-    shape.setLatLngs(taps); dots.clearLayers();
-    taps.forEach((p, i) => L.circleMarker(p, { radius: i === 0 ? 7 : 5, color: "#fff", weight: 2, fillColor: "#e4572e", fillOpacity: 1 }).addTo(dots));
+  const stats = () => {
     const st = taps.length >= 3 && shapeStats(toMetres(taps));
-    $("#mapstats").innerHTML = st ? `📐 About <b>${st.w.toFixed(1)} × ${st.h.toFixed(1)} m</b> across, <b>${Math.round(st.area)} m²</b> inside. Keep tapping corners, or use it.`
+    $("#mapstats").innerHTML = st ? `📐 About <b>${st.w.toFixed(1)} × ${st.h.toFixed(1)} m</b> across, <b>${Math.round(st.area)} m²</b> inside. Drag a corner to fix it, tap ＋ to add one, tap a corner to remove it.`
       : `<b>${taps.length ? `${taps.length} corner${taps.length === 1 ? "" : "s"} - keep going` : "Tap the first corner."}</b>`;
     $("#m-save").disabled = taps.length < 3;
+  };
+  // corners you can drag, ＋ halfway along each side to add a corner, tap a corner to remove it
+  const draw = () => {
+    shape.setLatLngs(taps); dots.clearLayers();
+    taps.forEach((p, i) => {
+      const mk = L.marker(p, { draggable: true, icon: L.divIcon({ className: "vtx-icon", iconSize: [18, 18] }), title: "Drag to move, tap to remove" }).addTo(dots);
+      mk.on("drag", (e) => { taps[i] = e.target.getLatLng(); shape.setLatLngs(taps); stats(); });
+      mk.on("dragend", draw);
+      mk.on("click", () => { taps.splice(i, 1); draw(); });
+    });
+    if (taps.length >= 2) taps.forEach((p, i) => {
+      if (i === taps.length - 1 && taps.length < 3) return;
+      const q = taps[(i + 1) % taps.length], at = L.latLng((p.lat + q.lat) / 2, (p.lng + q.lng) / 2);
+      L.marker(at, { icon: L.divIcon({ className: "mid-icon", html: "+", iconSize: [18, 18] }), title: "Add a corner here" }).addTo(dots)
+        .on("click", () => { taps.splice(i + 1, 0, at); draw(); });
+    });
+    stats();
   };
   map.on("click", (e) => { taps.push(e.latlng); draw(); });
   $("#m-undo").onclick = () => { taps.pop(); draw(); };

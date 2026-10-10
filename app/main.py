@@ -539,6 +539,7 @@ def path_width(body: PathWidth, user=Depends(auth.current_user)):
 
 class GardenShape(BaseModel):
     points: list   # [[x, y], ...] in metres - the browser converts the map taps, the location never reaches us
+    keep_beds: bool = False   # editing the existing outline: keep beds and features where they are relative to it
 
 
 @app.post("/api/garden/shape")
@@ -556,6 +557,11 @@ def garden_shape(body: GardenShape, user=Depends(auth.current_user)):
     if w < 1 or h < 1 or w > 2000 or h > 2000:
         raise HTTPException(400, "That outline is too small or too big - between 1m and 2km across.")
     with db.connect() as conn:
+        if body.keep_beds and (x0 or y0):
+            # the outline's corner moved (a corner was dragged up or left): move everything with it
+            conn.execute("UPDATE spaces SET pos_x = MAX(0, pos_x - ?), pos_y = MAX(0, pos_y - ?) WHERE user_id = ? AND pos_x IS NOT NULL",
+                         (x0, y0, user["id"]))
+            conn.execute("UPDATE features SET x = MAX(0, x - ?), y = MAX(0, y - ?) WHERE user_id = ?", (x0, y0, user["id"]))
         conn.execute("UPDATE users SET garden_w = ?, garden_h = ?, garden_shape = ? WHERE id = ?",
                      (round(w, 2), round(h, 2), json.dumps(pts), user["id"]))
         user = dict(conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone())

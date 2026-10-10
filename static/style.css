@@ -491,3 +491,16 @@ svg.plot .dims.edge text { fill: #6e4a2e; }
 .seltools { flex-wrap: wrap; }
 .seltools .copyrow { display: flex; align-items: center; gap: 4px; width: 100%; border-top: 1px dashed var(--line); padding-top: 6px; margin-top: 2px; font-size: 13px; font-weight: 800; color: var(--muted); }
 .seltools .copyrow span { margin-right: auto; }
+
+/* editing the garden's outline */
+svg.plot .bedge { stroke: transparent; cursor: pointer; }
+svg.plot .bedge.on { stroke: rgba(228, 87, 46, .35); }
+svg.plot .bmid circle { fill: #fff; stroke: #2e7a4d; stroke-width: 0.03; opacity: .9; }
+svg.plot .bmid text { fill: #2e7a4d; font-weight: 800; pointer-events: none; }
+svg.plot .bmid { cursor: copy; }
+svg.plot .bvtx { fill: #e4572e; stroke: #fff; stroke-width: 0.04; cursor: grab; }
+svg.plot .bvtx.on { fill: #f2b01e; }
+.btools input { width: 74px; padding: 6px; font-size: 15px; }
+/* corner markers on the satellite map */
+.vtx-icon { background: #e4572e; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+.mid-icon { background: rgba(255,255,255,.85); border: 2px solid #2e7a4d; border-radius: 50%; color: #2e7a4d; font-weight: 900; font-size: 14px; line-height: 14px; text-align: center; }
