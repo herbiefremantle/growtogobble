@@ -74,6 +74,7 @@ def bed_cost(space_id, with_jobs):
         plant = catalogue.BY_ID[plant_id]
         est = planner.cost_estimate(plant, g["qty"], method)
         items.append(dict(plant_id=plant_id, method=method, qty=g["qty"], bought=g["bought"], total=est["total"], text=est["text"],
+                          how=est["how"], per_plant=est["per_plant"], note=est["note"],
                           options={m: planner.cost_estimate(plant, g["qty"], m)["total"] for m in planner.methods_for(plant)}))
     total = sum(i["total"] for i in items)
     return {"total": round(total, 2), "to_buy": round(sum(i["total"] for i in items if not i["bought"]), 2), "items": items}

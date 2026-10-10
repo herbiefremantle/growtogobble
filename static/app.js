@@ -31,11 +31,20 @@ const GROUPS = { veg: { emoji: "🥕", name: "Fruit & veg" }, herb: { emoji: "�
 const isFlower = (p) => p.group !== "veg" && !p.eat;  // grown to look at, not eat
 const companionsFor = (p) => p.good_with.filter((x) => plant(x.plant_id).helps && plant(x.plant_id).group !== "veg");
 const money = (n) => "£" + (Math.round(n * 100) / 100).toFixed(2).replace(/\.00$/, "");
+const pence = (n) => (n < 1 ? `${Math.max(1, Math.round(n * 100))}p` : money(n));
 const METHOD_SHORT = { sow_out: "🌱 Seeds sown straight in", sow_in: "🏠 Seeds indoors, then planted out", plants: "🪴 Bought as plants" };
 // sets, cloves, bulbs and seed potatoes are planted straight in, not sown
 const methodLabel = (p, m) => (m === "sow_out" && p.buy_word ? `🌱 ${p.buy_word.charAt(0).toUpperCase() + p.buy_word.slice(1)} planted straight in`
   : m === "plants" && ["bulbs", "corms", "tubers", "crowns", "canes", "slips"].includes(p.buy_word) ? `🪴 ${p.buy_word.charAt(0).toUpperCase() + p.buy_word.slice(1)} planted` : METHOD_SHORT[m]);
 const helpsWhat = (p) => p.good_with.filter((x) => plant(x.plant_id).group === "veg");
+// Photos or emoji: real photos (from Wikimedia Commons) are an option - remembered on this device
+let showPhotos = false;
+try { showPhotos = localStorage.getItem("gtg-photos") === "1"; } catch (e) { /* private mode */ }
+const pic = (p) => (showPhotos && p.photo ? `<img class="pic" src="${esc(p.photo.src)}" alt="${esc(p.name)}" loading="lazy" data-fallback="${esc(p.emoji)}">` : p.emoji);
+const blobCls = (p) => (showPhotos && p.photo ? "has-pic" : "");
+const photoToggle = () => `<button class="btn small ${showPhotos ? "primary" : ""}" data-photos aria-pressed="${showPhotos}">${showPhotos ? "🖼️ Photos" : "😀 Icons"}</button>`;
+// a photo that won't load goes back to its emoji
+document.addEventListener("error", (e) => { const t = e.target; if (t.tagName === "IMG" && t.dataset && t.dataset.fallback) t.replaceWith(t.dataset.fallback); }, true);
 const SUN_EMOJI = { sun: "☀️", part: "⛅", shade: "🌥️" };
 // save one thing about a bed, keeping the rest as it is
 const patchSpace = (sp, extra, message) => change("PATCH", `/api/spaces/${sp.id}`, { name: sp.name, kind: sp.kind, soil: sp.soil,
@@ -360,7 +369,7 @@ function tile(p, picked, have, helpsLine) {
   const extra = p.group === "companion" || helpsLine ? `<span class="when">Helps ${helpsWhat(p).slice(0, 5).map((x) => plant(x.plant_id).emoji).join("")}</span>`
     : p.group === "flower" ? `<span class="when">${p.sun.map((x) => SUN_EMOJI[x]).join("")} · ${p.height_cm >= 100 ? p.height_cm / 100 + "m" : p.height_cm + "cm"} tall</span>` : "";
   return `<button class="tile ${picked ? "picked" : ""}" data-plant="${p.id}">${have ? `<span class="have" title="In your garden">🌱</span>` : ""}
-    <span class="blob l${p.level}">${p.emoji}</span><span class="n">${esc(p.name)}</span>${extra}<span class="chip l${p.level}">${lv.emoji} ${esc(lv.name)}</span></button>`;
+    <span class="blob l${p.level} ${blobCls(p)}">${pic(p)}</span><span class="n">${esc(p.name)}</span>${extra}<span class="chip l${p.level}">${lv.emoji} ${esc(lv.name)}</span></button>`;
 }
 
 // ---- jobs ------------------------------------------------------------------------------------------
@@ -547,7 +556,7 @@ function plantNowStrip() {
   return `<div class="section-title"><h2>🌱 You could plant now</h2><a href="#/plants?now">See all</a></div>
     <div class="strip">${list.map(({ p, m, w }) => {
       const open = d(w[0]) <= t;
-      return `<button class="tile" data-open-plant="${p.id}" data-method="${m}"><span class="blob l${p.level}">${p.emoji}</span>
+      return `<button class="tile" data-open-plant="${p.id}" data-method="${m}"><span class="blob l${p.level} ${blobCls(p)}">${pic(p)}</span>
         <span class="n">${esc(p.name)}</span><span class="when">${S.cat.methods[m].emoji} ${open ? "Until " + fmt(w[1]) : "From " + fmt(w[0])}</span></button>`;
     }).join("")}</div>`;
 }
@@ -643,7 +652,7 @@ function cropRow(c, opts = {}) {
   const p = plant(c.plant_id), j = nextJob(c), row = rowLabel(c);
   const when = c.sown_on ? "sown " + fmt(c.sown_on) : c.planted_on ? "planted " + fmt(c.planted_on) : "";
   return `<div class="crop-row" data-open-crop="${c.id}">
-    <span class="e">${p.emoji}</span>
+    <span class="e ${blobCls(p)}">${pic(p)}</span>
     <div class="n">${esc(p.name)}${c.variety ? ` <span class="vname">'${esc(c.variety)}'</span>` : ""}${row ? ` <span class="chip grey">${row}${when ? " · " + when : ""}</span>` : ""}<div class="small muted" style="font-weight:600">${j ? esc(j.title) + " · " + whenText(j) : c.finished_on ? "Finished" : "All done 🎉"}</div></div>
     <div class="stage" aria-label="Stage ${c.stage + 1} of ${stagesFor(plant(c.plant_id)).length}">${stagesFor(plant(c.plant_id)).map((e, i) => `<span class="${i <= c.stage ? "on" : ""}">${e}</span>`).join("")}</div>
     ${opts.unplace && c.space_id ? `<button class="unplace" data-unplace="${c.id}" aria-label="Take ${esc(p.name)} out of this bed" title="Take out of this bed">✕</button>` : ""}
@@ -687,7 +696,8 @@ function fruitInfo(fr) {
 function fruitSheet(f) {
   const fr = fruitOf(f);
   if (!fr) return;
-  openSheet(`<h2>${fr.emoji} ${esc(f.name)}</h2>${f.name !== fr.name ? `<p class="small muted" style="margin-top:-6px">${esc(fr.name)}</p>` : ""}
+  openSheet(`${showPhotos && fr.photo ? `<figure class="hero-pic"><img src="${esc(fr.photo.src)}" alt="${esc(fr.name)}" data-fallback="">
+      <figcaption><a href="${esc(fr.photo.page)}" target="_blank" rel="noopener">📷 ${esc(fr.photo.credit || "Wikimedia Commons")}</a></figcaption></figure>` : ""}<h2>${fr.emoji} ${esc(f.name)}</h2>${f.name !== fr.name ? `<p class="small muted" style="margin-top:-6px">${esc(fr.name)}</p>` : ""}
     ${fr.kinds.length ? `<div class="row" style="margin-bottom:10px"><span>🏷️ ${f.cultivar ? `<b>${esc(f.cultivar)}</b>` : `<span class="muted">Which variety? Not chosen</span>`}</span>
       <button class="btn small" id="kpick">${f.cultivar ? "Change" : "Choose"}</button></div>` : ""}${fruitInfo(fr, f)}`);
   const k = $("#kpick"); if (k) k.onclick = () => kindPicker(f);
@@ -726,7 +736,7 @@ function fruitPicker(kind, onPick) {
   const list = (S.cat.fruit || []).filter((x) => x.kind === kind);
   openSheet(`<h2>${kind === "tree" ? "🌳 What kind of tree?" : "🌿 What kind of bush?"}</h2>
     <p class="small muted" style="margin-top:-6px">Pick a fruit and we'll tell you when to pick it and how to look after it.</p>
-    <div class="fruit-list">${list.map((x) => `<button class="fruit-opt" data-fruit="${x.id}"><span class="fe">${x.emoji}</span>
+    <div class="fruit-list">${list.map((x) => `<button class="fruit-opt" data-fruit="${x.id}"><span class="fe ${showPhotos && x.photo ? "has-pic" : ""}">${showPhotos && x.photo ? `<img class="pic" src="${esc(x.photo.src)}" alt="" loading="lazy" data-fallback="${esc(x.emoji)}">` : x.emoji}</span>
       <span><b>${esc(x.name)}</b><span class="small muted">${x.plain ? "Just there - no fruit to pick" : `${esc(x.examples)} · pick ${pickMonths(x)}`}</span></span></button>`).join("")}</div>`);
   $("#sheet-card").querySelectorAll("[data-fruit]").forEach((b) => (b.onclick = () => { closeSheet(); onPick(list.find((x) => x.id === b.dataset.fruit)); }));
 }
@@ -2012,7 +2022,7 @@ function drawCrop(id) {
   const doneJobs = c.jobs.filter((j) => j.status === "done" && j.kind !== "buy");
   const near = new Set(activeCrops().filter((x) => x.space_id && x.space_id === c.space_id && x.id !== c.id).map((x) => x.plant_id));
   const row = rowLabel(c);
-  openSheet(`<div class="plant-head"><span class="blob l${p.level}">${p.emoji}</span><div><h2 style="margin:0">${esc(p.name)}${c.variety ? ` <span class="vname">'${esc(c.variety)}'</span>` : ""}${row ? ` <span class="chip grey" style="vertical-align:middle">${row}</span>` : ""}</h2>
+  openSheet(`<div class="plant-head"><span class="blob l${p.level} ${blobCls(p)}">${pic(p)}</span><div><h2 style="margin:0">${esc(p.name)}${c.variety ? ` <span class="vname">'${esc(c.variety)}'</span>` : ""}${row ? ` <span class="chip grey" style="vertical-align:middle">${row}</span>` : ""}</h2>
       <div class="stage" style="font-size:20px;margin-top:4px">${stagesFor(plant(c.plant_id)).map((e, i) => `<span class="${i <= c.stage ? "on" : ""}">${e}</span>`).join("")}</div></div></div>
     <div class="seg sticky-tabs" role="tablist">
       <button role="tab" data-pane="jobs" class="on">📋 Jobs</button><button role="tab" data-pane="details">⚙️ Details</button><button role="tab" data-pane="next">🔁 What next</button></div>
@@ -2029,7 +2039,8 @@ function drawCrop(id) {
       <select id="cs" aria-label="Where it grows"><option value="" ${c.space_id ? "" : "selected"}>📍 Not in a bed (decide later)</option>${fits.map((s) => `<option value="${s.id}" ${s.id === c.space_id ? "selected" : ""}>${SPACE_KINDS[s.kind].emoji} ${esc(s.name)}</option>`).join("")}</select>
       ${!started && p.methods.length > 1 ? `<label class="field">How to start it</label><div class="chips" style="margin-bottom:12px">${p.methods.map((m) => `<button class="btn small ${m === c.method ? "primary" : ""}" data-crop-method="${m}">${S.cat.methods[m].emoji} ${esc(S.cat.methods[m].label)}</button>`).join("")}</div>` : ""}
       <div class="card tint-sky" style="margin-top:12px"><div class="row" style="justify-content:space-between">
-        <div><b>How many ${esc(p.unit)}?</b><div class="small">🧺 ${esc(c.harvest || "")}</div><div class="small">🛒 ${esc(c.buy.text)}${c.buy.note ? ` <span class="muted">(${esc(c.buy.note)})</span>` : ""}</div>${c.space_id && S.g.spaces.find((s) => s.id === c.space_id).kind !== "pot" ? `<div class="small muted">📏 Uses about ${c.area} m²</div>` : ""}</div>
+        <div><b>How many ${esc(p.unit)}?</b><div class="small">🧺 ${esc(c.harvest || "")}</div><div class="small">🛒 ${esc(c.buy.text)}${c.buy.note ? ` <span class="muted">(${esc(c.buy.note)})</span>` : ""}</div>
+        <div class="small">💷 About ${money(c.cost.total)} (${esc(c.cost.how)}) · <b>${pence(c.cost.per_plant)} a plant</b></div>${c.space_id && S.g.spaces.find((s) => s.id === c.space_id).kind !== "pot" ? `<div class="small muted">📏 Uses about ${c.area} m²</div>` : ""}</div>
         <div class="counter qty"><button class="btn small" data-cq="-1" aria-label="Fewer">−</button><input id="cq" type="number" inputmode="numeric" min="1" value="${c.qty}"><button class="btn small" data-cq="1" aria-label="More">+</button></div></div></div>
       ${datesCard(c)}
       <div class="row" style="margin-top:10px">
@@ -2082,7 +2093,8 @@ function plantsPage() {
     companion: `<h1>🐞 Companion plants</h1><p class="muted">Flowers to grow in among your veg. They bring in bees to pollinate, and bugs that eat greenfly - or lure pests away from your crops.</p>`,
     flower: `<h1>🌸 Flower garden</h1><p class="muted">Just for colour, smell and bees. Choose by how sunny your spot is. For a whole bed of flowers that go together, open a bed and tap 🌸 Flower ideas.</p>`,
   }[plantGroup];
-  view.innerHTML = `<div class="seg" role="tablist" style="margin-bottom:12px">${Object.entries(GROUPS).map(([k, g]) => `<button data-pgroup="${k}" class="${plantGroup === k ? "on" : ""}">${g.emoji} ${g.name}</button>`).join("")}</div>
+  view.innerHTML = `<div class="row" style="justify-content:flex-end;margin:-6px 0 6px"><span class="small muted">Show plants as</span>${photoToggle()}</div>
+    <div class="seg" role="tablist" style="margin-bottom:12px">${Object.entries(GROUPS).map(([k, g]) => `<button data-pgroup="${k}" class="${plantGroup === k ? "on" : ""}">${g.emoji} ${g.name}</button>`).join("")}</div>
     ${head}
     ${plantGroup === "veg" && plantFilter === "all" && !plantSearch ? plantNowStrip() + mixStrip() : ""}
     <input type="text" id="q" placeholder="🔍 Search, e.g. ${plantGroup === "veg" ? "tomatoes" : plantGroup === "flower" ? "sunflowers" : plantGroup === "herb" ? "parsley" : "marigolds"}" value="${esc(plantSearch)}" style="margin-bottom:10px">
@@ -2095,6 +2107,7 @@ function plantsPage() {
   view.onclick = (e) => {
     const f = e.target.closest("[data-filter]");
     if (f) { plantFilter = f.dataset.filter; plantsPage(); return; }
+    if (e.target.closest("[data-photos]")) { showPhotos = !showPhotos; remember("gtg-photos", showPhotos); plantsPage(); toast(showPhotos ? "🖼️ Showing photos" : "😀 Showing icons"); return; }
     const g = e.target.closest("[data-pgroup]");
     if (g) { plantGroup = g.dataset.pgroup; plantFilter = "all"; plantSearch = ""; plantsPage(); return; }
     const t = e.target.closest(".tile[data-plant]");
@@ -2238,7 +2251,9 @@ function openPlant(id, spaceId, startMethod, after) {
       ${when ? `<div class="small muted">${when}</div>` : ""}</div></label>`;
   }).join("");
   const steps = p.steps_sow || p.steps_plant || null;
-  openSheet(`<div class="plant-head"><span class="blob l${p.level}">${p.emoji}</span><div><h2 style="margin:0">${esc(p.name)}</h2>
+  openSheet(`${showPhotos && p.photo ? `<figure class="hero-pic"><img src="${esc(p.photo.src)}" alt="${esc(p.name)}" data-fallback="">
+      <figcaption><a href="${esc(p.photo.page)}" target="_blank" rel="noopener">📷 ${esc(p.photo.credit || "Wikimedia Commons")}</a></figcaption></figure>` : ""}
+    <div class="plant-head"><span class="blob l${p.level}">${p.emoji}</span><div><h2 style="margin:0">${esc(p.name)}</h2>
       <div class="chips" style="margin-top:6px"><span class="chip l${p.level}">${lv.emoji} ${esc(lv.name)}</span>
       ${p.where.includes("pot") ? `<span class="chip sky">🪴 Pots OK</span>` : `<span class="chip grey">🟫 Beds only</span>`}
       ${p.tender ? `<span class="chip grey">❄️ Hates frost</span>` : ""}${p.perennial ? `<span class="chip grey">♻️ Comes back every year</span>` : ""}
@@ -2457,7 +2472,7 @@ function drawBedPlan(id) {
       <div class="small">${z ? esc(zoneWords(L, z.tier, z.part)) : p.group === "companion" ? "Dotted round the edges and ends, between your veg" : ""}</div>
       ${started ? `<div class="small muted">${methodLabel(p, it.method)} - already started</div>`
         : `<div class="chips" style="margin-top:4px">${Object.keys(it.options).map((m) => `<button class="btn small ${m === it.method ? "primary" : "ghost"}" data-bpm="${it.plant_id}|${it.method}|${m}">${methodLabel(p, m)} · ${money(it.options[m])}</button>`).join("")}</div>`}
-      <div class="small muted">🛒 ${esc(it.text)}${it.bought ? " · ✅ bought" : ""}</div></div><b class="bp-cost">${money(it.total)}</b></div>`;
+      <div class="small muted">🛒 ${esc(it.how)} = ${money(it.total)} · <b>${pence(it.per_plant)} a plant</b>${it.note ? ` (${esc(it.note)})` : ""}${it.bought ? " · ✅ bought" : ""}</div></div><b class="bp-cost">${money(it.total)}</b></div>`;
   };
   openSheet(`<h2>📐 ${esc(s.name)}: where to plant</h2>
     ${L.tiers.length || L.edge.length ? bedPlanSvg(L) : ""}
@@ -2465,6 +2480,8 @@ function drawBedPlan(id) {
     ${L.spare > 0.1 && !L.over ? `<p class="small muted">🟫 About ${Math.round(L.spare * 100)}% of the bed is still free${L.island ? " round the outside" : " at the front"} - room for more.</p>` : ""}
     <div class="card"><h3>🌱 What goes where</h3>${[...cost.items].sort((x, y) => order(x) - order(y)).map(row).join("") || `<p class="small muted">Nothing in this bed yet.</p>`}
       <div class="bp-total"><span><b>💷 About ${money(cost.total)}</b> to plant this bed${cost.to_buy < cost.total ? ` · <b>${money(cost.to_buy)}</b> still to buy` : ""}</span></div>
+      <details class="small" style="margin-top:8px"><summary><b>How are prices worked out?</b></summary>
+        <p style="margin:6px 0 0">We work out what you'd need to buy for that many plants - packets of seeds (with a few spare, as not every seed comes up), bags of sets or bulbs, or single plants - then multiply by a typical UK garden-shop price: about £2.50-£3.50 a seed packet, £4.50 a bulb of seed garlic, £2.50 for 250g of onion sets, £5.50 for 2kg of seed potatoes, £1.50-£3 for a baby veg plant, £5 for a bag of 10 flower bulbs, £7 for a perennial and £10-£15 for a shrub. Real prices vary by shop, variety and time of year.</p></details>
       <p class="small muted" style="margin:6px 0 0">Tap how you'll start each one to compare costs: seeds are cheapest, baby plants are quicker and easier. Prices are a rough guide (UK garden centres and online) - one packet of seeds often does more than one bed, and saved or swapped seeds are free!</p></div>
     <div class="row"><button class="btn small" data-flowers="${s.id}">🌸 Flower ideas</button><a class="btn small" href="#/plants" data-close>➕ Add plants</a></div>`);
   $("#sheet-card").querySelectorAll("[data-bpm]").forEach((b) => (b.onclick = async () => {
@@ -2619,7 +2636,8 @@ function checkHtml(p, r) {
   const word = { sow_in: "Sow indoors", sow_out: "Sow", plant_out: "Plant out", harvest: "Pick" };
   const plan = (r.plan || []).map((j) => `${icon[j.kind]} ${word[j.kind]} ${fmt(j.start)}`).join(" → ");
   const lines = [plan ? `<span class="plan">${plan}</span>` : "", `🧺 You'll get <b>${esc(r.harvest || "a good crop")}</b>`,
-    r.buy ? `🛒 <b>${esc(r.buy.text)}</b>${r.buy.seeds ? ` - enough to sow ${r.buy.seeds}` : ""}${r.buy.note ? ` <span class="muted">(${esc(r.buy.note)})</span>` : ""}` : ""].filter(Boolean);
+    r.buy ? `🛒 <b>${esc(r.buy.text)}</b>${r.buy.seeds ? ` - enough to sow ${r.buy.seeds}` : ""}${r.buy.note ? ` <span class="muted">(${esc(r.buy.note)})</span>` : ""}` : "",
+    r.cost ? `💷 About <b>${money(r.cost.total)}</b> - ${esc(r.cost.how)}. That's about <b>${pence(r.cost.per_plant)} a plant</b>.` : ""].filter(Boolean);
   let cls = "ok";
   if (r.space && r.space.area) {
     const u = r.space;

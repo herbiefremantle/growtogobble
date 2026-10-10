@@ -704,3 +704,13 @@ def test_costs_and_more_companions(client):
     assert tulips["cost"]["what"] == "bags of bulbs" and tulips["cost"]["total"] == 15.0
     plan = client.get("/api/spaces/%d/flowers?sun=sun" % bed).json()
     assert all(c["cost"] > 0 for c in plan["combos"])
+
+
+def test_every_plant_and_fruit_has_a_photo_with_credit(client):
+    import os
+    cat = client.get("/api/plants").json()
+    root = os.path.join(os.path.dirname(__file__), "..")
+    for item in cat["plants"] + [f for f in cat["fruit"] if not f.get("plain")]:
+        ph = item["photo"]
+        assert ph and ph["page"].startswith("https://commons.wikimedia.org/"), item["id"]
+        assert os.path.getsize(os.path.join(root, ph["src"].lstrip("/"))) > 2000, item["id"]

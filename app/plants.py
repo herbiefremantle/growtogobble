@@ -1107,6 +1107,15 @@ for _p in PLANTS:
     # flowers and herbs that also help the veg show up with the companion plants
     _p["helps"] = _p["group"] == "companion" or _p["id"] in _extras.MORE_HELPS
 ALL_ROUNDERS = _extras.ALL_ROUNDERS
+
+# Real photos, from Wikimedia Commons (free licences - each has its author and licence for the credit)
+import json as _json  # noqa: E402
+import os as _os  # noqa: E402
+with open(_os.path.join(_os.path.dirname(__file__), "photos.json"), encoding="utf-8") as _fh:
+    # saved in static/photos (so they load fast, work offline, and don't lean on Wikimedia's servers)
+    PHOTOS = {k: {"src": "/static/photos/" + v["file"], "page": v["page"], "credit": v["credit"]} for k, v in _json.load(_fh).items()}
+for _p in PLANTS:
+    _p["photo"] = PHOTOS.get(_p["id"])
 COMBOS, SUN_SPOTS, HELPS = _flowers.COMBOS, _flowers.SUN_SPOTS, _flowers.HELPS
 
 
@@ -1255,5 +1264,6 @@ FRUIT = [
      "care": ["Great for bees and birds - and it can shelter veg beds from wind"], "pests": ""},
 ]
 for _f in FRUIT:
+    _f["photo"] = PHOTOS.get("fruit:" + _f["id"])
     _f["kinds"] = [{"name": n, "tags": t, "why": w} for n, t, w in _extras.FRUIT_KINDS.get(_f["id"], [])]
 FRUIT_BY_ID = {f["id"]: f for f in FRUIT}

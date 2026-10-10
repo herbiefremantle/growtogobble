@@ -1,0 +1,716 @@
+{
+ "radish": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0c/Radish_3371103037_4ab07db0bf_o.jpg/330px-Radish_3371103037_4ab07db0bf_o.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Radish_3371103037_4ab07db0bf_o.jpg",
+  "credit": "Self, en:User:Jengod · Public domain",
+  "file": "radish.jpg"
+ },
+ "salad": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/49/Lettuce_mix.jpg/330px-Lettuce_mix.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Lettuce_mix.jpg",
+  "credit": "MyName (Mahlum) · Public domain",
+  "file": "salad.jpg"
+ },
+ "peas": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/11/Peas_in_pods_-_Studio.jpg/330px-Peas_in_pods_-_Studio.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Peas_in_pods_-_Studio.jpg",
+  "credit": "Bill Ebbesen · CC BY-SA 3.0",
+  "file": "peas.jpg"
+ },
+ "broad_beans": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/74/Fava_beans_1.jpg/330px-Fava_beans_1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Fava_beans_1.jpg",
+  "credit": "Tuinboon_zaden_in_peul.jpg: User:Rasbak\nderivative work: Hohum at en.wikipedia · CC BY-SA 3.0",
+  "file": "broad_beans.jpg"
+ },
+ "garlic": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4c/Single_clove_garlic.jpg/330px-Single_clove_garlic.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Single_clove_garlic.jpg",
+  "credit": "Dmitry Makarov (Dmit) · CC BY-SA 3.0",
+  "file": "garlic.jpg"
+ },
+ "onions": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a2/Mixed_onions.jpg/330px-Mixed_onions.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Mixed_onions.jpg",
+  "credit": "Colin · CC BY-SA 3.0",
+  "file": "onions.jpg"
+ },
+ "spring_onions": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/da/CSA-Red-Spring-Onions.jpg/330px-CSA-Red-Spring-Onions.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:CSA-Red-Spring-Onions.jpg",
+  "credit": "Evan-Amos · Public domain",
+  "file": "spring_onions.jpg"
+ },
+ "potatoes": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Patates.jpg/330px-Patates.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Patates.jpg",
+  "credit": "Scott Bauer, USDA ARS · Public domain",
+  "file": "potatoes.jpg"
+ },
+ "courgette": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/92/CSA-Striped-Zucchini.jpg/330px-CSA-Striped-Zucchini.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:CSA-Striped-Zucchini.jpg",
+  "credit": "Evan-Amos · Public domain",
+  "file": "courgette.jpg"
+ },
+ "strawberries": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4c/Garden_strawberry_%28Fragaria_%C3%97_ananassa%29_single2.jpg/330px-Garden_strawberry_%28Fragaria_%C3%97_ananassa%29_single2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Garden_strawberry_(Fragaria_%C3%97_ananassa)_single2.jpg",
+  "credit": "Ivar Leidus · CC BY-SA 4.0",
+  "file": "strawberries.jpg"
+ },
+ "nasturtium": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/87/Tropaeolum_majus_2005_G1.jpg/330px-Tropaeolum_majus_2005_G1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Tropaeolum_majus_2005_G1.jpg",
+  "credit": "George Chernilevsky · Public domain",
+  "file": "nasturtium.jpg"
+ },
+ "chives": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/49/Allium_schoenoprasum_-_Bombus_lapidarius_-_Tootsi.jpg/330px-Allium_schoenoprasum_-_Bombus_lapidarius_-_Tootsi.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Allium_schoenoprasum_-_Bombus_lapidarius_-_Tootsi.jpg",
+  "credit": "Ivar Leidus · CC BY-SA 4.0",
+  "file": "chives.jpg"
+ },
+ "mint": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/54/Spearmint_in_Bangladesh_03.jpg/330px-Spearmint_in_Bangladesh_03.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Spearmint_in_Bangladesh_03.jpg",
+  "credit": "কামরুল ইসলাম শাহীন · CC BY-SA 4.0",
+  "file": "mint.jpg"
+ },
+ "chard": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/45/Chard_%28Beta_vulgaris_var_cicla%29.jpg/330px-Chard_%28Beta_vulgaris_var_cicla%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Chard_(Beta_vulgaris_var_cicla).jpg",
+  "credit": "Neelix at English Wikipedia · Public domain",
+  "file": "chard.jpg"
+ },
+ "beetroot": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/21/Beets-Bundle.jpg/330px-Beets-Bundle.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Beets-Bundle.jpg",
+  "credit": "Evan-Amos · CC0",
+  "file": "beetroot.jpg"
+ },
+ "runner_beans": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/24/Stick_beans_for_sale_on_a_UK_greengrocer%27s_market_stall_in_August_2013.jpg/330px-Stick_beans_for_sale_on_a_UK_greengrocer%27s_market_stall_in_August_2013.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Stick_beans_for_sale_on_a_UK_greengrocer%27s_market_stall_in_August_2013.jpg",
+  "credit": "InterestingPics · CC BY-SA 3.0",
+  "file": "runner_beans.jpg"
+ },
+ "french_beans": {
+  "src": "https://upload.wikimedia.org/wikipedia/commons/c/cd/CDC_greenbean.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+  "page": "https://commons.wikimedia.org/wiki/File:CDC_greenbean.jpg",
+  "credit": "Public domain",
+  "file": "french_beans.jpg"
+ },
+ "rhubarb": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9e/CSA-Rhubarb.jpg/330px-CSA-Rhubarb.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:CSA-Rhubarb.jpg",
+  "credit": "Evan-Amos · Public domain",
+  "file": "rhubarb.jpg"
+ },
+ "carrots": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a2/Vegetable-Carrot-Bundle-wStalks.jpg/330px-Vegetable-Carrot-Bundle-wStalks.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Vegetable-Carrot-Bundle-wStalks.jpg",
+  "credit": "Evan-Amos · Public domain",
+  "file": "carrots.jpg"
+ },
+ "tomatoes": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/10/Tomates_cerises_Luc_Viatour.jpg/330px-Tomates_cerises_Luc_Viatour.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Tomates_cerises_Luc_Viatour.jpg",
+  "credit": "Luc Viatour · CC BY-SA 3.0",
+  "file": "tomatoes.jpg"
+ },
+ "tomatoes_big": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/89/Tomato_je.jpg/330px-Tomato_je.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Tomato_je.jpg",
+  "credit": "Softeis · CC BY-SA 3.0",
+  "file": "tomatoes_big.jpg"
+ },
+ "squash": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/77/Cucurbita_moschata_Butternut_2012_G2.jpg/330px-Cucurbita_moschata_Butternut_2012_G2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Cucurbita_moschata_Butternut_2012_G2.jpg",
+  "credit": "George Chernilevsky · Public domain",
+  "file": "squash.jpg"
+ },
+ "summer_squash": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9c/Golden_Bush_Pattypan_Squash.jpg/330px-Golden_Bush_Pattypan_Squash.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Golden_Bush_Pattypan_Squash.jpg",
+  "credit": "Netherzone · CC0",
+  "file": "summer_squash.jpg"
+ },
+ "sweet_potatoes": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/58/Ipomoea_batatas_006.JPG/330px-Ipomoea_batatas_006.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Ipomoea_batatas_006.JPG",
+  "credit": "Llez · CC BY-SA 3.0",
+  "file": "sweet_potatoes.jpg"
+ },
+ "cucumber": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/96/ARS_cucumber.jpg/330px-ARS_cucumber.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:ARS_cucumber.jpg",
+  "credit": "Stephen Ausmus, USDA ARS · Public domain",
+  "file": "cucumber.jpg"
+ },
+ "pumpkin": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5c/FrenchMarketPumpkinsB.jpg/330px-FrenchMarketPumpkinsB.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:FrenchMarketPumpkinsB.jpg",
+  "credit": "Infrogmation of New Orleans · CC BY-SA 3.0",
+  "file": "pumpkin.jpg"
+ },
+ "sweetcorn": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/79/VegCorn.jpg/330px-VegCorn.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:VegCorn.jpg",
+  "credit": "The original Uploader was wstoakLL at English Wikipedia · Public domain",
+  "file": "sweetcorn.jpg"
+ },
+ "kale": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/20/Boerenkool.jpg/330px-Boerenkool.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Boerenkool.jpg",
+  "credit": "Rasbak · CC BY-SA 3.0",
+  "file": "kale.jpg"
+ },
+ "leeks": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b1/Leeks_and_Thyme.jpg/330px-Leeks_and_Thyme.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Leeks_and_Thyme.jpg",
+  "credit": "THOR · CC BY 2.0",
+  "file": "leeks.jpg"
+ },
+ "parsnips": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b7/PastinakePflanzegeerntet.jpg/330px-PastinakePflanzegeerntet.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:PastinakePflanzegeerntet.jpg",
+  "credit": "Goldlocki · CC BY-SA 3.0",
+  "file": "parsnips.jpg"
+ },
+ "basil": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/97/Ocimum_basilicum_8zz.jpg/330px-Ocimum_basilicum_8zz.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Ocimum_basilicum_8zz.jpg",
+  "credit": "Photo by David J. Stang · CC BY-SA 4.0",
+  "file": "basil.jpg"
+ },
+ "raspberries": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2b/Raspberries_%28Rubus_idaeus%29.jpg/330px-Raspberries_%28Rubus_idaeus%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Raspberries_(Rubus_idaeus).jpg",
+  "credit": "Ivar Leidus · CC BY-SA 4.0",
+  "file": "raspberries.jpg"
+ },
+ "blueberries": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/15/Blueberries.jpg/330px-Blueberries.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Blueberries.jpg",
+  "credit": "The original Uploader was Oven Fresh at English Wikipedia · Public domain",
+  "file": "blueberries.jpg"
+ },
+ "chillies": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/77/Shan_Hills%2C_Myanmar%2C_Red_chili_pepper_plant.jpg/330px-Shan_Hills%2C_Myanmar%2C_Red_chili_pepper_plant.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Shan_Hills,_Myanmar,_Red_chili_pepper_plant.jpg",
+  "credit": "Vyacheslav Argenberg · CC BY 4.0",
+  "file": "chillies.jpg"
+ },
+ "peppers": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/85/Green-Yellow-Red-Pepper-2009.jpg/330px-Green-Yellow-Red-Pepper-2009.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Green-Yellow-Red-Pepper-2009.jpg",
+  "credit": "Kham Tran - www.khamtran.com · CC BY-SA 3.0",
+  "file": "peppers.jpg"
+ },
+ "broccoli": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/03/Broccoli_and_cross_section_edit.jpg/330px-Broccoli_and_cross_section_edit.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Broccoli_and_cross_section_edit.jpg",
+  "credit": "Fir0002 · GFDL 1.2",
+  "file": "broccoli.jpg"
+ },
+ "cauliflower": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2f/Chou-fleur_02.jpg/330px-Chou-fleur_02.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Chou-fleur_02.jpg",
+  "credit": "Coyau · CC BY-SA 3.0",
+  "file": "cauliflower.jpg"
+ },
+ "sprouts": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/23/Brussels_sprout_closeup.jpg/330px-Brussels_sprout_closeup.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Brussels_sprout_closeup.jpg",
+  "credit": "Eric Hunt · CC BY 2.5",
+  "file": "sprouts.jpg"
+ },
+ "melon": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4c/Cucumis_melo_var._reticulatus_%28photo_by_Scott_Bauer%29.jpg/330px-Cucumis_melo_var._reticulatus_%28photo_by_Scott_Bauer%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Cucumis_melo_var._reticulatus_(photo_by_Scott_Bauer).jpg",
+  "credit": "USDA photo by Scott Bauer. Image Number K7355-11. · Public domain",
+  "file": "melon.jpg"
+ },
+ "aubergine": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/76/Solanum_melongena_24_08_2012_%281%29.JPG/330px-Solanum_melongena_24_08_2012_%281%29.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Solanum_melongena_24_08_2012_(1).JPG",
+  "credit": "Joydeep · CC BY-SA 3.0",
+  "file": "aubergine.jpg"
+ },
+ "parsley": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bf/Parsley100.jpg/330px-Parsley100.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Parsley100.jpg",
+  "credit": "Tharish · CC BY-SA 3.0",
+  "file": "parsley.jpg"
+ },
+ "coriander": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/51/A_scene_of_Coriander_leaves.JPG/330px-A_scene_of_Coriander_leaves.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:A_scene_of_Coriander_leaves.JPG",
+  "credit": "Thamizhpparithi Maari · CC BY-SA 3.0",
+  "file": "coriander.jpg"
+ },
+ "dill": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a7/20141003Anethum_graveolens.jpg/330px-20141003Anethum_graveolens.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:20141003Anethum_graveolens.jpg",
+  "credit": "AnRo0002 · CC0",
+  "file": "dill.jpg"
+ },
+ "thyme": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4f/Thymus_vulgaris1.JPG/330px-Thymus_vulgaris1.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Thymus_vulgaris1.JPG",
+  "credit": "Henry Brisse (upload by user:Abalg) · CC BY-SA 3.0",
+  "file": "thyme.jpg"
+ },
+ "rosemary": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d9/Rosmarinus_officinalis_prostratus.jpg/330px-Rosmarinus_officinalis_prostratus.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Rosmarinus_officinalis_prostratus.jpg",
+  "credit": "Petar43 · CC BY-SA 3.0",
+  "file": "rosemary.jpg"
+ },
+ "sage": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/50/Salvia_officinalis_Berggarten.JPG/330px-Salvia_officinalis_Berggarten.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Salvia_officinalis_Berggarten.JPG",
+  "credit": "Helichrysum Italicum · CC BY-SA 3.0",
+  "file": "sage.jpg"
+ },
+ "oregano": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4b/Majorana_syriaca_-_za%27atar.jpg/330px-Majorana_syriaca_-_za%27atar.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Majorana_syriaca_-_za%27atar.jpg",
+  "credit": "איתן פרמן · CC BY 3.0",
+  "file": "oregano.jpg"
+ },
+ "french_marigold": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/62/French_Marigold_--_October_Birthday_Flower_--_Tagetes_patula.jpg/330px-French_Marigold_--_October_Birthday_Flower_--_Tagetes_patula.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:French_Marigold_--_October_Birthday_Flower_--_Tagetes_patula.jpg",
+  "credit": "Jim Evans · CC BY-SA 4.0",
+  "file": "french_marigold.jpg"
+ },
+ "calendula": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/52/Calendula_officinalis%2C_pot_marigold.JPG/330px-Calendula_officinalis%2C_pot_marigold.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Calendula_officinalis,_pot_marigold.JPG",
+  "credit": "Betty Cai · CC BY-SA 4.0",
+  "file": "calendula.jpg"
+ },
+ "borage": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5c/Borage_starflower_Rohtopurasruoho_02.jpg/330px-Borage_starflower_Rohtopurasruoho_02.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Borage_starflower_Rohtopurasruoho_02.jpg",
+  "credit": "Paasikivi · CC BY-SA 4.0",
+  "file": "borage.jpg"
+ },
+ "poached_egg": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3d/Limnanthes_douglasii_Limnantes_Douglasa_2010-05-29_01.jpg/330px-Limnanthes_douglasii_Limnantes_Douglasa_2010-05-29_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Limnanthes_douglasii_Limnantes_Douglasa_2010-05-29_01.jpg",
+  "credit": "Agnieszka Kwiecień, Nova · CC BY-SA 4.0",
+  "file": "poached_egg.jpg"
+ },
+ "phacelia": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7f/Phacelia_tanacetifolia_in_bloom%2C_Souris%2C_PEI%2C_July_2025.jpg/330px-Phacelia_tanacetifolia_in_bloom%2C_Souris%2C_PEI%2C_July_2025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Phacelia_tanacetifolia_in_bloom,_Souris,_PEI,_July_2025.jpg",
+  "credit": "Hayden Soloviev · CC BY 4.0",
+  "file": "phacelia.jpg"
+ },
+ "alyssum": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/30/Brassicaceae_-_Lobularia_maritima-4.JPG/330px-Brassicaceae_-_Lobularia_maritima-4.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Brassicaceae_-_Lobularia_maritima-4.JPG",
+  "credit": "Hectonichus · CC BY-SA 3.0",
+  "file": "alyssum.jpg"
+ },
+ "sweet_pea": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d7/Sweet_Pea-7.jpg/330px-Sweet_Pea-7.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Sweet_Pea-7.jpg",
+  "credit": "Aftabbanoori · CC BY-SA 3.0",
+  "file": "sweet_pea.jpg"
+ },
+ "sunflower": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/40/Sunflower_sky_backdrop.jpg/330px-Sunflower_sky_backdrop.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Sunflower_sky_backdrop.jpg",
+  "credit": "Fir0002 · GFDL 1.2",
+  "file": "sunflower.jpg"
+ },
+ "cosmos": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9c/Cosmos_bipinnatus_pink%2C_Burdwan%2C_West_Bengal%2C_India_10_01_2013.jpg/330px-Cosmos_bipinnatus_pink%2C_Burdwan%2C_West_Bengal%2C_India_10_01_2013.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Cosmos_bipinnatus_pink,_Burdwan,_West_Bengal,_India_10_01_2013.jpg",
+  "credit": "Joydeep · CC BY-SA 3.0",
+  "file": "cosmos.jpg"
+ },
+ "zinnia": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6e/Zinnienbl%C3%BCte_Zinnia_elegans_stack15_20190722-RM-7222254.jpg/330px-Zinnienbl%C3%BCte_Zinnia_elegans_stack15_20190722-RM-7222254.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Zinnienbl%C3%BCte_Zinnia_elegans_stack15_20190722-RM-7222254.jpg",
+  "credit": "Ermell · CC BY-SA 4.0",
+  "file": "zinnia.jpg"
+ },
+ "cornflower": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/07/Centaurea_cyanus_flower_001.jpg/330px-Centaurea_cyanus_flower_001.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Centaurea_cyanus_flower_001.jpg",
+  "credit": "Orikrin1998 · CC BY 3.0",
+  "file": "cornflower.jpg"
+ },
+ "nigella": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0d/Love-in-a-mist_%28Nigella_Damascena%29_Inflorescence.jpg/330px-Love-in-a-mist_%28Nigella_Damascena%29_Inflorescence.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Love-in-a-mist_(Nigella_Damascena)_Inflorescence.jpg",
+  "credit": "Andreiflorea993 · CC BY-SA 4.0",
+  "file": "nigella.jpg"
+ },
+ "dahlia": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c6/Dahlia_Blooming.jpg/330px-Dahlia_Blooming.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Dahlia_Blooming.jpg",
+  "credit": "শক্তিশেল · CC BY-SA 4.0",
+  "file": "dahlia.jpg"
+ },
+ "lavender": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/36/Lavande_off_FR_2012.jpg/330px-Lavande_off_FR_2012.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Lavande_off_FR_2012.jpg",
+  "credit": "JLPC · CC BY-SA 3.0",
+  "file": "lavender.jpg"
+ },
+ "salvia": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1b/Salvia_nemorosa-IMG_3624.jpg/330px-Salvia_nemorosa-IMG_3624.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Salvia_nemorosa-IMG_3624.jpg",
+  "credit": "C T Johansson · CC BY-SA 3.0",
+  "file": "salvia.jpg"
+ },
+ "rose": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1f/A_close-up_of_climbing_roses.jpg/330px-A_close-up_of_climbing_roses.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:A_close-up_of_climbing_roses.jpg",
+  "credit": "Spring's Flowers · CC0",
+  "file": "rose.jpg"
+ },
+ "lupin": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/da/Lupinus_polyphyllus.JPG/330px-Lupinus_polyphyllus.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Lupinus_polyphyllus.JPG",
+  "credit": "CC BY-SA 3.0",
+  "file": "lupin.jpg"
+ },
+ "tulip": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9e/%D7%A6%D7%91%D7%A2%D7%95%D7%A0%D7%99%D7%9D.JPG/330px-%D7%A6%D7%91%D7%A2%D7%95%D7%A0%D7%99%D7%9D.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:%D7%A6%D7%91%D7%A2%D7%95%D7%A0%D7%99%D7%9D.JPG",
+  "credit": "Dina L · CC0",
+  "file": "tulip.jpg"
+ },
+ "daffodil": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a4/Narcissus_pseudonarcissus_flower_300303.jpg/330px-Narcissus_pseudonarcissus_flower_300303.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Narcissus_pseudonarcissus_flower_300303.jpg",
+  "credit": "CC BY-SA 3.0",
+  "file": "daffodil.jpg"
+ },
+ "viola": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7d/Pansy_Flower.jpg/330px-Pansy_Flower.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Pansy_Flower.jpg",
+  "credit": "The original uploader was Fir0002 at English Wikipedia. · CC BY-SA 3.0",
+  "file": "viola.jpg"
+ },
+ "geranium": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/ff/Geranium_himalayense%2C_Cloppenburg_%28DE%29_P6244293.jpg/330px-Geranium_himalayense%2C_Cloppenburg_%28DE%29_P6244293.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Geranium_himalayense,_Cloppenburg_(DE)_P6244293.jpg",
+  "credit": "Roman Köhler · Public domain",
+  "file": "geranium.jpg"
+ },
+ "fuchsia": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/dc/Fuchsia_Magellanica_Tas.jpg/330px-Fuchsia_Magellanica_Tas.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Fuchsia_Magellanica_Tas.jpg",
+  "credit": "JJ Harrison (https://www.jjharrison.com.au/) · CC BY-SA 3.0",
+  "file": "fuchsia.jpg"
+ },
+ "anemone": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/84/Anemone_hupehensis_var._japonica_1.jpg/330px-Anemone_hupehensis_var._japonica_1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Anemone_hupehensis_var._japonica_1.jpg",
+  "credit": "JJ Harrison (https://www.jjharrison.com.au/) · CC BY-SA 3.0",
+  "file": "anemone.jpg"
+ },
+ "forget_me_not": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/17/Myosotis_sylvatica_3.jpg/330px-Myosotis_sylvatica_3.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Myosotis_sylvatica_3.jpg",
+  "credit": "LaTerreACotta · CC BY-SA 4.0",
+  "file": "forget_me_not.jpg"
+ },
+ "hydrangea": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0a/Hydrangea_MacrophyllaTaube.JPG/330px-Hydrangea_MacrophyllaTaube.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Hydrangea_MacrophyllaTaube.JPG",
+  "credit": "Shmoopy · Public domain",
+  "file": "hydrangea.jpg"
+ },
+ "hosta": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7d/Hosta_Bressingham_Blue.JPG/330px-Hosta_Bressingham_Blue.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Hosta_Bressingham_Blue.JPG",
+  "credit": "CC BY-SA 3.0",
+  "file": "hosta.jpg"
+ },
+ "fern": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8a/Uitrollend_blad_van_een_mannetjesvaren_%28Dryopteris_filix-mas%29_28-04-2025_%28d.j.b.%29_02.jpg/330px-Uitrollend_blad_van_een_mannetjesvaren_%28Dryopteris_filix-mas%29_28-04-2025_%28d.j.b.%29_02.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Uitrollend_blad_van_een_mannetjesvaren_(Dryopteris_filix-mas)_28-04-2025_(d.j.b.)_02.jpg",
+  "credit": "Dominicus Johannes Bergsma. · CC BY-SA 4.0",
+  "file": "fern.jpg"
+ },
+ "hellebore": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b6/Helleborus_orientalis._Lenteroos_04.JPG/330px-Helleborus_orientalis._Lenteroos_04.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Helleborus_orientalis._Lenteroos_04.JPG",
+  "credit": "Dominicus Johannes Bergsma · CC BY-SA 3.0",
+  "file": "hellebore.jpg"
+ },
+ "snowdrop": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6d/Snowdrop_bells.jpg/330px-Snowdrop_bells.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Snowdrop_bells.jpg",
+  "credit": "Redsimon · CC BY 3.0",
+  "file": "snowdrop.jpg"
+ },
+ "sweet_william": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d0/June_Summer_Flowers.jpg/330px-June_Summer_Flowers.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:June_Summer_Flowers.jpg",
+  "credit": "Zirguezi · Public domain",
+  "file": "sweet_william.jpg"
+ },
+ "snapdragon": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/87/Yellow-Snapdragon-Flower%28Antirrhinum_majus%29_08.jpg/330px-Yellow-Snapdragon-Flower%28Antirrhinum_majus%29_08.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Yellow-Snapdragon-Flower(Antirrhinum_majus)_08.jpg",
+  "credit": "Sabina Bajracharya · CC BY-SA 4.0",
+  "file": "snapdragon.jpg"
+ },
+ "petunia": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/57/Petunia_Violet.jpg/330px-Petunia_Violet.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Petunia_Violet.jpg",
+  "credit": "শক্তিশেল · CC BY-SA 4.0",
+  "file": "petunia.jpg"
+ },
+ "bedding_geranium": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9c/Ger%C3%A2nio.jpg/330px-Ger%C3%A2nio.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Ger%C3%A2nio.jpg",
+  "credit": "Gabriel Collares · CC BY 4.0",
+  "file": "bedding_geranium.jpg"
+ },
+ "lobelia": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a5/Lobelia_erinus_0.02.jpg/330px-Lobelia_erinus_0.02.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Lobelia_erinus_0.02.jpg",
+  "credit": "Rob Hille · Public domain",
+  "file": "lobelia.jpg"
+ },
+ "begonia": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/09/Begonia_1.jpg/330px-Begonia_1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Begonia_1.jpg",
+  "credit": "Quadell · CC BY-SA 3.0",
+  "file": "begonia.jpg"
+ },
+ "busy_lizzie": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a2/Impatiens_walleriana.JPG/330px-Impatiens_walleriana.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Impatiens_walleriana.JPG",
+  "credit": "Donarreiskoffer · CC BY-SA 3.0",
+  "file": "busy_lizzie.jpg"
+ },
+ "allium": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/60/PurpleBallFlower.JPG/330px-PurpleBallFlower.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:PurpleBallFlower.JPG",
+  "credit": "Wadester16 · CC BY-SA 3.0",
+  "file": "allium.jpg"
+ },
+ "crocus": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e2/Crocus_vernus_with_bee.jpg/330px-Crocus_vernus_with_bee.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Crocus_vernus_with_bee.jpg",
+  "credit": "Generalrelative · CC BY-SA 4.0",
+  "file": "crocus.jpg"
+ },
+ "hyacinth": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/74/Hyacinthus_orientalis_%28blue_cultivar%29_01.JPG/330px-Hyacinthus_orientalis_%28blue_cultivar%29_01.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Hyacinthus_orientalis_(blue_cultivar)_01.JPG",
+  "credit": "Kor!An (Корзун Андрей) · CC BY-SA 3.0",
+  "file": "hyacinth.jpg"
+ },
+ "bluebell": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5e/Hyacinthoides_in_Narrow_Wood%2C_Wadborough_-_geograph.org.uk_-_781186.jpg/330px-Hyacinthoides_in_Narrow_Wood%2C_Wadborough_-_geograph.org.uk_-_781186.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Hyacinthoides_in_Narrow_Wood,_Wadborough_-_geograph.org.uk_-_781186.jpg",
+  "credit": "Philip Halling · CC BY-SA 2.0",
+  "file": "bluebell.jpg"
+ },
+ "lily": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/30/Lilium_candidum_1.jpg/330px-Lilium_candidum_1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Lilium_candidum_1.jpg",
+  "credit": "Stan Shebs · CC BY-SA 3.0",
+  "file": "lily.jpg"
+ },
+ "gladiolus": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/86/Gladiolus_dalenii_Plant_Ooty_Jul25_A7CR_06318.jpg/330px-Gladiolus_dalenii_Plant_Ooty_Jul25_A7CR_06318.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Gladiolus_dalenii_Plant_Ooty_Jul25_A7CR_06318.jpg",
+  "credit": "Timothy A. Gonsalves · CC BY-SA 4.0",
+  "file": "gladiolus.jpg"
+ },
+ "echinacea": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8e/Echinacea_purpurea_Grandview_Prairie.jpg/330px-Echinacea_purpurea_Grandview_Prairie.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Echinacea_purpurea_Grandview_Prairie.jpg",
+  "credit": "Eric Hunt · CC BY-SA 4.0",
+  "file": "echinacea.jpg"
+ },
+ "rudbeckia": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1f/Rudbeckia_hirta_kz03.jpg/330px-Rudbeckia_hirta_kz03.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Rudbeckia_hirta_kz03.jpg",
+  "credit": "Krzysztof Ziarnek, Kenraiz · CC BY-SA 4.0",
+  "file": "rudbeckia.jpg"
+ },
+ "verbena": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/87/Bonariensis.jpg/330px-Bonariensis.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Bonariensis.jpg",
+  "credit": "Original uploader was Jeantosti at fr.wikipedia · CC BY-SA 3.0",
+  "file": "verbena.jpg"
+ },
+ "hollyhock": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8f/Alcea_rosea01.jpg/330px-Alcea_rosea01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Alcea_rosea01.jpg",
+  "credit": "CC BY-SA 3.0",
+  "file": "hollyhock.jpg"
+ },
+ "delphinium": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/13/Delph_1.jpg/330px-Delph_1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Delph_1.jpg",
+  "credit": "Darorcilmir · CC BY-SA 3.0",
+  "file": "delphinium.jpg"
+ },
+ "peony": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/be/Lactiflora1b.UME.jpg/330px-Lactiflora1b.UME.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Lactiflora1b.UME.jpg",
+  "credit": "Ulf Eliasson · CC BY-SA 3.0",
+  "file": "peony.jpg"
+ },
+ "aquilegia": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/dc/Aquilegia_nora_barlow.JPG/330px-Aquilegia_nora_barlow.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Aquilegia_nora_barlow.JPG",
+  "credit": "Darorcilmir · CC BY-SA 3.0",
+  "file": "aquilegia.jpg"
+ },
+ "astilbe": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e8/Astilbe_arendsii1.jpg/330px-Astilbe_arendsii1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Astilbe_arendsii1.jpg",
+  "credit": "CC BY-SA 3.0",
+  "file": "astilbe.jpg"
+ },
+ "heuchera": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/81/Heuchera_americana_Green_spice.jpg/330px-Heuchera_americana_Green_spice.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Heuchera_americana_Green_spice.jpg",
+  "credit": "Tahota at English Wikipedia · Public domain",
+  "file": "heuchera.jpg"
+ },
+ "primrose": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/74/Primrose_pin.jpg/330px-Primrose_pin.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Primrose_pin.jpg",
+  "credit": "Public domain",
+  "file": "primrose.jpg"
+ },
+ "poppy": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/72/Papaver_rhoeas_Lincolnshire_2026.jpg/330px-Papaver_rhoeas_Lincolnshire_2026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Papaver_rhoeas_Lincolnshire_2026.jpg",
+  "credit": "Kieran Roy Powell · CC BY 4.0",
+  "file": "poppy.jpg"
+ },
+ "clematis": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5c/Clematis_macro_1.JPG/330px-Clematis_macro_1.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Clematis_macro_1.JPG",
+  "credit": "Ksd5 · CC0",
+  "file": "clematis.jpg"
+ },
+ "honeysuckle": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/European_honeysuckle_800.jpg/330px-European_honeysuckle_800.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:European_honeysuckle_800.jpg",
+  "credit": "CC BY-SA 3.0",
+  "file": "honeysuckle.jpg"
+ },
+ "buddleja": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f7/Buddleia2.jpg/330px-Buddleia2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Buddleia2.jpg",
+  "credit": "Nabokov (talk). Attribution required = \"Photo by Tom Oates\" · CC BY-SA 3.0",
+  "file": "buddleja.jpg"
+ },
+ "fruit:apple_eating": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fb/Gala_apples_on_cloth.jpg/330px-Gala_apples_on_cloth.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Gala_apples_on_cloth.jpg",
+  "credit": "Nerd271 · CC BY-SA 4.0",
+  "file": "fruit_apple_eating.jpg"
+ },
+ "fruit:apple_cooking": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7d/Brimley_Apples.jpg/330px-Brimley_Apples.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Brimley_Apples.jpg",
+  "credit": "Marcin Floryan · CC BY-SA 2.5",
+  "file": "fruit_apple_cooking.jpg"
+ },
+ "fruit:pear": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/52/Pyrus_communis_%27Conference%27.jpg/330px-Pyrus_communis_%27Conference%27.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Pyrus_communis_%27Conference%27.jpg",
+  "credit": "Rasbak · CC BY-SA 3.0",
+  "file": "fruit_pear.jpg"
+ },
+ "fruit:plum": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8f/Damson_plum_fruit.jpg/330px-Damson_plum_fruit.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Damson_plum_fruit.jpg",
+  "credit": "Jonathan Billinger · CC BY-SA 2.0",
+  "file": "fruit_plum.jpg"
+ },
+ "fruit:cherry": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/49/Prunus_avium_fruit.jpg/330px-Prunus_avium_fruit.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Prunus_avium_fruit.jpg",
+  "credit": "MPF · CC BY 2.5",
+  "file": "fruit_cherry.jpg"
+ },
+ "fruit:damson": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8f/Damson_plum_fruit.jpg/330px-Damson_plum_fruit.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Damson_plum_fruit.jpg",
+  "credit": "Jonathan Billinger · CC BY-SA 2.0",
+  "file": "fruit_damson.jpg"
+ },
+ "fruit:fig": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/69/Smokve_na_grani.jpg/330px-Smokve_na_grani.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Smokve_na_grani.jpg",
+  "credit": "Silverije · CC BY-SA 4.0",
+  "file": "fruit_fig.jpg"
+ },
+ "fruit:hazel": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e4/Hazelnuts_%28Corylus_avellana%29_-_whole_with_kernels.jpg/330px-Hazelnuts_%28Corylus_avellana%29_-_whole_with_kernels.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Hazelnuts_(Corylus_avellana)_-_whole_with_kernels.jpg",
+  "credit": "Ivar Leidus · CC BY-SA 4.0",
+  "file": "fruit_hazel.jpg"
+ },
+ "fruit:blackcurrant": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/24/Schwarze_Johannisbeeren_Makro.jpg/330px-Schwarze_Johannisbeeren_Makro.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Schwarze_Johannisbeeren_Makro.jpg",
+  "credit": "Aconcagua · CC BY-SA 3.0",
+  "file": "fruit_blackcurrant.jpg"
+ },
+ "fruit:redcurrant": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1c/Ribes_rubrum2005-07-17.JPG/330px-Ribes_rubrum2005-07-17.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Ribes_rubrum2005-07-17.JPG",
+  "credit": "Lukas Riebling · CC BY-SA 3.0",
+  "file": "fruit_redcurrant.jpg"
+ },
+ "fruit:gooseberry": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1f/Stachelbeeren.jpg/330px-Stachelbeeren.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Stachelbeeren.jpg",
+  "credit": "CC BY-SA 3.0",
+  "file": "fruit_gooseberry.jpg"
+ },
+ "fruit:blueberry_bush": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b9/Vaccinium_corymbosum_Beeren.jpg/330px-Vaccinium_corymbosum_Beeren.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Vaccinium_corymbosum_Beeren.jpg",
+  "credit": "Darkone (talk · contribs) · CC BY-SA 2.5",
+  "file": "fruit_blueberry_bush.jpg"
+ },
+ "fruit:blackberry": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/78/Ripe%2C_ripening%2C_and_green_blackberries.jpg/330px-Ripe%2C_ripening%2C_and_green_blackberries.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Ripe,_ripening,_and_green_blackberries.jpg",
+  "credit": "Ragesoss · CC BY-SA 3.0",
+  "file": "fruit_blackberry.jpg"
+ },
+ "fruit:loganberry": {
+  "src": "https://upload.wikimedia.org/wikipedia/commons/2/27/Rubus_loganobaccus.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+  "page": "https://commons.wikimedia.org/wiki/File:Rubus_loganobaccus.jpg",
+  "credit": "Public domain",
+  "file": "fruit_loganberry.jpg"
+ },
+ "fruit:waldo": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/84/Blackberry_from_Srem%2C_Serbia_%28Sremska_kupine%2C_selo_Dobrinci%29.jpg/330px-Blackberry_from_Srem%2C_Serbia_%28Sremska_kupine%2C_selo_Dobrinci%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Blackberry_from_Srem,_Serbia_(Sremska_kupine,_selo_Dobrinci).jpg",
+  "credit": "Petar Milošević · CC BY-SA 4.0",
+  "file": "fruit_waldo.jpg"
+ },
+ "fruit:elder": {
+  "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e1/Sambucus_nigra2.jpg/330px-Sambucus_nigra2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "page": "https://commons.wikimedia.org/wiki/File:Sambucus_nigra2.jpg",
+  "credit": "CC BY-SA 3.0",
+  "file": "fruit_elder.jpg"
+ }
+}

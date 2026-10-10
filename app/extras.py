@@ -396,7 +396,7 @@ PLANT_EACH = {  # buying it as a plant (one)
 }
 GROUP_PLANT_EACH = {"veg": 1.5, "herb": 3.5, "companion": 1.5, "flower": 1.5}
 KIND_PLANT_EACH = {"perennial": 7.0, "shrub": 12.0, "climber": 10.0, "biennial": 2.0, "tuber": 5.0}
-PACK_PRICE = {"bags of onion sets (250g each)": 2.5, "bags of seed potatoes (2kg each)": 5.5, "bulbs": 3.0, "canes": 4.0,
+PACK_PRICE = {"bags of onion sets (250g each)": 2.5, "bags of seed potatoes (2kg each)": 5.5, "bulbs": 4.5, "canes": 4.0,
               "crowns": 10.0, "slips": 3.0, "tubers": 5.0, "bags of bulbs": 5.0}
 
 # ---- more flowers that help the veg -------------------------------------------------------------------------

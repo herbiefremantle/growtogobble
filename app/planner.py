@@ -407,7 +407,10 @@ def cost_estimate(plant, qty, method):
     """Roughly what it costs to buy what's needed for `qty` plants grown this way."""
     buy = buy_estimate(plant, qty, method)
     each = unit_price(plant, buy["what"], method)
-    return {"total": round(buy["count"] * each, 2), "each": each, "count": buy["count"], "what": buy["what"], "text": buy["text"]}
+    total = round(buy["count"] * each, 2)
+    what = buy["text"].replace("Buy about ", "").replace("Buy ", "")
+    return {"total": total, "each": each, "count": buy["count"], "what": buy["what"], "text": buy["text"], "note": buy["note"],
+            "per_plant": round(total / max(1, qty), 2), "how": "%s at about £%.2f each" % (what, each)}
 
 
 def fill_quantity(plant, area, fraction):

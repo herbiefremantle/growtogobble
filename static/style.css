@@ -570,3 +570,15 @@ svg.plot.withsat .gridline { stroke: rgba(255,255,255,.18); }
 .costcard { text-align: left; font: inherit; color: inherit; cursor: pointer; border: none; }
 .costline { margin-top: 8px; }
 #sheet-card .fdiagram { max-height: 340px; }
+
+/* photos instead of emoji */
+.blob.has-pic, .e.has-pic, .fe.has-pic { overflow: hidden; padding: 0; background: var(--sage-2); }
+.blob.has-pic { border-radius: 22px; }
+.blob .pic, .e .pic, .fe .pic { width: 100%; height: 100%; object-fit: cover; display: block; }
+.crop-row .e.has-pic { width: 40px; height: 40px; border-radius: 12px; flex: none; }
+.fruit-opt .fe.has-pic { width: 44px; height: 44px; border-radius: 12px; flex: none; }
+.hero-pic { margin: -4px 0 12px; position: relative; }
+.hero-pic img { width: 100%; max-height: 240px; object-fit: cover; border-radius: 18px; display: block; background: var(--sage-2); }
+.hero-pic figcaption { position: absolute; right: 8px; bottom: 8px; max-width: 80%; }
+.hero-pic figcaption a { font-size: 11px; color: #fff; background: rgba(0,0,0,.55); padding: 2px 8px; border-radius: 999px; text-decoration: none;
+  display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
