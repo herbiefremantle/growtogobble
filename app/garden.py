@@ -59,6 +59,26 @@ def mark_duplicates(suggestion, state, space_names):
     return suggestion
 
 
+def bed_cost(space_id, with_jobs):
+    """Roughly what it costs to plant everything planned in a bed. Several rows of the same thing share their seed
+    packets, so they're added up first. 'to_buy': the part not ticked off as bought yet."""
+    groups = {}
+    for crop, jobs in with_jobs:
+        if crop["space_id"] != space_id or crop.get("finished_on"):
+            continue
+        g = groups.setdefault((crop["plant_id"], crop["method"]), {"qty": 0, "bought": True})
+        g["qty"] += planner.quantity(crop)
+        g["bought"] = g["bought"] and any(j["kind"] == "buy" and j["status"] == "done" for j in jobs)
+    items = []
+    for (plant_id, method), g in groups.items():
+        plant = catalogue.BY_ID[plant_id]
+        est = planner.cost_estimate(plant, g["qty"], method)
+        items.append(dict(plant_id=plant_id, method=method, qty=g["qty"], bought=g["bought"], total=est["total"], text=est["text"],
+                          options={m: planner.cost_estimate(plant, g["qty"], m)["total"] for m in planner.methods_for(plant)}))
+    total = sum(i["total"] for i in items)
+    return {"total": round(total, 2), "to_buy": round(sum(i["total"] for i in items if not i["bought"]), 2), "items": items}
+
+
 def second_season(state, crop):
     """Autumn/spring crops: the other season's window, and which spaces have room for a batch then."""
     season = planner.other_season(crop, state["shift"])
@@ -100,6 +120,9 @@ def payload(conn, user):
             starts=starts.isoformat() if starts else None, finishes=finishes.isoformat() if finishes else None,
             qty=qty, area=round(qty * planner.area_each(plant), 2), harvest=planner.harvest_estimate(plant, qty),
             buy=planner.buy_estimate(plant, qty, crop["method"]),
+            cost=planner.cost_estimate(plant, qty, crop["method"]),
+            cost_options={m: planner.cost_estimate(plant, qty, m)["total"] for m in planner.methods_for(plant)},
+            bought=any(j["kind"] == "buy" and j["status"] == "done" for j in jobs),
             then=None if crop.get("finished_on") or plant["group"] not in ("veg", "herb") else mark_duplicates(planner.next_in_space(
                 crop, jobs, kinds.get(crop["space_id"], "bed"), state["liked"], state["shift"], today), state, space_names),
             second=None if crop.get("finished_on") else second_season(state, crop)))
@@ -109,7 +132,7 @@ def payload(conn, user):
         steps_done = [i for i in range(len(catalogue.NODIG_STEPS)) if "s%d:nodig%d" % (space["id"], i) in state["done"]]
         suggestion = mark_duplicates(planner.suggestions_for_space(
             space, state["with_jobs"], state["liked"], today, state["shift"]), state, space_names)
-        spaces_out.append(dict(space, nodig_done=steps_done, suggestion=suggestion,
+        spaces_out.append(dict(space, nodig_done=steps_done, suggestion=suggestion, cost=bed_cost(space["id"], state["with_jobs"]),
                                usage=planner.usage(space, state["with_jobs"]),
                                clashes=planner.clashes(space, state["with_jobs"])))
 
@@ -176,6 +199,7 @@ def catalogue_payload(user=None):
     return {
         "plants": out, "levels": catalogue.LEVELS, "methods": planner.METHODS,
         "nodig_steps": catalogue.NODIG_STEPS, "pot_steps": catalogue.POT_STEPS,
+        "all_rounders": catalogue.ALL_ROUNDERS,
         "nodig_planting": catalogue.NODIG_PLANTING, "soil_types": catalogue.SOIL_TYPES, "fruit": catalogue.FRUIT, "mixes": catalogue.MIXES, "weed_tips": catalogue.WEED_TIPS,
         "combos": catalogue.COMBOS, "sun_spots": catalogue.SUN_SPOTS,
         "affiliate": shops.is_affiliate(),

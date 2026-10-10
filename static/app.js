@@ -29,7 +29,12 @@ function space(id) { return S.g.spaces.find((s) => s.id === id); }
 // Fruit & veg is the main thing; companion plants and flowers are kept in their own lists
 const GROUPS = { veg: { emoji: "🥕", name: "Fruit & veg" }, herb: { emoji: "🌿", name: "Herbs" }, companion: { emoji: "🐞", name: "Companions" }, flower: { emoji: "🌸", name: "Flowers" } };
 const isFlower = (p) => p.group !== "veg" && !p.eat;  // grown to look at, not eat
-const companionsFor = (p) => p.good_with.filter((x) => plant(x.plant_id).group === "companion");
+const companionsFor = (p) => p.good_with.filter((x) => plant(x.plant_id).helps && plant(x.plant_id).group !== "veg");
+const money = (n) => "£" + (Math.round(n * 100) / 100).toFixed(2).replace(/\.00$/, "");
+const METHOD_SHORT = { sow_out: "🌱 Seeds sown straight in", sow_in: "🏠 Seeds indoors, then planted out", plants: "🪴 Bought as plants" };
+// sets, cloves, bulbs and seed potatoes are planted straight in, not sown
+const methodLabel = (p, m) => (m === "sow_out" && p.buy_word ? `🌱 ${p.buy_word.charAt(0).toUpperCase() + p.buy_word.slice(1)} planted straight in`
+  : m === "plants" && ["bulbs", "corms", "tubers", "crowns", "canes", "slips"].includes(p.buy_word) ? `🪴 ${p.buy_word.charAt(0).toUpperCase() + p.buy_word.slice(1)} planted` : METHOD_SHORT[m]);
 const helpsWhat = (p) => p.good_with.filter((x) => plant(x.plant_id).group === "veg");
 const SUN_EMOJI = { sun: "☀️", part: "⛅", shade: "🌥️" };
 // save one thing about a bed, keeping the rest as it is
@@ -350,9 +355,9 @@ function filterBar(current, group = "veg") {
   return `<div class="filter">${opts.map(([k, l]) => `<button data-filter="${k}" class="${current === k ? "on" : ""}">${l}</button>`).join("")}</div>`;
 }
 
-function tile(p, picked, have) {
+function tile(p, picked, have, helpsLine) {
   const lv = S.cat.levels[p.level];
-  const extra = p.group === "companion" ? `<span class="when">Helps ${helpsWhat(p).slice(0, 5).map((x) => plant(x.plant_id).emoji).join("")}</span>`
+  const extra = p.group === "companion" || helpsLine ? `<span class="when">Helps ${helpsWhat(p).slice(0, 5).map((x) => plant(x.plant_id).emoji).join("")}</span>`
     : p.group === "flower" ? `<span class="when">${p.sun.map((x) => SUN_EMOJI[x]).join("")} · ${p.height_cm >= 100 ? p.height_cm / 100 + "m" : p.height_cm + "cm"} tall</span>` : "";
   return `<button class="tile ${picked ? "picked" : ""}" data-plant="${p.id}">${have ? `<span class="have" title="In your garden">🌱</span>` : ""}
     <span class="blob l${p.level}">${p.emoji}</span><span class="n">${esc(p.name)}</span>${extra}<span class="chip l${p.level}">${lv.emoji} ${esc(lv.name)}</span></button>`;
@@ -442,6 +447,8 @@ document.addEventListener("click", async (e) => {
     if (await addCompanion(ac.dataset.addcomp, Number(ac.dataset.space))) ac.outerHTML = `<span class="chip grey">✅ Added</span>`;
     return;
   }
+  const bp = e.target.closest("[data-bedplan]");
+  if (bp) { openBedPlan(Number(bp.dataset.bedplan)); return; }
   const mx = e.target.closest("[data-open-mix]");
   if (mx) { openMix(mx.dataset.openMix); return; }
   const fp = e.target.closest("[data-flowers]");
@@ -1785,7 +1792,9 @@ async function openMapTrace() {
 function gardenList() {
   const unplaced = activeCrops().filter((c) => !c.space_id);
   const finished = S.g.crops.filter((c) => c.finished_on);
+  const spend = S.g.spaces.reduce((n, sp) => n + sp.cost.total, 0), still = S.g.spaces.reduce((n, sp) => n + sp.cost.to_buy, 0);
   view.innerHTML = `<h1>🪴 My garden</h1>${gardenTabs()}
+    ${spend ? `<div class="card tint-sun small"><b>💷 About ${money(spend)} to plant all your beds</b>${still < spend ? ` · ${money(still)} still to buy` : ""} - a rough guide to seeds and plants.</div>` : ""}
     ${S.g.spaces.map((s) => {
       const crops = activeCrops().filter((c) => c.space_id === s.id);
       const k = SPACE_KINDS[s.kind];
@@ -1794,6 +1803,7 @@ function gardenList() {
         <div class="space-head"><span class="e">${k.emoji}</span><h3>${esc(s.name)}</h3><button class="btn small ghost" data-open-space="${s.id}">${s.kind === "pot" || s.built === 1 ? "Open" : s.built === 0 && built < total ? "Build it" : "Open"}</button></div>
         ${s.kind !== "pot" && s.built === 0 && built < total ? `<div class="progress" title="No-dig bed ${built} of ${total}"><i style="width:${(100 * built) / total}%"></i></div>` : ""}
         ${usageBar(s)}
+        ${s.cost.total ? `<button class="btn small ghost costline" data-bedplan="${s.id}">💷 About ${money(s.cost.total)} to plant${s.cost.to_buy < s.cost.total ? ` · ${money(s.cost.to_buy)} still to buy` : ""} · 📐 plan</button>` : ""}
         ${s.clashes.map((x) => `<div class="checkbox warn small" style="margin-top:8px">🙅 ${plant(x.a).emoji} ${esc(plant(x.a).name)} and ${plant(x.b).emoji} ${esc(plant(x.b).name)} don't like sharing: ${esc(x.why)}.</div>`).join("")}
         ${crops.map(inBedRow).join("") || `<p class="small muted" style="margin:8px 0 0">Nothing growing here yet.</p>`}
         ${s.suggestion && s.suggestion.plants.length ? `<div class="suggest">${s.suggestion.plants.map((x) => suggestChip(x, `data-open-plant="${x.plant_id}" data-space="${s.id}"`, "+ ")).join("")}</div>` : ""}
@@ -1904,11 +1914,12 @@ function drawSpace(id) {
   // companions that would help the veg in this bed, and aren't here yet
   const helpers = {};
   veg.forEach((c) => companionsFor(plant(c.plant_id)).forEach((x) => {
-    if (comps.some((k) => k.plant_id === x.plant_id)) return;
+    if (here.some((k) => k.plant_id === x.plant_id)) return;
     const list = (helpers[x.plant_id] = helpers[x.plant_id] || []);
     if (!list.includes(plant(c.plant_id))) list.push(plant(c.plant_id));
   }));
-  const helpList = Object.entries(helpers).sort((a, b) => b[1].length - a[1].length).slice(0, 4);
+  const helpList = Object.entries(helpers).sort((a, b) => b[1].length - a[1].length).slice(0, 5);
+  const allRound = helpList.length || pot ? [] : S.cat.all_rounders.filter((id2) => !here.some((k) => k.plant_id === id2));
   const stepList = (ticks) => `<div class="card">${steps.map((st, i) => `<div class="nodig-step"><span class="e">${st.emoji}</span><div style="flex:1"><b>${i + 1}. ${esc(st.title)}</b><div class="small">${esc(st.text)}</div></div>
       ${ticks ? `<button class="tick ${done.has(i) ? "done" : ""}" data-tick="s${s.id}:nodig${i}" ${done.has(i) ? 'data-undo="1"' : ""} aria-label="Done">${done.has(i) ? "✓" : ""}</button>` : ""}</div>`).join("")}</div>`;
   const tips = `<details class="card" data-key="tips-${s.id}"><summary><b>🌱 Planting into a no-dig bed - tips</b></summary><ol class="steps">${S.cat.nodig_planting.map((t) => `<li>${esc(t)}</li>`).join("")}</ol></details>`;
@@ -1922,17 +1933,22 @@ function drawSpace(id) {
       <div class="row" style="margin-top:8px"><button class="btn small primary" data-setbuilt="${s.id}" data-v="1">✅ Yes, it's ready</button><button class="btn small" data-setbuilt="${s.id}" data-v="0">🛠️ Not yet - show me how</button></div></div>`;
   openSheet(`<div class="plant-head"><span class="e">${SPACE_KINDS[s.kind].emoji}</span><div><h2 style="margin:0">${esc(s.name)}</h2>
       <div class="muted">${pot ? "Growing in pots" : s.built === 1 ? "Built and ready to plant ✅" : s.built === 0 ? "Let's build it" : "Your bed"}</div></div></div>
+    ${here.length ? `<button class="card tint-sun row costcard" data-bedplan="${s.id}" style="justify-content:space-between;width:100%">
+      <span><b>💷 About ${money(s.cost.total)} to plant</b><span class="small" style="display:block">${s.cost.to_buy < s.cost.total ? `${money(s.cost.to_buy)} still to buy · ` : ""}seeds & plants, roughly</span></span><span class="btn small">See plan 👉</span></button>` : ""}
     <div class="card"><h3>🌱 Growing here</h3>${veg.map(inBedRow).join("") || (here.length ? "" : `<p class="small muted" style="margin:0">Nothing yet.</p>`)}
       ${herbs.length ? `<h3 style="margin-top:14px">🌿 Herbs</h3>${herbs.map(inBedRow).join("")}` : ""}
       ${comps.length ? `<h3 style="margin-top:14px">🐞 Companion plants</h3>${comps.map(inBedRow).join("")}` : ""}
       ${flowers.length ? `<h3 style="margin-top:14px">🌸 Flowers</h3>${flowers.map(inBedRow).join("")}` : ""}
-      <div class="row" style="margin-top:10px"><a class="btn small" href="#/plants" data-close>➕ Add plants</a><button class="btn small" data-layout="all">🧩 Suggest a layout</button>
+      <div class="row" style="margin-top:10px"><a class="btn small" href="#/plants" data-close>➕ Add plants</a>${here.length ? `<button class="btn small primary" data-bedplan="${s.id}">📐 Where to plant & cost</button>` : ""}
       ${here.length ? `<button class="btn small ghost" data-empty="${s.id}">📤 Take everything out</button>` : ""}</div>
       ${here.length ? `<p class="small muted" style="margin:8px 0 0">✕ takes a plant out of this bed - it stays in your plan under "Not placed yet".</p>` : ""}</div>
     ${helpList.length ? `<div class="card tint-leaf"><h3>🐞 Keep pests off</h3><p class="small" style="margin:0 0 8px">Flowers to grow among what's in this bed:</p>
       <div class="nbs">${helpList.map(([id2, veg2]) => { const q = plant(id2); return `<div class="nb comp"><span class="e">${q.emoji}</span><span style="flex:1"><b>${esc(q.name)}</b>
         <small>Helps your ${veg2.map((v) => esc(v.name.toLowerCase())).join(", ")}</small></span>
         <button class="btn small" data-addcomp="${id2}" data-space="${s.id}">➕ Add</button></div>`; }).join("")}</div></div>` : ""}
+    ${allRound.length ? `<div class="card tint-leaf"><h3>🐞 Keep pests off</h3><p class="small" style="margin:0 0 8px">Good all-rounders to dot round any ${s.kind === "allotment" ? "allotment" : "bed"} - they bring in bees and the bugs that eat greenfly, or lure pests away:</p>
+      <div class="nbs">${allRound.map((id2) => { const q = plant(id2); return `<div class="nb comp"><span class="e">${q.emoji}</span><span style="flex:1"><b>${esc(q.name)}</b>
+        <small>${esc(q.blurb)}</small></span><button class="btn small" data-addcomp="${id2}" data-space="${s.id}">➕ Add</button></div>`; }).join("")}</div></div>` : ""}
     <div class="card tint-plum row" style="justify-content:space-between"><div><b>🌸 Flower ideas</b><div class="small">Flowers that go together, laid out for this ${pot ? "pot" : "bed's shape"}${s.sun ? ` (${S.cat.sun_spots[s.sun].emoji} ${S.cat.sun_spots[s.sun].name.toLowerCase()})` : ""}</div></div>
       <button class="btn small" data-flowers="${s.id}">Show me 👉</button></div>
     <details class="card" data-key="about-${s.id}" ${s.width_m || s.built !== null ? "" : "open"}><summary><b>✏️ About this ${pot ? "space" : "bed"}</b> <span class="small muted">name, size, soil${pot ? "" : ", built?"}</span></summary>${spaceForm(s)}
@@ -2071,7 +2087,10 @@ function plantsPage() {
     ${plantGroup === "veg" && plantFilter === "all" && !plantSearch ? plantNowStrip() + mixStrip() : ""}
     <input type="text" id="q" placeholder="🔍 Search, e.g. ${plantGroup === "veg" ? "tomatoes" : plantGroup === "flower" ? "sunflowers" : plantGroup === "herb" ? "parsley" : "marigolds"}" value="${esc(plantSearch)}" style="margin-bottom:10px">
     ${plantGroup === "companion" ? "" : filterBar(plantFilter, plantGroup)}
-    <div class="grid">${list.map((p) => tile(p, false, have.has(p.id))).join("") || `<p class="muted">Nothing matches.</p>`}</div>`;
+    <div class="grid">${list.map((p) => tile(p, false, have.has(p.id))).join("") || `<p class="muted">Nothing matches.</p>`}</div>
+    ${plantGroup === "companion" ? `<h2 style="margin-top:20px">🌻 Flowers & herbs that help too</h2>
+      <p class="muted">These are in the Flowers and Herbs lists, but they also bring in bees and bug-eaters - or confuse pests. Sunflowers are great on an allotment: put them on the north side so they don't shade your veg (and keep them away from potatoes).</p>
+      <div class="grid">${S.cat.plants.filter((p) => p.helps && p.group !== "companion" && (!q || p.name.toLowerCase().includes(q))).map((p) => tile(p, false, have.has(p.id), true)).join("")}</div>` : ""}`;
   $("#q").oninput = (e) => { plantSearch = e.target.value; const pos = e.target.selectionStart; plantsPage(); const q2 = $("#q"); q2.focus(); q2.setSelectionRange(pos, pos); };
   view.onclick = (e) => {
     const f = e.target.closest("[data-filter]");
@@ -2335,6 +2354,128 @@ function openPlant(id, spaceId, startMethod, after) {
   };
 }
 
+// ---- a bed's planting plan: where each thing goes, how it's started, and roughly what it costs ----------------
+// Tallest at the back (the north side, so they don't shade the rest) - or in the middle of a round bed you walk
+// round. Companion plants are dotted round the edges. Each strip's size is the room its plants need.
+function bedLayout(s) {
+  const here = activeCrops().filter((c) => c.space_id === s.id), sz = spaceSize(s), t = shapeType(s);
+  const island = ["circle", "free", "pot"].includes(t);
+  const used = (c) => c.area || plant(c.plant_id).area_each * c.qty;
+  const edge = here.filter((c) => plant(c.plant_id).group === "companion");
+  const byPlant = {};
+  here.filter((c) => !edge.includes(c)).forEach((c) => (byPlant[c.plant_id] = byPlant[c.plant_id] || []).push(c));
+  const groups = Object.values(byPlant).map((cs) => ({ crops: cs, p: plant(cs[0].plant_id), need: cs.reduce((m, c) => m + used(c), 0) }));
+  const area = (s.usage && s.usage.area) || sz.w * sz.h, need = groups.reduce((n, g) => n + g.need, 0);
+  const squeeze = need > area ? area / need : 1;
+  // tall (80cm+), medium and short: one band each, with the plants of that height side by side in it
+  const tierOf = (p) => (p.height_cm >= 80 ? 0 : p.height_cm >= 35 ? 1 : 2);
+  let at = 0, n = 0;
+  const tiers = [0, 1, 2].map((k) => groups.filter((g) => tierOf(g.p) === k).sort((x, y) => y.p.height_cm - x.p.height_cm)).filter((g) => g.length).map((gs) => {
+    const tierNeed = gs.reduce((m, g) => m + g.need, 0), tier = { from: at, to: Math.min(1, at + (tierNeed * squeeze) / area), parts: [] };
+    let x = 0;
+    gs.forEach((g) => { const share = g.need / tierNeed; tier.parts.push({ ...g, x0: x, x1: x + share, n: ++n }); x += share; });
+    at = tier.to; return tier;
+  });
+  return { s, w: sz.w, h: sz.h, t, island, tiers, edge, spare: Math.max(0, 1 - at), over: need > area * 1.02 };
+}
+function zoneWords(L, tier, part) {
+  const k = L.tiers.indexOf(tier), first = k === 0, last = k === L.tiers.length - 1, only = first && last;
+  const where = only ? (L.island ? "All over the bed" : "Across the whole bed")
+    : L.island ? (first ? "In the middle" : last ? "Round the outside" : "In a ring round the middle")
+    : L.t === "corner" ? (first ? "Tucked into the corner" : last ? "Along the open edge" : "Fanning out from the corner")
+    : first ? (L.t === "triangle" ? "At the pointy end (north)" : "At the back (north side)") : last ? "At the front" : "In the middle strip";
+  const np = tier.parts.length, i = tier.parts.indexOf(part);
+  const side = np === 1 ? "" : L.island ? ` - a section ${i + 1} of ${np} going round` : np <= 3 ? `, ${(np === 2 ? ["left", "right"] : ["left", "middle", "right"])[i]} side` : `, section ${i + 1} of ${np} counting from the left`;
+  if (L.island) return `${where}${side}, ${part.p.sp_cm}cm apart`;
+  const depth = (tier.to - tier.from) * L.h, rows = Math.max(1, Math.floor((depth * 100) / part.p.row_cm));
+  return `${where}${side}: ${rows} row${rows > 1 ? "s" : ""} in a strip about ${Math.round(depth * 100)}cm deep, ${part.p.sp_cm}cm between plants`;
+}
+function bedPlanSvg(L) {
+  const { s, w, h } = L, fs = Math.min(w, h) * 0.11, pad = Math.max(w, h) * 0.05, clip = `bp${s.id}`;
+  const tone = (k) => ["#7da35a", "#a5c47c", "#8db46a", "#bcd593", "#6f9550", "#98bb71"][k % 6];
+  let bands = "", marks = "", nums = "";
+  const mark = (x, y, e, size = fs) => { marks += `<text x="${x}" y="${y + size * 0.35}" font-size="${size}" text-anchor="middle">${e}</text>`; };
+  const num = (x, y, n) => { nums += `<g class="bp-n"><circle cx="${x}" cy="${y}" r="${fs * 0.42}"/><text x="${x}" y="${y + fs * 0.17}" font-size="${fs * 0.5}" text-anchor="middle">${n}</text></g>`; };
+  const P = outlinePts(s, w, h), cx = P.reduce((a, q) => a + q[0], 0) / P.length, cy = P.reduce((a, q) => a + q[1], 0) / P.length;
+  const count = (part) => part.crops.reduce((m, c) => m + c.qty, 0);
+  const at = (f, r) => { const q = P[Math.min(P.length - 1, Math.floor(f * P.length))]; return [cx + (q[0] - cx) * r, cy + (q[1] - cy) * r]; };  // round the shape
+  L.tiers.forEach((tier) => tier.parts.forEach((part) => {
+    const a = tier.from, b = tier.to, mid = (a + b) / 2, k = part.n - 1;
+    if (L.island) {
+      const r0 = Math.sqrt(a), r1 = Math.sqrt(b), steps = Math.max(2, Math.ceil((part.x1 - part.x0) * 32));
+      const outer = Array.from({ length: steps + 1 }, (_, i) => at(part.x0 + ((part.x1 - part.x0) * i) / steps, r1));
+      const inner = Array.from({ length: steps + 1 }, (_, i) => at(part.x1 - ((part.x1 - part.x0) * i) / steps, r0));
+      bands += `<polygon points="${[...outer, ...inner].map((q) => q.join(",")).join(" ")}" fill="${tone(k)}"/>`;
+      const r = a === 0 && tier.parts.length === 1 ? 0 : (r0 + r1) / 2, m = r === 0 ? 1 : Math.max(1, Math.min(count(part), Math.round((part.x1 - part.x0) * 12)));
+      for (let i = 0; i < m; i++) { const q = at(part.x0 + ((part.x1 - part.x0) * (i + 0.5)) / m, r || 0.001); mark(q[0], q[1], part.p.emoji); }
+      const q = at((part.x0 + part.x1) / 2, r ? r : 0.001); num(q[0] - (r ? 0 : fs), q[1] - fs * 0.9, part.n);
+      return;
+    }
+    if (L.t === "corner") {
+      const pt2 = (c, f) => [c * w * (1 - f), c * h * f];
+      bands += `<polygon points="${[pt2(b, part.x0), pt2(b, part.x1), pt2(a, part.x1), pt2(a, part.x0)].map((q) => q.join(",")).join(" ")}" fill="${tone(k)}"/>`;
+      const m = Math.max(1, Math.min(count(part), Math.round(((part.x1 - part.x0) * mid * Math.hypot(w, h)) / (fs * 1.3))));
+      for (let i = 0; i < m; i++) { const q = pt2(mid, part.x0 + ((part.x1 - part.x0) * (i + 0.5)) / m); mark(q[0], q[1], part.p.emoji); }
+      const q = pt2(mid, (part.x0 + part.x1) / 2); num(q[0] - fs * 0.6, q[1] - fs * 0.6, part.n);
+      return;
+    }
+    bands += `<rect x="${part.x0 * w}" y="${a * h}" width="${(part.x1 - part.x0) * w}" height="${(b - a) * h}" fill="${tone(k)}"/>`;
+    // one line of plants for each row that fits in the strip
+    const rowsN = Math.max(1, Math.min(Math.floor(((b - a) * h * 100) / part.p.row_cm), Math.floor(((b - a) * h) / (fs * 1.25))));
+    for (let r = 0; r < rowsN; r++) {
+      const yy = (a + ((b - a) * (r + 0.5)) / rowsN) * h, half = L.t === "triangle" ? (yy / h) * (w / 2) : w / 2;
+      const x0 = Math.max(part.x0 * w, w / 2 - half), x1 = Math.min(part.x1 * w, w / 2 + half), span = Math.max(0, x1 - x0);
+      const m = Math.max(1, Math.min(Math.ceil(count(part) / rowsN), Math.round(span / (fs * 1.3))));
+      for (let i = 0; i < m; i++) mark(x0 + (span * (i + 0.5)) / m, yy, part.p.emoji);
+    }
+    const yy = mid * h, half = L.t === "triangle" ? (yy / h) * (w / 2) : w / 2;
+    num(Math.min(part.x1 * w, w / 2 + half) - fs * 0.45, L.t === "triangle" ? yy : a * h + fs * 0.45, part.n);
+  }));
+  // companions dotted round the edge
+  const dots = L.edge.flatMap((c) => Array(Math.min(c.qty, 6)).fill(plant(c.plant_id).emoji));
+  dots.forEach((e, i) => { const q = at((i + 0.5) / dots.length, 0.9); mark(q[0], q[1], e, fs * 0.8); });
+  const labels = L.island ? "" : `<text x="${L.t === "corner" ? 0 : w / 2}" y="${-fs * 0.35}" font-size="${fs * 0.5}" text-anchor="${L.t === "corner" ? "start" : "middle"}" class="fd-lab">${L.t === "corner" ? "↖ the corner" : "back - north side ↑"}</text>
+    <text x="${w / 2}" y="${h + fs * 0.8}" font-size="${fs * 0.5}" text-anchor="middle" class="fd-lab">front</text>`;
+  return `<svg class="fdiagram" viewBox="${-pad} ${-pad - fs * 0.8} ${w + 2 * pad} ${h + 2 * pad + fs * 1.6}" role="img" aria-label="Where to plant each thing in ${esc(s.name)}">
+    <defs><clipPath id="${clip}">${shapeSvg(s, 0, 0, w, h, "")}</clipPath></defs>${shapeSvg(s, 0, 0, w, h, 'class="fd-bed"')}
+    <g clip-path="url(#${clip})">${bands}${marks}</g>${nums}${labels}</svg>`;
+}
+function openBedPlan(id) {
+  S.sheet = () => { if (space(id)) drawBedPlan(id); else closeSheet(); };
+  drawBedPlan(id);
+}
+function drawBedPlan(id) {
+  const s = space(id), L = bedLayout(s), cost = s.cost;
+  const parts = L.tiers.flatMap((tier) => tier.parts.map((part) => ({ tier, part })));
+  const zoneOf = (pid) => parts.find((x) => x.part.p.id === pid);
+  const order = (it) => (zoneOf(it.plant_id) ? zoneOf(it.plant_id).part.n : 99);
+  const row = (it) => {
+    const p = plant(it.plant_id), z = zoneOf(it.plant_id), crops = activeCrops().filter((c) => c.space_id === id && c.plant_id === it.plant_id && c.method === it.method);
+    const started = crops.some((c) => c.sown_on || c.planted_on), vs = [...new Set(crops.map((c) => c.variety).filter(Boolean))];
+    return `<div class="bp-row"><span class="bp-num">${z ? z.part.n : "•"}</span><span class="e">${p.emoji}</span><div style="flex:1;min-width:0">
+      <b>${it.qty} × ${esc(p.name)}${vs.length ? ` <span class="vname">'${vs.map(esc).join("', '")}'</span>` : ""}</b>
+      <div class="small">${z ? esc(zoneWords(L, z.tier, z.part)) : p.group === "companion" ? "Dotted round the edges and ends, between your veg" : ""}</div>
+      ${started ? `<div class="small muted">${methodLabel(p, it.method)} - already started</div>`
+        : `<div class="chips" style="margin-top:4px">${Object.keys(it.options).map((m) => `<button class="btn small ${m === it.method ? "primary" : "ghost"}" data-bpm="${it.plant_id}|${it.method}|${m}">${methodLabel(p, m)} · ${money(it.options[m])}</button>`).join("")}</div>`}
+      <div class="small muted">🛒 ${esc(it.text)}${it.bought ? " · ✅ bought" : ""}</div></div><b class="bp-cost">${money(it.total)}</b></div>`;
+  };
+  openSheet(`<h2>📐 ${esc(s.name)}: where to plant</h2>
+    ${L.tiers.length || L.edge.length ? bedPlanSvg(L) : ""}
+    ${L.over ? `<div class="checkbox warn small">⚠️ There's more planned than fits - it's squeezed up here. Take something out, plant fewer, or use a bigger bed.</div>` : ""}
+    ${L.spare > 0.1 && !L.over ? `<p class="small muted">🟫 About ${Math.round(L.spare * 100)}% of the bed is still free${L.island ? " round the outside" : " at the front"} - room for more.</p>` : ""}
+    <div class="card"><h3>🌱 What goes where</h3>${[...cost.items].sort((x, y) => order(x) - order(y)).map(row).join("") || `<p class="small muted">Nothing in this bed yet.</p>`}
+      <div class="bp-total"><span><b>💷 About ${money(cost.total)}</b> to plant this bed${cost.to_buy < cost.total ? ` · <b>${money(cost.to_buy)}</b> still to buy` : ""}</span></div>
+      <p class="small muted" style="margin:6px 0 0">Tap how you'll start each one to compare costs: seeds are cheapest, baby plants are quicker and easier. Prices are a rough guide (UK garden centres and online) - one packet of seeds often does more than one bed, and saved or swapped seeds are free!</p></div>
+    <div class="row"><button class="btn small" data-flowers="${s.id}">🌸 Flower ideas</button><a class="btn small" href="#/plants" data-close>➕ Add plants</a></div>`);
+  $("#sheet-card").querySelectorAll("[data-bpm]").forEach((b) => (b.onclick = async () => {
+    const [pid, from, to] = b.dataset.bpm.split("|");
+    if (from === to) return;
+    const crops = activeCrops().filter((c) => c.space_id === id && c.plant_id === pid && c.method === from && !c.sown_on && !c.planted_on);
+    for (const c of crops.slice(0, -1)) await api("PATCH", `/api/crops/${c.id}`, { plant_id: pid, method: to });
+    if (crops.length) await change("PATCH", `/api/crops/${crops[crops.length - 1].id}`, { plant_id: pid, method: to }, `${plant(pid).emoji} ${methodLabel(plant(pid), to)} - dates updated 📅`);
+  }));
+}
+
 // Sowing together: crops sharing a row, each picked before the next needs the room
 const mixOrder = (m) => [...m.plants].sort((a, b) => a.ready - b.ready);
 function mixButton(id) {
@@ -2400,8 +2541,8 @@ async function openFlowerPlan(id, sun) {
     ${plan.combos.map((c) => `<div class="card combo"><h3>${c.emoji} ${esc(c.name)}</h3><p class="small" style="margin:0 0 8px">${esc(c.why)}</p>
       ${flowerDiagram(s, plan, c)}
       ${c.zones.map((z) => `<div class="zone"><b class="small">${esc(z.label)}</b><div class="chips">${z.plants.map((x) => { const q = plant(x.plant_id);
-        return `<button class="btn small ghost" data-open-plant="${q.id}" data-space="${s.id}">${q.emoji} ${x.qty} × ${esc(q.name)}${x.sunny_end ? " ☀️" : ""}</button>`; }).join("")}</div></div>`).join("")}
-      <button class="btn primary small" data-addcombo="${c.id}" style="margin-top:10px">➕ Add these to ${esc(s.name)}</button></div>`).join("")
+        return `<button class="btn small ghost" data-open-plant="${q.id}" data-space="${s.id}" title="${esc(x.cost.text)}">${q.emoji} ${x.qty} × ${esc(q.name)}${x.sunny_end ? " ☀️" : ""} <span class="muted">· ${{ sow_out: "seeds", sow_in: "seeds indoors", plants: q.buy_word === "bulbs" ? "bulbs" : "plants" }[x.method]} ${money(x.cost.total)}</span></button>`; }).join("")}</div></div>`).join("")}
+      <div class="row" style="margin-top:10px;justify-content:space-between"><b>💷 About ${money(c.cost)} for the lot</b><button class="btn primary small" data-addcombo="${c.id}">➕ Add these to ${esc(s.name)}</button></div></div>`).join("")
       || `<p class="muted">No ideas for this spot yet.</p>`}
     <p class="small muted">Numbers are worked out to fill the ${s.kind === "pot" ? "pot" : "bed"}${s.width_m || s.kind === "pot" ? "" : " (a standard 1.2 × 2.4 m bed - add its size for a better guess)"}. ☀️ = put it at the sunniest end.</p>`);
   const card = $("#sheet-card");

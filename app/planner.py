@@ -347,9 +347,11 @@ def flower_plan(space, sun):
         for (zid, label, frac), group in present:
             share = area * frac / total / len(group)
             laid.append({"zone": zid, "label": label, "plants": [
-                {"plant_id": p["id"], "qty": max(1, min(50, int(round(share / area_each(p))))),
-                 "sunny_end": sun == "mixed" and "part" not in p["sun"] and "shade" not in p["sun"]} for p in group]})
-        combos.append({"id": combo["id"], "name": combo["name"], "emoji": combo["emoji"], "why": combo["why"], "zones": laid})
+                dict(plant_id=p["id"], qty=qty, method=methods_for(p)[0], cost=cost_estimate(p, qty, methods_for(p)[0]),
+                     sunny_end=sun == "mixed" and "part" not in p["sun"] and "shade" not in p["sun"])
+                for p in group for qty in [max(1, min(50, int(round(share / area_each(p)))))]]})
+        combos.append({"id": combo["id"], "name": combo["name"], "emoji": combo["emoji"], "why": combo["why"], "zones": laid,
+                       "cost": round(sum(x["cost"]["total"] for z in laid for x in z["plants"]), 2)})
     tips = {"pot": "Tallest in the middle, and trailing or short ones round the edge to spill over.",
             "island": "You can walk all the way round, so the tall ones go in the middle and the short ones round the edge.",
             "border": "Tall at the back (against a fence or wall, or the north side), short at the front - so nothing hides."}
@@ -375,9 +377,9 @@ def harvest_estimate(plant, qty):
 def buy_estimate(plant, qty, method):
     """What to buy for `qty` plants: '2 bulbs', '1 packet of seeds'... with a few spare where seeds don't all come up."""
     import math
-    if method == "plants":
-        return {"count": qty, "what": "plants", "note": "", "text": "Buy %d plant%s" % (qty, "" if qty == 1 else "s")}
     what, per, spare, note = catalogue.PACKS[plant["id"]]
+    if method == "plants" and ("seed" in what or what == "plants"):  # bulbs, canes, crowns... are still bought by the bag or each
+        return {"count": qty, "what": "plants", "note": "", "text": "Buy %d plant%s" % (qty, "" if qty == 1 else "s")}
     need = math.ceil(qty * spare)
     count = max(1, math.ceil(need / per))
     first, _, rest = what.partition(" ")
@@ -385,6 +387,27 @@ def buy_estimate(plant, qty, method):
     text = ("Buy %d %s" if per == 1 else "Buy about %d %s") % (count, unit)
     return {"count": count, "what": what, "note": note, "text": text,
             "seeds": need if "seed" in what and per > 1 else None}
+
+
+def unit_price(plant, what, method):
+    """Rough price of one of what you buy: a packet of seeds, a plant, a bag of bulbs..."""
+    from . import extras
+    if method == "plants" and ("seed" in what or what == "plants") or what == "plants":
+        return extras.PLANT_EACH.get(plant["id"]) or extras.KIND_PLANT_EACH.get(plant.get("kind")) \
+            or (extras.KIND_PLANT_EACH["perennial"] if plant.get("perennial") and plant["group"] == "flower" else None) \
+            or extras.GROUP_PLANT_EACH.get(plant["group"], 1.5)
+    if "packet" in what:
+        return extras.SEED_PACKET.get(plant["id"], 2.5)
+    if plant["id"] == "snowdrop":
+        return 8.0  # a bag of 25
+    return extras.PACK_PRICE.get(what, 3.0)
+
+
+def cost_estimate(plant, qty, method):
+    """Roughly what it costs to buy what's needed for `qty` plants grown this way."""
+    buy = buy_estimate(plant, qty, method)
+    each = unit_price(plant, buy["what"], method)
+    return {"total": round(buy["count"] * each, 2), "each": each, "count": buy["count"], "what": buy["what"], "text": buy["text"]}
 
 
 def fill_quantity(plant, area, fraction):

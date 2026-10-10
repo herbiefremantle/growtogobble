@@ -556,3 +556,17 @@ svg.plot.withsat .gridline { stroke: rgba(255,255,255,.18); }
 .mix-step { display: flex; gap: 10px; align-items: center; padding: 6px 0; }
 .mix-step .e { font-size: 28px; }
 .mix-step + .mix-step { border-top: 1px dashed var(--line); }
+
+/* bed planting plan and costs */
+.bp-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; }
+.bp-row + .bp-row { border-top: 1px dashed var(--line); }
+.bp-row .e { font-size: 26px; }
+.bp-num { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--forest-2); color: #fff; font-weight: 800; font-size: 13px;
+  display: flex; align-items: center; justify-content: center; margin-top: 4px; }
+.bp-cost { white-space: nowrap; }
+.bp-total { border-top: 2px solid var(--line); margin-top: 6px; padding-top: 10px; font-size: 16px; }
+.fdiagram .bp-n circle { fill: #fff; stroke: #2e7a4d; stroke-width: 0.02; }
+.fdiagram .bp-n text { fill: #2e7a4d; font-weight: 800; }
+.costcard { text-align: left; font: inherit; color: inherit; cursor: pointer; border: none; }
+.costline { margin-top: 8px; }
+#sheet-card .fdiagram { max-height: 340px; }

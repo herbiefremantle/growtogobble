@@ -684,8 +684,9 @@ def _neighbours(pairs):
     return out
 
 
-GOOD_NEIGHBOURS += [(veg, comp, why) for comp, helps in _flowers.HELPS.items() for veg, why in helps
+GOOD_NEIGHBOURS += [(veg, comp, why) for comp, helps in list(_flowers.HELPS.items()) + list(_extras.MORE_HELPS.items()) for veg, why in helps
                     if not any({a, b} == {veg, comp} for a, b, _ in GOOD_NEIGHBOURS)]
+BAD_NEIGHBOURS += _extras.MORE_BAD
 GOOD_WITH = _neighbours(GOOD_NEIGHBOURS)
 BAD_WITH = _neighbours(BAD_NEIGHBOURS)
 for _p in PLANTS:
@@ -1102,6 +1103,10 @@ for _p in PLANTS:
     _p["varieties"] = [{"name": n, "tags": t, "why": w} for n, t, w in _extras.VARIETIES.get(_p["id"], [])]
     _p["seedling"] = _extras.SEEDLINGS.get(_p["id"])
     _p["mixes"] = [m["id"] for m in MIXES if any(x["plant_id"] == _p["id"] for x in m["plants"])]
+    _p.setdefault("height_cm", _extras.HEIGHTS.get(_p["id"], 40))
+    # flowers and herbs that also help the veg show up with the companion plants
+    _p["helps"] = _p["group"] == "companion" or _p["id"] in _extras.MORE_HELPS
+ALL_ROUNDERS = _extras.ALL_ROUNDERS
 COMBOS, SUN_SPOTS, HELPS = _flowers.COMBOS, _flowers.SUN_SPOTS, _flowers.HELPS
 
 

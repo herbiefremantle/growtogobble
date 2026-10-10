@@ -370,3 +370,58 @@ FRUIT_KINDS = {
     "elder": [("Black Lace", ["colour", "pretty"], "Dark purple lacy leaves and pink flowers."),
               ("Wild elder", ["hardy"], "The hedgerow elder - flowers for cordial, berries for syrup.")],
 }
+
+
+# ---- how tall things get (cm) - tall ones go at the back (north side) so they don't shade the rest ------------
+HEIGHTS = {
+    "sweetcorn": 180, "runner_beans": 250, "french_beans": 150, "peas": 120, "broad_beans": 100, "tomatoes": 150,
+    "tomatoes_big": 180, "cucumber": 180, "raspberries": 180, "blueberries": 120, "rhubarb": 90, "sprouts": 90,
+    "broccoli": 80, "kale": 70, "aubergine": 70, "courgette": 60, "summer_squash": 60, "potatoes": 60, "chillies": 60,
+    "peppers": 60, "cauliflower": 60, "squash": 50, "leeks": 50, "chard": 50, "garlic": 50, "pumpkin": 40, "onions": 40,
+    "parsnips": 40, "melon": 30, "sweet_potatoes": 30, "spring_onions": 30, "carrots": 30, "beetroot": 30, "salad": 20,
+    "strawberries": 20, "radish": 15, "chives": 30, "mint": 50, "basil": 30, "parsley": 30, "coriander": 40, "dill": 90,
+    "thyme": 20, "rosemary": 100, "sage": 60, "oregano": 40,
+}
+
+# ---- rough prices (UK, 2026, garden centre / online) - a guide for budgeting, not exact -----------------------
+SEED_PACKET = {"tomatoes": 3.5, "tomatoes_big": 3.5, "cucumber": 3.5, "melon": 3.5, "peppers": 3.0, "chillies": 3.0,
+               "aubergine": 3.0, "sweetcorn": 3.0, "squash": 3.0, "pumpkin": 3.0, "summer_squash": 3.0, "courgette": 3.0,
+               "sweet_pea": 3.0, "sunflower": 2.5}  # everything else about £2.50 a packet
+PLANT_EACH = {  # buying it as a plant (one)
+    "tomatoes": 2.5, "tomatoes_big": 2.5, "courgette": 3.0, "summer_squash": 3.0, "squash": 3.0, "pumpkin": 3.0,
+    "cucumber": 3.0, "melon": 3.5, "chillies": 3.0, "peppers": 3.0, "aubergine": 3.0, "strawberries": 2.0,
+    "blueberries": 12.0, "rhubarb": 10.0, "raspberries": 4.0, "sweet_potatoes": 3.0, "lavender": 5.0, "rosemary": 5.0,
+    "rose": 15.0, "hydrangea": 15.0, "clematis": 12.0, "honeysuckle": 10.0, "buddleja": 10.0, "fuchsia": 7.0, "dahlia": 5.0,
+    "petunia": 1.0, "bedding_geranium": 1.5, "lobelia": 1.0, "begonia": 1.0, "busy_lizzie": 1.0, "viola": 1.0,
+}
+GROUP_PLANT_EACH = {"veg": 1.5, "herb": 3.5, "companion": 1.5, "flower": 1.5}
+KIND_PLANT_EACH = {"perennial": 7.0, "shrub": 12.0, "climber": 10.0, "biennial": 2.0, "tuber": 5.0}
+PACK_PRICE = {"bags of onion sets (250g each)": 2.5, "bags of seed potatoes (2kg each)": 5.5, "bulbs": 3.0, "canes": 4.0,
+              "crowns": 10.0, "slips": 3.0, "tubers": 5.0, "bags of bulbs": 5.0}
+
+# ---- more flowers that help the veg -------------------------------------------------------------------------
+MORE_HELPS = {
+    "sunflower": [("sweetcorn", "tall friends - plant them on the north side together so they don't shade the rest"),
+                  ("cucumber", "a sturdy pole for cucumbers to climb"),
+                  ("runner_beans", "beans can climb the stems; bees visit both"),
+                  ("squash", "bring in bees to pollinate"), ("courgette", "bring in bees to pollinate"),
+                  ("pumpkin", "bring in bees to pollinate"),
+                  ("broad_beans", "greenfly and blackfly often go for the sunflowers instead")],
+    "cosmos": [("tomatoes", "brings hoverflies and lacewings, which eat greenfly"),
+               ("tomatoes_big", "brings hoverflies and lacewings, which eat greenfly"),
+               ("french_beans", "brings hoverflies that eat blackfly"), ("kale", "brings hoverflies and tiny wasps that eat pests"),
+               ("strawberries", "brings bees for more berries")],
+    "lavender": [("strawberries", "bees galore for more berries"), ("raspberries", "bees for more berries"),
+                 ("blueberries", "bees for more berries"), ("kale", "its smell may confuse cabbage white butterflies")],
+    "cornflower": [("broad_beans", "brings hoverflies and ladybirds that eat blackfly"), ("peas", "brings helpful insects")],
+    "dill": [("kale", "its flowers bring hoverflies and tiny wasps that eat greenfly and caterpillars"),
+             ("broccoli", "its flowers bring hoverflies and tiny wasps that eat greenfly and caterpillars"),
+             ("salad", "brings hoverflies that eat greenfly"), ("cucumber", "brings hoverflies and bees")],
+    "coriander": [("salad", "let a few flower - hoverflies love them"), ("chard", "brings hoverflies")],
+    "sage": [("carrots", "its strong smell may hide carrots from carrot fly"), ("kale", "may confuse cabbage white butterflies")],
+    "rosemary": [("carrots", "its strong smell may hide carrots from carrot fly")],
+    "thyme": [("kale", "may confuse cabbage white butterflies"), ("strawberries", "flowers bring bees")],
+}
+MORE_BAD = [("sunflower", "potatoes", "sunflowers are said to stunt potatoes - keep them apart")]
+# good all-rounders, for a bed or allotment where nothing's planted yet
+ALL_ROUNDERS = ["french_marigold", "nasturtium", "calendula", "borage", "poached_egg", "phacelia", "sunflower", "cosmos"]

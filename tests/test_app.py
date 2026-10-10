@@ -684,3 +684,23 @@ def test_herbs_mixes_and_varieties(client):
     tree = client.post("/api/features", json={"kind": "tree", "variety": "apple_eating"}).json()["garden"]["features"][0]
     g = client.patch("/api/features/%d" % tree["id"], json={"cultivar": "Gala"}).json()
     assert g["garden"]["features"][0]["cultivar"] == "Gala"
+
+
+def test_costs_and_more_companions(client):
+    _join(client)
+    plants = {p["id"]: p for p in client.get("/api/plants").json()["plants"]}
+    assert plants["sunflower"]["helps"] and any(x["plant_id"] == "sunflower" for x in plants["sweetcorn"]["good_with"])
+    assert any(x["plant_id"] == "sunflower" for x in plants["potatoes"]["bad_with"])
+    bed = client.post("/api/spaces", json={"name": "Bed 1", "kind": "bed"}).json()["spaces"][0]["id"]
+    client.post("/api/crops", json={"plant_id": "carrots", "space_id": bed, "quantity": 30, "batches": 3, "every_weeks": 2})
+    g = client.post("/api/crops", json={"plant_id": "tomatoes", "space_id": bed, "quantity": 4, "method": "plants"}).json()
+    toms = next(c for c in g["crops"] if c["plant_id"] == "tomatoes")
+    assert toms["cost"]["total"] == 10.0 and toms["cost_options"]["sow_in"] == 3.5  # 4 plants at £2.50, or one packet
+    space = next(s for s in g["spaces"] if s["id"] == bed)
+    assert space["cost"]["total"] == 12.5  # three rows of carrots share one packet: 90 carrots x2 spare = 180 seeds < 1000
+    # bulbs are bought by the bag, not "as plants"
+    g = client.post("/api/crops", json={"plant_id": "tulip", "space_id": bed, "quantity": 30}).json()
+    tulips = next(c for c in g["crops"] if c["plant_id"] == "tulip")
+    assert tulips["cost"]["what"] == "bags of bulbs" and tulips["cost"]["total"] == 15.0
+    plan = client.get("/api/spaces/%d/flowers?sun=sun" % bed).json()
+    assert all(c["cost"] > 0 for c in plan["combos"])
