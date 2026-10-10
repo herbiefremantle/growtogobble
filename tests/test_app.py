@@ -551,3 +551,16 @@ def test_map_outline_keeps_shape_not_location(client):
     assert client.post("/api/garden/shape", json={"points": [[0, 0], [5, 5]]}).status_code == 400
     g = client.post("/api/garden/size", json={"w": 12, "h": 8}).json()["garden"]
     assert g["shape"] is None   # typing a size replaces the outline
+
+
+def test_beds_and_features_can_sit_at_any_angle(client):
+    _join(client)
+    sid = client.post("/api/spaces", json={"name": "Bed", "kind": "bed"}).json()["spaces"][0]["id"]
+    g = client.post("/api/spaces/positions", json={"positions": [{"id": sid, "x": 2, "y": 1, "angle": 377.5}]}).json()
+    assert g["spaces"][0]["angle"] == 17.5
+    g = client.post("/api/spaces/positions", json={"positions": [{"id": sid, "x": 3, "y": 1}]}).json()
+    assert g["spaces"][0]["angle"] == 17.5 and g["spaces"][0]["pos_x"] == 3   # moving keeps the angle
+    fid = client.post("/api/features", json={"kind": "path", "x": 1, "y": 1}).json()["garden"]["features"][0]["id"]
+    assert client.patch("/api/features/%d" % fid, json={"angle": -30}).json()["garden"]["features"][0]["angle"] == -30
+    assert client.get("/api/garden").json()["garden"]["path_w"] == 0.5
+    assert client.post("/api/garden/paths", json={"w": 0.6}).json()["garden"]["path_w"] == 0.6

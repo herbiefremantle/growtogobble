@@ -117,6 +117,7 @@ function celebrate(badges) {
 // ---- sheets (pop-ups) -------------------------------------------------------------------------------
 
 function openSheet(html) {
+  $("#sheet-card").oninput = $("#sheet-card").onchange = null;  // nothing left over from the last pop-up
   $("#sheet-card").innerHTML = `<button class="sheet-close" data-close aria-label="Close">✕</button>` + html;
   $("#sheet").hidden = false; $("#sheet-card").scrollTop = 0;
   document.body.style.overflow = "hidden";
@@ -670,16 +671,82 @@ function plotPositions() {
 function planItems() {
   const pos = plotPositions();
   return [
-    ...S.g.spaces.map((s) => ({ type: "space", id: s.id, ...pos[s.id], ...spaceSize(s), s })),
-    ...S.g.garden.features.map((f) => ({ type: "feature", id: f.id, x: f.x, y: f.y, w: f.w, h: f.h, f })),
+    ...S.g.spaces.map((s) => ({ type: "space", id: s.id, ...pos[s.id], ...spaceSize(s), a: s.angle || 0, s })),
+    ...S.g.garden.features.map((f) => ({ type: "feature", id: f.id, x: f.x, y: f.y, w: f.w, h: f.h, a: f.angle || 0, f })),
   ];
+}
+
+// ---- geometry for turned (rotated) boxes: angles are degrees clockwise round the box's middle ----
+const rad = (a) => (a * Math.PI) / 180;
+function corners(i) {
+  const cx = i.x + i.w / 2, cy = i.y + i.h / 2, c = Math.cos(rad(i.a || 0)), sn = Math.sin(rad(i.a || 0));
+  return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) => {
+    const dx = (sx * i.w) / 2, dy = (sy * i.h) / 2;
+    return [cx + dx * c - dy * sn, cy + dx * sn + dy * c];
+  });
+}
+function box(i) { const cs = corners(i), xs = cs.map((p) => p[0]), ys = cs.map((p) => p[1]); return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) }; }
+// do two turned boxes overlap? (separating-axis test; just touching doesn't count)
+function overlaps(A, B, tol = 0.03) {
+  const shrink = (i) => ({ ...i, x: i.x + tol, y: i.y + tol, w: Math.max(0.01, i.w - 2 * tol), h: Math.max(0.01, i.h - 2 * tol) });
+  const pa = corners(shrink(A)), pb = corners(shrink(B));
+  for (const poly of [pa, pb]) for (let k = 0; k < 4; k++) {
+    const [x1, y1] = poly[k], [x2, y2] = poly[(k + 1) % 4], nx = y2 - y1, ny = x1 - x2;
+    const a = pa.map(([x, y]) => x * nx + y * ny), b = pb.map(([x, y]) => x * nx + y * ny);
+    if (Math.max(...a) <= Math.min(...b) || Math.max(...b) <= Math.min(...a)) return false;
+  }
+  return true;
+}
+// where B's middle is, in A's own turned frame
+function localOf(A, px, py) {
+  const t = rad(A.a || 0), cx = A.x + A.w / 2, cy = A.y + A.h / 2, dx = px - cx, dy = py - cy;
+  return { lx: dx * Math.cos(t) + dy * Math.sin(t), ly: -dx * Math.sin(t) + dy * Math.cos(t) };
+}
+let snapOn = true;
+try { snapOn = localStorage.getItem("gtg-snap") !== "0"; } catch (e) { /* private mode */ }
+
+// Dropped near another bed? Line it up alongside: same angle, a path's width apart, ends level
+// (unless it was dropped well along the other bed's length, then it keeps that slide)
+function snapNextTo(M, items) {
+  if (!snapOn || M.type !== "space" || M.s.kind === "pot") return null;
+  const gap = S.g.garden.path_w, mx = M.x + M.w / 2, my = M.y + M.h / 2;
+  let best = null;
+  for (const N of items) {
+    if (N.type !== "space" || N.id === M.id || N.s.kind === "pot") continue;
+    const { lx, ly } = localOf(N, mx, my);
+    if (Math.abs(lx) > N.w / 2 + gap + M.w / 2 + 1 || Math.abs(ly) > N.h / 2 + M.h / 2 + 0.5) continue;
+    const dist = Math.hypot(lx, ly);
+    if (best && dist >= best.dist) continue;
+    const side = lx >= 0 ? 1 : -1, ox = side * (N.w / 2 + gap + M.w / 2), level = -N.h / 2 + M.h / 2;
+    const oy = Math.abs(ly - level) < 0.6 ? level : Math.round(ly * 10) / 10;
+    const t = rad(N.a || 0), ncx = N.x + N.w / 2, ncy = N.y + N.h / 2;
+    const cx = ncx + ox * Math.cos(t) - oy * Math.sin(t), cy = ncy + ox * Math.sin(t) + oy * Math.cos(t);
+    best = { dist, x: Math.round((cx - M.w / 2) * 100) / 100, y: Math.round((cy - M.h / 2) * 100) / 100, a: N.a || 0, to: N };
+  }
+  return best;
+}
+
+// Paths: wherever two beds sit side by side at the same angle with a gap, draw the path between them
+function pathsBetween(items, ppm) {
+  const beds = items.filter((i) => i.type === "space" && i.s.kind !== "pot"), out = [];
+  for (const A of beds) for (const B of beds) {
+    if (A.id >= B.id || Math.abs((((A.a || 0) - (B.a || 0)) % 360 + 540) % 360 - 180) > 1) continue;
+    const { lx, ly } = localOf(A, B.x + B.w / 2, B.y + B.h / 2);
+    const gap = Math.abs(lx) - (A.w + B.w) / 2;
+    if (gap < 0.15 || gap > 1.5) continue;
+    const top = Math.max(-A.h / 2, ly - B.h / 2), bot = Math.min(A.h / 2, ly + B.h / 2);
+    if (bot - top < 0.3) continue;
+    const cx = A.x + A.w / 2, cy = A.y + A.h / 2, x0 = lx > 0 ? A.w / 2 : -A.w / 2 - gap;
+    out.push(`<rect x="${cx + x0}" y="${cy + top}" width="${gap}" height="${bot - top}" class="pathstrip" transform="rotate(${A.a || 0} ${cx} ${cy})"><title>Path, ${Math.round(gap * 100)}cm wide</title></rect>`);
+  }
+  return out.join("");
 }
 
 function planBounds(items) {
   const g = S.g.garden;
   if (g.w && g.h) return { x0: -0.6, y0: -0.8, W: g.w + 1.2, H: g.h + 1.4, fenced: true };
-  const maxX = Math.max(6, ...items.map((i) => i.x + i.w)) + (plotEdit ? 3 : 0.6);
-  const maxY = Math.max(4, ...items.map((i) => i.y + i.h)) + (plotEdit ? 3 : 0.8);
+  const maxX = Math.max(6, ...items.map((i) => box(i).x1)) + (plotEdit ? 3 : 0.6);
+  const maxY = Math.max(4, ...items.map((i) => box(i).y1)) + (plotEdit ? 3 : 0.8);
   return { x0: 0, y0: 0, W: maxX, H: maxY, fenced: false };
 }
 
@@ -714,9 +781,11 @@ function plotSvg() {
     const shape = k.round ? `<ellipse cx="${i.x + i.w / 2}" cy="${i.y + i.h / 2}" rx="${i.w / 2}" ry="${i.h / 2}" fill="${k.fill}" class="feat ${i.f.kind}"/>`
       : `<rect x="${i.x}" y="${i.y}" width="${i.w}" height="${i.h}" rx="${Math.min(0.15, i.w / 6)}" fill="${k.fill}" class="feat ${i.f.kind}"/>`;
     const es = Math.min(Math.min(i.w, i.h) * 0.55, px(30));
-    return `<g class="item feature ${isSel(i) ? "sel" : ""}" data-item="feature" data-id="${i.id}" data-x="${i.x}" data-y="${i.y}" data-w="${i.w}" data-h="${i.h}">
-      <title>${esc(i.f.name)}</title>${shape}<text x="${i.x + i.w / 2}" y="${i.y + i.h / 2 + es * 0.35}" font-size="${es}" text-anchor="middle">${k.emoji}</text>
-      <text x="${i.x + i.w / 2}" y="${i.y + i.h + lab.size * 1.1}" font-size="${lab.size}" text-anchor="middle" class="label">${esc(lab.text)}</text></g>`;
+    const bb = box(i);
+    return `<g class="item feature ${isSel(i) ? "sel" : ""}" data-item="feature" data-id="${i.id}" data-x="${i.x}" data-y="${i.y}" data-w="${i.w}" data-h="${i.h}" data-a="${i.a}">
+      <title>${esc(i.f.name)}</title><g class="turn" transform="rotate(${i.a} ${i.x + i.w / 2} ${i.y + i.h / 2})">${shape}</g>
+      <text x="${i.x + i.w / 2}" y="${i.y + i.h / 2 + es * 0.35}" font-size="${es}" text-anchor="middle">${k.emoji}</text>
+      <text x="${i.x + i.w / 2}" y="${bb.y1 + lab.size * 1.1}" font-size="${lab.size}" text-anchor="middle" class="label">${esc(lab.text)}</text></g>`;
   }).join("");
 
   const beds = items.filter((i) => i.type === "space").map((i) => {
@@ -750,10 +819,10 @@ function plotSvg() {
         return `<g class="crop" data-open-crop="${c.id}"><rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" rx="0.06" fill="${FAMILY_COLOUR[p.family] || "#9fd88f"}"/>${emojis}</g>`;
       }).join("") + (need < long * 0.9 && !plotEdit ? `<text x="${across ? x + w / 2 : x + at + (w - at) / 2}" y="${across ? y + at + (h - at) / 2 + 0.1 : y + h / 2 + 0.1}" font-size="${Math.min(0.3, px(22))}" text-anchor="middle" class="plus">＋</text>` : "");
     }
-    const lab = fitLabel(s.name + (later ? `  +${later}` : ""), w + 0.1, ppm);
-    return `<g class="item space ${isSel(i) ? "sel" : ""} ${placing ? (target ? "target" : "nope") : ""}" data-item="space" data-id="${s.id}" data-space-id="${s.id}" data-x="${x}" data-y="${y}" data-w="${w}" data-h="${h}">
-      <title>${esc(s.name)}</title><rect x="${x - 0.1}" y="${y - 0.1}" width="${w + 0.2}" height="${h + 0.2}" rx="0.12" class="hit"/>
-      ${inner}<text x="${x}" y="${y - lab.size * 0.45}" font-size="${lab.size}" class="label">${esc(lab.text)}</text></g>`;
+    const lab = fitLabel(s.name + (later ? `  +${later}` : ""), w + 0.1, ppm), bb = box(i);
+    return `<g class="item space ${isSel(i) ? "sel" : ""} ${placing ? (target ? "target" : "nope") : ""}" data-item="space" data-id="${s.id}" data-space-id="${s.id}" data-x="${x}" data-y="${y}" data-w="${w}" data-h="${h}" data-a="${i.a}">
+      <title>${esc(s.name)}</title><g class="turn" transform="rotate(${i.a} ${x + w / 2} ${y + h / 2})"><rect x="${x - 0.1}" y="${y - 0.1}" width="${w + 0.2}" height="${h + 0.2}" rx="0.12" class="hit"/>
+      ${inner}</g><text x="${i.a ? (bb.x0 + bb.x1) / 2 : x}" y="${bb.y0 - lab.size * 0.45}" font-size="${lab.size}" ${i.a ? 'text-anchor="middle"' : ""} class="label">${esc(lab.text)}</text></g>`;
   }).join("");
 
   // grid squares that stay readable whatever the zoom: 50cm up close, 1m, 5m or 10m across a field
@@ -767,7 +836,7 @@ function plotSvg() {
     <rect x="${b.x0}" y="${b.y0}" width="${b.W}" height="${b.H}" class="${b.fenced ? "outside" : "grass"}"/>
     ${b.fenced ? (shape ? `<polygon points="${shape}" class="grass"/>` : `<rect x="0" y="0" width="${S.g.garden.w}" height="${S.g.garden.h}" class="grass"/>`) : ""}
     <rect x="${b.x0}" y="${b.y0}" width="${b.W}" height="${b.H}" fill="url(#grid)"/>
-    ${fence}${features}${beds}
+    ${fence}${pathsBetween(items, ppm)}${features}${beds}
     <g class="scalebar" style="stroke-width:${px(2)}"><path d="M ${b.x0 + px(12)} ${b.y0 + b.H - px(12)} h ${bar}"/><text x="${b.x0 + px(12) + bar / 2}" y="${b.y0 + b.H - px(17)}" font-size="${px(11)}" text-anchor="middle">${bar} m</text></g></svg>`;
 }
 
@@ -806,19 +875,30 @@ function editPanel() {
       });
       sel = `<div class="card sel-card"><b>${SPACE_KINDS[it.s.kind].emoji} ${esc(it.s.name)}</b> <span class="small muted">${it.s.kind === "pot" ? "pots" : `${it.w} × ${it.h} m`}</span>
         ${shade ? `<p class="small" style="margin:6px 0 0">🌥️ It's close to the ${esc(shade.f.name.toLowerCase())} - it may get shade. Most veg want 6+ hours of sun a day.</p>` : ""}
-        <div class="row" style="margin-top:8px"><button class="btn small" data-open-space="${it.id}">✏️ Name, size & soil</button>
-        ${it.s.kind !== "pot" ? `<button class="btn small" id="turn-space">↻ Turn</button>` : ""}<button class="btn small ghost" id="desel">Done</button></div></div>`;
+        ${it.s.kind !== "pot" ? `<div class="angle"><button class="btn small" data-rot="-15" aria-label="Turn 15 degrees left">↺ 15°</button>
+          <input type="range" id="ang" min="-180" max="180" step="1" value="${Math.round(it.a)}" aria-label="Angle"><button class="btn small" data-rot="15" aria-label="Turn 15 degrees right">↻ 15°</button></div>
+        <div class="row" style="margin-top:6px"><span class="small">Angle <b id="angv">${Math.round(it.a)}°</b></span><button class="btn small" data-rot="90">↻ 90°</button>${it.a ? `<button class="btn small ghost" data-rot="0">Straighten</button>` : ""}</div>` : ""}
+        <div class="row" style="margin-top:8px"><button class="btn small" data-open-space="${it.id}">✏️ Name, size & soil</button><button class="btn small ghost" id="desel">Done</button></div></div>`;
     } else {
       const k = FEATURES[it.f.kind] || FEATURES.bush;
       sel = `<div class="card sel-card"><b>${k.emoji} ${esc(it.f.name)}</b>
         <div class="row" style="margin-top:8px;flex-wrap:nowrap"><input id="fname" type="text" maxlength="40" value="${esc(it.f.name)}" aria-label="Name"></div>
         <div class="row" style="margin-top:8px;flex-wrap:nowrap"><label class="mini">Width<input id="fw" type="number" step="0.1" min="0.2" value="${it.w}"></label><span>×</span>
           <label class="mini">${k.round ? "Height" : "Length"}<input id="fh" type="number" step="0.1" min="0.2" value="${it.h}"></label><span class="small muted">m</span></div>
-        <div class="row" style="margin-top:8px"><button class="btn small primary" id="fsave">Save</button><button class="btn small" id="fturn">↻ Turn</button>
+        <div class="angle"><button class="btn small" data-rot="-15" aria-label="Turn 15 degrees left">↺ 15°</button>
+          <input type="range" id="ang" min="-180" max="180" step="1" value="${Math.round(it.a)}" aria-label="Angle"><button class="btn small" data-rot="15" aria-label="Turn 15 degrees right">↻ 15°</button></div>
+        <div class="row" style="margin-top:6px"><span class="small">Angle <b id="angv">${Math.round(it.a)}°</b></span><button class="btn small" data-rot="90">↻ 90°</button>${it.a ? `<button class="btn small ghost" data-rot="0">Straighten</button>` : ""}</div>
+        <div class="row" style="margin-top:8px"><button class="btn small primary" id="fsave">Save</button>
           <button class="btn small danger" id="fdel">🗑️ Remove</button><button class="btn small ghost" id="desel">Done</button></div></div>`;
     }
   }
   return `${sel}
+    <div class="card"><b>🧲 Lining beds up</b>
+      <label class="check" style="margin-top:6px"><input type="checkbox" id="snap" ${snapOn ? "checked" : ""}> <span>Snap a bed alongside the one you drop it next to - same angle, ends level</span></label>
+      <label class="field" for="pathw" style="margin-top:8px">Path between beds</label>
+      <select id="pathw">${[[0, "No path - right up against each other"], [0.3, "30cm"], [0.4, "40cm"], [0.5, "50cm"], [0.6, "60cm"], [0.75, "75cm"], [1, "1m"]]
+        .map(([v, l]) => `<option value="${v}" ${Math.abs(v - g.path_w) < 0.001 ? "selected" : ""}>${l}</option>`).join("")}</select>
+      <p class="small muted" style="margin:6px 0 0">Paths are drawn for you between beds that sit side by side.</p></div>
     <div class="card"><b>➕ Add to your plan</b>
       <div class="adds"><button class="btn small" id="add-space">🟫 Bed or pots</button>
         ${Object.entries(FEATURES).map(([k, f]) => `<button class="btn small" data-addfeat="${k}">${f.emoji} ${f.name}</button>`).join("")}</div></div>
@@ -871,14 +951,36 @@ function wirePlot() {
 
 // Edit mode: drag anything; tap to select; add, change, turn and remove things
 function wireEdit(svg, redraw) {
-  const save = async (moved) => {
-    // pin every bed where it is now, so only what you dragged moves
+  const save = async (moved, message) => {
+    // pin every bed where it is now, so only what you dragged (or turned) moves
     const pos = plotPositions();
     const list = Object.entries(pos).map(([id, p]) => ({ id: Number(id), x: p.x, y: p.y }));
-    if (moved.type === "space") list.find((e) => e.id === moved.id).x = moved.x, list.find((e) => e.id === moved.id).y = moved.y;
-    else list.push({ feature: moved.id, x: moved.x, y: moved.y });
-    await change("POST", "/api/spaces/positions", { positions: list });
+    if (moved.type === "space") Object.assign(list.find((e) => e.id === moved.id), { x: moved.x, y: moved.y, angle: moved.a });
+    else list.push({ feature: moved.id, x: moved.x, y: moved.y, angle: moved.a });
+    await change("POST", "/api/spaces/positions", { positions: list }, message);
   };
+  // turning the selected thing
+  const it = selected && planItems().find((i) => i.type === selected.type && i.id === selected.id);
+  const setAngle = (a) => {
+    const norm = Math.round(((((a + 180) % 360) + 360) % 360) - 180);
+    const items = planItems(), me = { ...it, a: norm };
+    if (it.type === "space" && items.some((o) => o.type === "space" && o.id !== it.id && overlaps(me, o))) { toast("Turning it would hit another bed - move it first"); redraw(); return; }
+    save({ type: it.type, id: it.id, x: it.x, y: it.y, a: norm });
+  };
+  if (it) {
+    view.querySelectorAll("[data-rot]").forEach((b) => (b.onclick = () => {
+      const r = b.dataset.rot;
+      setAngle(r === "0" ? 0 : r === "90" ? it.a + 90 : it.a + Number(r));
+    }));
+    const ang = $("#ang");
+    if (ang) {
+      const g = svg && svg.querySelector(`[data-item="${it.type}"][data-id="${it.id}"] .turn`);
+      ang.oninput = () => { $("#angv").textContent = ang.value + "°"; if (g) g.setAttribute("transform", `rotate(${ang.value} ${it.x + it.w / 2} ${it.y + it.h / 2})`); };
+      ang.onchange = () => setAngle(Number(ang.value));
+    }
+  }
+  $("#snap").onchange = (e) => { snapOn = e.target.checked; try { localStorage.setItem("gtg-snap", snapOn ? "1" : "0"); } catch (err) { /* ignore */ } };
+  $("#pathw").onchange = (e) => change("POST", "/api/garden/paths", { w: Number(e.target.value) }, "Path width saved");
   if (svg) {
     svg.addEventListener("click", (e) => e.stopPropagation(), true);  // in edit mode, taps select rather than open
     const pt = (ev) => { const p = svg.createSVGPoint(); p.x = ev.clientX; p.y = ev.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); };
@@ -895,23 +997,29 @@ function wireEdit(svg, redraw) {
           const snap = (v) => Math.round(v * 10) / 10, gw = S.g.garden.w, gh = S.g.garden.h;
           let x = Math.max(0, snap(x0 + dx)), y = Math.max(0, snap(y0 + dy));
           if (gw && gh) { x = Math.min(x, Math.max(0, gw - w)); y = Math.min(y, Math.max(0, gh - h)); }
+          const items = planItems(), me = items.find((i) => i.type === type && i.id === id);
+          let moved = { ...me, x, y }, message;
+          const lined = type === "space" && snapNextTo(moved, items);
+          if (lined) {
+            moved = { ...moved, x: lined.x, y: lined.y, a: lined.a };
+            message = `🧲 Lined up next to ${lined.to.s.name}${S.g.garden.path_w ? ` with a ${Math.round(S.g.garden.path_w * 100)}cm path` : ""}`;
+          }
           if (type === "space") {
-            const hit = planItems().find((o) => o.type === "space" && o.id !== id
-              && x < o.x + o.w + 0.1 && o.x < x + w + 0.1 && y < o.y + o.h + 0.1 && o.y < y + h + 0.1);
+            const hit = items.find((o) => o.type === "space" && o.id !== id && overlaps(moved, o));
             if (hit) { g.removeAttribute("transform"); toast(`That's on top of ${hit.s.name} - drag it to a clear spot`); return; }
           }
           selected = { type, id };
-          await save({ type, id, x, y });
+          await save({ type, id, x: moved.x, y: moved.y, a: moved.a }, message);
         };
       };
     });
   }
   const desel = $("#desel"); if (desel) desel.onclick = () => { selected = null; redraw(); };
-  const turn = $("#turn-space"); if (turn) turn.onclick = () => change("POST", `/api/spaces/${selected.id}/turn`, null, "Turned ↻");
+
   const f = selected && selected.type === "feature" && S.g.garden.features.find((x) => x.id === selected.id);
   if (f) {
     $("#fsave").onclick = () => change("PATCH", `/api/features/${f.id}`, { name: $("#fname").value, w: Number($("#fw").value), h: Number($("#fh").value) }, "Saved ✅");
-    $("#fturn").onclick = () => change("PATCH", `/api/features/${f.id}`, { w: f.h, h: f.w }, "Turned ↻");
+
     $("#fdel").onclick = async () => { if (confirm(`Remove the ${f.name.toLowerCase()} from your plan?`)) { selected = null; await change("DELETE", `/api/features/${f.id}`, null, "Removed"); } };
   }
   $("#add-space").onclick = addSpaceSheet;
@@ -1080,6 +1188,7 @@ function wireSpaceForm(s, afterSave) {
   const card = $("#sheet-card");
   const val = (n) => { const el = card.querySelector(`input[name=${n}]:checked`); return el && el.value; };
   const refresh = () => {
+    if (!$("#size")) return;  // the pop-up now shows something else
     card.querySelectorAll(".kind").forEach((el) => el.classList.toggle("on", el.querySelector("input").checked));
     card.querySelectorAll(".soilopt").forEach((el) => el.classList.toggle("on", el.querySelector("input").checked));
     $("#size").hidden = $("#builtq").hidden = val("kind") === "pot";
@@ -1089,8 +1198,7 @@ function wireSpaceForm(s, afterSave) {
     const t = S.cat.soil_types[val("soil") || "unknown"];
     $("#soiltip").innerHTML = `<div><b>${t.emoji} How to tell:</b> ${esc(t.test)}</div><div><b>🌱 What to do:</b> ${esc(t.tips)}</div>`;
   };
-  card.addEventListener("input", refresh);
-  card.addEventListener("change", refresh);
+  card.oninput = card.onchange = refresh;  // replaced (not added to) each time a bed form opens
   refresh();
   $("#save").onclick = async () => {
     const b = val("built");

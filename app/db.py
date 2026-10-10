@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS users (
     invited_by INTEGER,               -- who invited them (users.id), if they came from an invite link
     garden_w REAL,                    -- the whole garden / field, for the plan (metres); NULL = fit to what's in it
     garden_h REAL,
-    garden_shape TEXT,                -- outline traced on a satellite map, as JSON [[x, y], ...] in metres from its
+    garden_shape TEXT,
+    path_w REAL,                      -- path width between beds when they snap side by side (metres); NULL = 0.5                -- outline traced on a satellite map, as JSON [[x, y], ...] in metres from its
                                       -- top-left corner. Only the shape - where it is on the map is never stored.
     invite_token TEXT,                -- which invite link they used
     created_at TEXT NOT NULL
@@ -35,6 +36,7 @@ CREATE TABLE IF NOT EXISTS spaces (
     built INTEGER,                    -- a bed: 1 already built, 0 still to build, NULL not asked yet
     pos_x REAL,                       -- where it sits on the bird's-eye plot (metres); NULL = arranged automatically
     pos_y REAL,
+    angle REAL,                       -- turned on the plan, degrees clockwise round its middle
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS crops (
@@ -86,6 +88,7 @@ CREATE TABLE IF NOT EXISTS features (       -- things on the garden plan that ar
     kind TEXT NOT NULL,
     name TEXT NOT NULL,
     x REAL NOT NULL, y REAL NOT NULL, w REAL NOT NULL, h REAL NOT NULL,
+    angle REAL,
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS invites (        -- each time someone taps "Invite a friend"
@@ -129,7 +132,8 @@ MIGRATIONS = [("spaces", "width_m", "REAL"), ("spaces", "length_m", "REAL"), ("c
               ("users", "last_active", "TEXT"), ("spaces", "soil", "TEXT"),
               ("spaces", "built", "INTEGER"), ("users", "invited_by", "INTEGER"), ("users", "invite_token", "TEXT"),
               ("spaces", "pos_x", "REAL"), ("spaces", "pos_y", "REAL"), ("users", "garden_w", "REAL"), ("users", "garden_h", "REAL"),
-              ("users", "garden_shape", "TEXT")]
+              ("users", "garden_shape", "TEXT"), ("spaces", "angle", "REAL"), ("features", "angle", "REAL"),
+              ("users", "path_w", "REAL")]
 
 
 def init():

@@ -470,3 +470,7 @@ svg.plot .item.sel > :first-child, svg.plot .item.sel .hit { stroke: #e4572e !im
 .mini input { padding: 8px; font-size: 16px; }
 .map { height: 58vh; min-height: 300px; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); background: var(--bg-2); }
 .leaflet-container { font-family: inherit; }
+svg.plot .pathstrip { fill: #e3d8bf; stroke: #c9b996; stroke-width: 0.02; }
+@media (prefers-color-scheme: dark) { svg.plot .pathstrip { fill: #4a4335; stroke: #5d543f; } }
+.angle { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.angle input[type=range] { flex: 1; accent-color: var(--forest-2); }

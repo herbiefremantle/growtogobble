@@ -461,6 +461,12 @@ class Positions(BaseModel):
     positions: list
 
 
+def _angle(v):
+    """Degrees, kept between -180 and 180."""
+    a = float(v) % 360
+    return round(a - 360 if a > 180 else a, 1)
+
+
 def _metres(v, lo=0.0, hi=500.0):
     return round(max(lo, min(float(v), hi)), 2)
 
@@ -472,14 +478,15 @@ def move_spaces(body: Positions, user=Depends(auth.current_user)):
     with db.connect() as conn:
         for raw in body.positions[:200]:
             x, y = _metres(raw["x"]), _metres(raw["y"])
+            angle = _angle(raw["angle"]) if raw.get("angle") is not None else None
             if raw.get("feature"):
                 fid = int(raw["feature"])
                 _own(conn, "features", fid, user)
-                conn.execute("UPDATE features SET x = ?, y = ? WHERE id = ?", (x, y, fid))
+                conn.execute("UPDATE features SET x = ?, y = ?, angle = COALESCE(?, angle) WHERE id = ?", (x, y, angle, fid))
             else:
                 sid = int(raw["id"])
                 _own(conn, "spaces", sid, user)
-                conn.execute("UPDATE spaces SET pos_x = ?, pos_y = ? WHERE id = ?", (x, y, sid))
+                conn.execute("UPDATE spaces SET pos_x = ?, pos_y = ?, angle = COALESCE(?, angle) WHERE id = ?", (x, y, angle, sid))
         return garden.payload(conn, user)
 
 
@@ -506,6 +513,19 @@ def garden_size(body: GardenSize, user=Depends(auth.current_user)):
     with db.connect() as conn:
         conn.execute("UPDATE users SET garden_w = ?, garden_h = ?, garden_shape = NULL WHERE id = ?",
                      (_metres(body.w, 1) if body.w else None, _metres(body.h, 1) if body.h else None, user["id"]))
+        user = dict(conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone())
+        return garden.payload(conn, user)
+
+
+class PathWidth(BaseModel):
+    w: float
+
+
+@app.post("/api/garden/paths")
+def path_width(body: PathWidth, user=Depends(auth.current_user)):
+    """How wide a path to leave when beds snap side by side (0 = right up against each other)."""
+    with db.connect() as conn:
+        conn.execute("UPDATE users SET path_w = ? WHERE id = ?", (round(max(0.0, min(body.w, 3.0)), 2), user["id"]))
         user = dict(conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone())
         return garden.payload(conn, user)
 
@@ -545,6 +565,7 @@ class FeatureIn(BaseModel):
     y: Optional[float] = None
     w: Optional[float] = None
     h: Optional[float] = None
+    angle: Optional[float] = None
 
 
 @app.post("/api/features")
@@ -562,10 +583,11 @@ def add_feature(body: FeatureIn, user=Depends(auth.current_user)):
 def edit_feature(feature_id: int, body: FeatureIn, user=Depends(auth.current_user)):
     with db.connect() as conn:
         f = _own(conn, "features", feature_id, user)
-        conn.execute("UPDATE features SET name = ?, x = ?, y = ?, w = ?, h = ? WHERE id = ?", (
+        conn.execute("UPDATE features SET name = ?, x = ?, y = ?, w = ?, h = ?, angle = ? WHERE id = ?", (
             (body.name or f["name"]).strip()[:40] or f["name"],
             _metres(body.x) if body.x is not None else f["x"], _metres(body.y) if body.y is not None else f["y"],
-            _metres(body.w, 0.2, 100) if body.w else f["w"], _metres(body.h, 0.2, 100) if body.h else f["h"], feature_id))
+            _metres(body.w, 0.2, 100) if body.w else f["w"], _metres(body.h, 0.2, 100) if body.h else f["h"],
+            _angle(body.angle) if body.angle is not None else f["angle"], feature_id))
         return garden.payload(conn, user)
 
 
