@@ -614,3 +614,48 @@ def test_fruit_trees_and_bushes(client):
     assert client.post("/api/features", json={"kind": "bush", "variety": "apple_eating"}).status_code == 400  # no apple bushes
     g = client.patch("/api/features/%d" % tree["id"], json={"variety": "pear", "name": "Pear"}).json()
     assert g["garden"]["features"][0]["variety"] == "pear" and g["garden"]["features"][0]["name"] == "Pear"
+
+
+def test_companions_and_flowers_are_kept_apart(client):
+    _join(client)
+    plants = client.get("/api/plants").json()["plants"]
+    groups = {p["id"]: p["group"] for p in plants}
+    assert groups["carrots"] == "veg" and groups["french_marigold"] == "companion" and groups["sunflower"] == "flower"
+    toms = next(p for p in plants if p["id"] == "tomatoes")
+    assert any(x["plant_id"] == "french_marigold" for x in toms["good_with"])
+    bed = client.post("/api/spaces", json={"name": "Bed 1", "kind": "bed", "width_m": 1.2, "length_m": 2.4}).json()["spaces"][0]["id"]
+    # flowers flower (no eating or storing jobs), and an empty bed's suggestions are fruit & veg only
+    g = client.post("/api/crops", json={"plant_id": "cosmos", "space_id": bed}).json()
+    jobs = g["crops"][0]["jobs"]
+    assert any(j["kind"] == "harvest" and "flowering" in j["title"] for j in jobs)
+    for s in g["spaces"]:
+        for x in (s["suggestion"] or {}).get("plants", []):
+            assert groups[x["plant_id"]] == "veg"
+    fruit = {f["id"] for f in client.get("/api/plants").json()["fruit"]}
+    assert {"loganberry", "waldo"} <= fruit
+
+
+def test_bed_shapes_and_flower_plans(client):
+    _join(client)
+    g = client.post("/api/spaces", json={"name": "Round bed", "kind": "bed", "width_m": 2, "length_m": 2,
+                                         "shape": {"type": "circle"}, "sun": "shade"}).json()
+    s = g["spaces"][0]
+    assert s["shape"] == {"type": "circle"} and s["sun"] == "shade"
+    assert s["usage"]["area"] == 3.14  # pi x 1 x 1
+    # freeform: corners in metres inside its box
+    g = client.patch("/api/spaces/%d" % s["id"], json={"name": "Round bed", "kind": "bed", "width_m": 2, "length_m": 2,
+                                                       "shape": {"type": "free", "pts": [[0, 0], [2, 0], [0, 2]]}}).json()
+    assert g["spaces"][0]["usage"]["area"] == 2.0 and g["spaces"][0]["sun"] == "shade"  # sun kept when not sent
+    assert client.patch("/api/spaces/%d" % s["id"], json={"name": "x", "kind": "bed", "shape": {"type": "free", "pts": [[0, 0]]}}).status_code == 400
+    client.patch("/api/spaces/%d" % s["id"], json={"name": "Round bed", "kind": "bed", "width_m": 2, "length_m": 2, "shape": {"type": "circle"}})
+    plan = client.get("/api/spaces/%d/flowers" % s["id"]).json()
+    assert plan["sun"] == "shade" and plan["shape"] == "circle"
+    shady = next(c for c in plan["combos"] if c["id"] == "shade")
+    assert [z["zone"] for z in shady["zones"]][0] == "centre"  # tall ones in the middle of a round bed
+    assert all(c["id"] not in ("bees", "cutting") for c in plan["combos"])  # sun-lovers aren't offered for shade
+    border = client.get("/api/spaces/%d/flowers?sun=sun" % s["id"]).json()
+    assert any(c["id"] == "bees" for c in border["combos"])
+    # add a whole group to the bed at once
+    adds = [{"plant_id": p["plant_id"], "quantity": p["qty"]} for z in shady["zones"] for p in z["plants"]]
+    g = client.post("/api/crops/bulk", json={"crops": adds, "space_id": s["id"]}).json()
+    assert len([c for c in g["crops"] if c["space_id"] == s["id"]]) == len(adds)

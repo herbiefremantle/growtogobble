@@ -16,6 +16,8 @@ def load(conn, user, today=None):
     today = today or clock.today()
     shift = shift_for(user)
     spaces = rows(conn, "SELECT * FROM spaces WHERE user_id = ? ORDER BY id", user["id"])
+    for space in spaces:
+        space["shape"] = planner.shape_of(space)
     crops = rows(conn, "SELECT * FROM crops WHERE user_id = ? ORDER BY id", user["id"])
     done = {r["key"] for r in rows(conn, "SELECT key FROM done WHERE user_id = ?", user["id"])}
     has_push = conn.execute("SELECT 1 FROM push_subs WHERE user_id = ?", (user["id"],)).fetchone() is not None
@@ -98,7 +100,7 @@ def payload(conn, user):
             starts=starts.isoformat() if starts else None, finishes=finishes.isoformat() if finishes else None,
             qty=qty, area=round(qty * planner.area_each(plant), 2), harvest=planner.harvest_estimate(plant, qty),
             buy=planner.buy_estimate(plant, qty, crop["method"]),
-            then=None if crop.get("finished_on") else mark_duplicates(planner.next_in_space(
+            then=None if crop.get("finished_on") or plant["group"] != "veg" else mark_duplicates(planner.next_in_space(
                 crop, jobs, kinds.get(crop["space_id"], "bed"), state["liked"], state["shift"], today), state, space_names),
             second=None if crop.get("finished_on") else second_season(state, crop)))
 
@@ -161,7 +163,7 @@ def catalogue_payload(user=None):
         # what could follow it in the same bed, after this year's picking
         then = None
         harvest = planner.next_window(plant["harvest"], today, shift)
-        if harvest and not plant.get("perennial"):
+        if harvest and not plant.get("perennial") and plant["group"] == "veg":
             free = min(harvest[1], harvest[0] + (plant.get("pick_weeks") or 99) * planner.WEEK)
             then = {"free_from": free.isoformat(),
                     "plants": planner.follow_ons(free, "bed", set(), shift, not_families=(plant["family"],), today=today)}
@@ -173,5 +175,6 @@ def catalogue_payload(user=None):
         "plants": out, "levels": catalogue.LEVELS, "methods": planner.METHODS,
         "nodig_steps": catalogue.NODIG_STEPS, "pot_steps": catalogue.POT_STEPS,
         "nodig_planting": catalogue.NODIG_PLANTING, "soil_types": catalogue.SOIL_TYPES, "fruit": catalogue.FRUIT,
+        "combos": catalogue.COMBOS, "sun_spots": catalogue.SUN_SPOTS,
         "affiliate": shops.is_affiliate(),
     }

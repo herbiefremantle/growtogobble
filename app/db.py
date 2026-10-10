@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS spaces (
     pos_y REAL,
     angle REAL,                       -- turned on the plan, degrees clockwise round its middle
     grp INTEGER,                      -- grouped with other beds/features on the plan, to move together
+    shape TEXT,                       -- JSON: NULL = rectangle, {"type": circle|triangle|corner|free, "pts": [[x, y], ...]}
+    sun TEXT,                         -- sun | mixed | shade (NULL = not said)
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS crops (
@@ -137,7 +139,7 @@ MIGRATIONS = [("spaces", "width_m", "REAL"), ("spaces", "length_m", "REAL"), ("c
               ("spaces", "pos_x", "REAL"), ("spaces", "pos_y", "REAL"), ("users", "garden_w", "REAL"), ("users", "garden_h", "REAL"),
               ("users", "garden_shape", "TEXT"), ("spaces", "angle", "REAL"), ("features", "angle", "REAL"),
               ("users", "path_w", "REAL"), ("spaces", "grp", "INTEGER"), ("features", "grp", "INTEGER"),
-              ("features", "variety", "TEXT")]
+              ("features", "variety", "TEXT"), ("spaces", "shape", "TEXT"), ("spaces", "sun", "TEXT")]
 
 
 def init():

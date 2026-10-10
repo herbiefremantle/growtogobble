@@ -470,6 +470,13 @@ PLANTS = [
     },
 ]
 
+# Fruit & veg first; companion plants (flowers that help the veg) and the flower garden are kept apart - see flowers.py
+from . import flowers as _flowers  # noqa: E402
+for _p in PLANTS:
+    _p["group"] = "veg"
+_nas = next(_p for _p in PLANTS if _p["id"] == "nasturtium")
+_nas.update(group="companion", sun=["sun", "part"], height_cm=30, kind="annual")
+PLANTS += [dict(_p, group="companion") for _p in _flowers.COMPANIONS] + [dict(_p, group="flower") for _p in _flowers.FLOWERS]
 BY_ID = {p["id"]: p for p in PLANTS}
 
 # Default step-by-step instructions, used when a plant doesn't have its own.
@@ -590,6 +597,7 @@ PACK_HINTS = {  # help turning a shop order into a number of plants
 GROUPS = {"cabbage": "cabbage family", "onion": "onion family", "bean": "pea & bean family",
           "potato": "tomato & potato family", "squash": "squash family", "carrot": "carrot family", "beet": "beet family"}
 
+GROW.update({k: (sp, row, unit, None, None, "flower") for k, (sp, row, unit) in _flowers.GROW.items()})
 for _p in PLANTS:
     _sp, _row, _unit, _yield, _pick, _family = GROW[_p["id"]]
     _p.update(sp_cm=_sp, row_cm=_row, unit=_unit, yield_each=_yield, pick_weeks=_pick, family=_family,
@@ -672,6 +680,8 @@ def _neighbours(pairs):
     return out
 
 
+GOOD_NEIGHBOURS += [(veg, comp, why) for comp, helps in _flowers.HELPS.items() for veg, why in helps
+                    if not any({a, b} == {veg, comp} for a, b, _ in GOOD_NEIGHBOURS)]
 GOOD_WITH = _neighbours(GOOD_NEIGHBOURS)
 BAD_WITH = _neighbours(BAD_NEIGHBOURS)
 for _p in PLANTS:
@@ -785,8 +795,11 @@ CURE = {
                 "Leave for 1-2 weeks until the skin is hard and sounds hollow when you knock", "Then store them somewhere cool indoors 🎃"]),
 }
 for _p in PLANTS:
-    _keeps, _how, _freeze = STORE[_p["id"]]
-    _p.update(store={"keeps": _keeps, "how": _how, "freeze": _freeze})
+    if _p["id"] in STORE:  # flowers aren't stored
+        _keeps, _how, _freeze = STORE[_p["id"]]
+        _p.update(store={"keeps": _keeps, "how": _how, "freeze": _freeze})
+    else:
+        _p["store"] = None
 
 
 # ---- two planting seasons -------------------------------------------------------------------------
@@ -914,8 +927,9 @@ PESTS = {
     "nasturtium": (["blackfly", "caterpillars"], ["Leave them - nasturtiums are a decoy that keeps pests off your other plants 🎯"], 0, ""),
     "chives": ([], [], 0, ""), "mint": ([], [], 0, ""), "rhubarb": (["slugs"], ["Slugs sometimes nibble new shoots in spring - hunt them at dusk"], 0, ""),
 }
+PESTS.update(_flowers.PESTS)
 for _p in PLANTS:
-    _who, _how, _cover, _uncover = PESTS[_p["id"]]
+    _who, _how, _cover, _uncover = PESTS.get(_p["id"], ([], [], 0, ""))
     _p["pests"] = {"who": [dict(zip(("emoji", "name", "what"), PESTS_WHO[w])) for w in _who],
                    "protect": _how, "cover": _cover, "uncover": _uncover}
 
@@ -1008,7 +1022,7 @@ SOIL_OF = {
     "strawberries": "berries", "raspberries": "berries", "blueberries": "blueberries", "sweet_potatoes": "sweet_potato",
 }
 for _p in PLANTS:
-    _likes, _add, _how, _bigger = SOIL_PROFILES[SOIL_OF[_p["id"]]]
+    _likes, _add, _how, _bigger = SOIL_PROFILES[SOIL_OF.get(_p["id"], "flowers")]
     _p["soil"] = {"likes": _likes, "how": _how, "bigger": _bigger,
                   "add": [dict(zip(("emoji", "name", "what"), IMPROVERS[a])) for a in _add]}
 
@@ -1075,6 +1089,8 @@ PACKS = {
     "melon": ("packets of seeds", 8, 1.5, "about 8 seeds a packet"),
     "sweet_potatoes": ("slips", 1, 1.0, "usually sold in packs of 5"),
 }
+PACKS.update(_flowers.PACKS)
+COMBOS, SUN_SPOTS, HELPS = _flowers.COMBOS, _flowers.SUN_SPOTS, _flowers.HELPS
 
 
 # ---- fruit trees and bushes on the garden plan ------------------------------------------------------
@@ -1191,6 +1207,24 @@ FRUIT = [
      "keep": "Eat within a day or two, or freeze on a tray.",
      "care": ["Tie the long canes along wires on a fence or frame",
               "After picking, cut the canes that fruited down to the ground and tie in the new ones"],
+     "pests": "Few problems - birds at ripe fruit."},
+    {"id": "loganberry", "kind": "bush", "name": "Loganberry", "emoji": "🍇", "w": 2.5, "h": 0.8,
+     "examples": "LY 654 (thornless)",
+     "pick": [7, 8], "pick_text": "July-August.",
+     "ripe": "Ripe when deep dark red (almost purple) and they come off the plant easily - pick every couple of days.",
+     "keep": "Eat within a day or two, or freeze on a tray. Sharper than a raspberry - brilliant in jam and crumbles.",
+     "care": ["A cross between a raspberry and a blackberry - tie the long canes along wires on a fence",
+              "After picking, cut the canes that fruited down to the ground, and tie in this year's new ones",
+              "Spread compost round it every spring"],
+     "pests": "Birds - net it as the berries colour. Watch for maggots of raspberry beetle in the fruit."},
+    {"id": "waldo", "kind": "bush", "name": "Blackberry 'Waldo'", "emoji": "🫐", "w": 1.5, "h": 0.8,
+     "examples": "Waldo (thornless, compact)",
+     "pick": [7, 8], "pick_text": "Late July-August - earlier than most blackberries.",
+     "ripe": "Pick when shiny black all over and they pull off easily.",
+     "keep": "Eat within a day or two, or freeze on a tray for crumbles and smoothies.",
+     "care": ["Thornless and compact - perfect for a small garden or a big pot",
+              "Tie the canes to a fence or frame",
+              "After picking, cut the canes that fruited to the ground and tie in the new ones"],
      "pests": "Few problems - birds at ripe fruit."},
     {"id": "elder", "kind": "bush", "name": "Elder", "emoji": "🤍", "w": 2.5, "h": 2.5,
      "examples": "Black Lace, wild elder",

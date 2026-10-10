@@ -529,3 +529,17 @@ svg.plot.withsat .gridline { stroke: rgba(255,255,255,.18); }
 .fruit-now { background: #fff1c9; color: #6b4a00; border-radius: 10px; padding: 6px 10px; font-weight: 800; margin: 0 0 8px; }
 .fruit-card { margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 8px; }
 .fruit-card summary { cursor: pointer; }
+
+/* companion plants, flowers and bed shapes */
+.nb.comp { cursor: default; align-items: flex-start; }
+.kinds.shapes { grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); }
+.kinds.shapes .kind { padding: 10px 4px; }
+.kinds.shapes .kind .e { font-size: 26px; }
+.combo h3 { margin-bottom: 4px; }
+.combo .zone { margin-top: 8px; }
+.combo .zone .chips { margin-top: 4px; gap: 6px; }
+.fdiagram { display: block; width: 100%; max-height: 260px; margin: 4px 0; }
+.fdiagram .fd-bed { fill: #6b4a2e; }
+.fdiagram .fd-z0 { fill: #6f8f4e; } .fdiagram .fd-z1 { fill: #86a85e; } .fdiagram .fd-z2 { fill: #a3c27a; }
+.fdiagram .fd-lab { fill: var(--muted); font-weight: 800; }
+.tile .when { font-size: 12px; }

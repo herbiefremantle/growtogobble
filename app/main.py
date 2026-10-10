@@ -412,6 +412,31 @@ class SpaceIn(BaseModel):
     pos_x: Optional[float] = None     # where it goes on the plan (e.g. a copy placed next door)
     pos_y: Optional[float] = None
     angle: Optional[float] = None
+    shape: Optional[dict] = None      # {"type": "rect"|"circle"|"triangle"|"corner"|"free", "pts": [[x, y], ...]}
+    sun: Optional[str] = None
+
+
+def _shape(v):
+    """A bed's shape, checked, as JSON text - or None for a rectangle."""
+    if not v or v.get("type") in (None, "rect"):
+        return None
+    kind = v["type"]
+    if kind in ("circle", "triangle", "corner"):
+        return json.dumps({"type": kind})
+    if kind == "free":
+        pts = v.get("pts") or []
+        if not 3 <= len(pts) <= 40:
+            raise HTTPException(400, "A freeform bed needs 3 to 40 corners")
+        try:
+            clean = [[round(min(max(float(x), 0.0), 500.0), 2), round(min(max(float(y), 0.0), 500.0), 2)] for x, y in pts]
+        except (TypeError, ValueError):
+            raise HTTPException(400, "Bad corner")
+        return json.dumps({"type": "free", "pts": clean})
+    raise HTTPException(400, "Unknown shape")
+
+
+def _sun(v):
+    return v if v in catalogue.SUN_SPOTS else None
 
 
 def _soil(v):
@@ -428,12 +453,13 @@ def add_space(body: SpaceIn, user=Depends(auth.current_user)):
         raise HTTPException(400, "Unknown kind of space")
     with db.connect() as conn:
         placed = body.pos_x is not None and body.pos_y is not None
-        conn.execute("INSERT INTO spaces (user_id, name, kind, width_m, length_m, soil, built, pos_x, pos_y, angle, created_at) "
-                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        conn.execute("INSERT INTO spaces (user_id, name, kind, width_m, length_m, soil, built, pos_x, pos_y, angle, shape, sun, created_at) "
+                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                      (user["id"], body.name.strip()[:40] or "My bed", body.kind, _size(body.width_m), _size(body.length_m),
                       _soil(body.soil), None if body.built is None else int(body.built),
                       _metres(body.pos_x) if placed else None, _metres(body.pos_y) if placed else None,
-                      _angle(body.angle) if body.angle is not None else None, clock.now().isoformat()))
+                      _angle(body.angle) if body.angle is not None else None,
+                      _shape(body.shape) if body.kind != "pot" else None, _sun(body.sun), clock.now().isoformat()))
         return garden.payload(conn, user)
 
 
@@ -446,7 +472,21 @@ def rename_space(space_id: int, body: SpaceIn, user=Depends(auth.current_user)):
                       _soil(body.soil), space_id))
         if body.built is not None:
             conn.execute("UPDATE spaces SET built = ? WHERE id = ?", (int(body.built), space_id))
+        if body.shape is not None:  # left out = keep the shape it has
+            conn.execute("UPDATE spaces SET shape = ? WHERE id = ?", (_shape(body.shape) if body.kind != "pot" else None, space_id))
+        if body.sun is not None:
+            conn.execute("UPDATE spaces SET sun = ? WHERE id = ?", (_sun(body.sun), space_id))
+        if body.pos_x is not None and body.pos_y is not None:  # reshaping a bed can move its box
+            conn.execute("UPDATE spaces SET pos_x = ?, pos_y = ? WHERE id = ?", (_metres(body.pos_x), _metres(body.pos_y), space_id))
         return garden.payload(conn, user)
+
+
+@app.get("/api/spaces/{space_id}/flowers")
+def flower_ideas(space_id: int, sun: Optional[str] = None, user=Depends(auth.current_user)):
+    """Flowers that go together for this bed, laid out to suit its shape and how sunny it is."""
+    with db.connect() as conn:
+        space = _own(conn, "spaces", space_id, user)
+    return planner.flower_plan(space, sun or space.get("sun"))
 
 
 class Position(BaseModel):
@@ -742,7 +782,8 @@ def add_crop(body: CropIn, user=Depends(auth.current_user)):
 
 
 class CropsIn(BaseModel):
-    crops: list
+    crops: list                       # plant ids, or {"plant_id", "quantity"}
+    space_id: Optional[int] = None    # a whole group of flowers going into one bed, when the user taps "add these"
 
 
 @app.post("/api/crops/bulk")
@@ -750,10 +791,13 @@ def add_crops(body: CropsIn, user=Depends(auth.current_user)):
     """Onboarding: add several at once. They start "not placed yet" - the user places them, or agrees to a
     suggested layout (/api/layout) - nothing goes into a bed without them saying so."""
     with db.connect() as conn:
-        for plant_id in body.crops[:40]:
+        if body.space_id is not None:
+            _own(conn, "spaces", body.space_id, user)
+        for item in body.crops[:40]:
+            plant_id, qty = (item.get("plant_id"), item.get("quantity")) if isinstance(item, dict) else (item, None)
             plant = catalogue.BY_ID.get(str(plant_id))
             if plant:
-                _new_crop(conn, user, plant["id"], None, None)
+                _new_crop(conn, user, plant["id"], body.space_id, None, quantity=qty)
         return garden.payload(conn, user)
 
 

@@ -26,6 +26,18 @@ function fmt(iso, withDay) {
 function plant(id) { return S.cat.plants.find((p) => p.id === id); }
 function crop(id) { return S.g.crops.find((c) => c.id === id); }
 function space(id) { return S.g.spaces.find((s) => s.id === id); }
+// Fruit & veg is the main thing; companion plants and flowers are kept in their own lists
+const GROUPS = { veg: { emoji: "🥕", name: "Fruit & veg" }, companion: { emoji: "🐞", name: "Companions" }, flower: { emoji: "🌸", name: "Flowers" } };
+const isFlower = (p) => p.group !== "veg" && !p.eat;  // grown to look at, not eat
+const companionsFor = (p) => p.good_with.filter((x) => plant(x.plant_id).group === "companion");
+const helpsWhat = (p) => p.good_with.filter((x) => plant(x.plant_id).group === "veg");
+const SUN_EMOJI = { sun: "☀️", part: "⛅", shade: "🌥️" };
+// save one thing about a bed, keeping the rest as it is
+const patchSpace = (sp, extra, message) => change("PATCH", `/api/spaces/${sp.id}`, { name: sp.name, kind: sp.kind, soil: sp.soil,
+  width_m: sp.width_m, length_m: sp.length_m, ...extra }, message);
+// a companion straight into a bed, a few plants - change the number on its own page
+const addCompanion = (plantId, spaceId) => change("POST", "/api/crops", { plant_id: plantId, space_id: spaceId, quantity: 3 },
+  `${plant(plantId).emoji} 3 ${plant(plantId).name.toLowerCase()} added to ${space(spaceId).name}`);
 // Artwork, drawn inline so it themes and scales: a little garden scene, the logo, and Pip the seed.
 const SCENE = `<svg class="scene" viewBox="0 0 400 150" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
   <circle cx="330" cy="46" r="24" fill="#f5c05a"/><circle cx="330" cy="46" r="34" fill="#f5c05a" opacity=".25"/>
@@ -55,6 +67,7 @@ const PIP = `<svg class="pip-face" viewBox="0 0 46 46" aria-hidden="true">
 
 const SPACE_KINDS = { bed: { emoji: "🟫", label: "No-dig bed" }, pot: { emoji: "🪴", label: "Pots & containers" }, allotment: { emoji: "🏡", label: "Allotment plot" } };
 const STAGES = ["🌰", "🌱", "🌿", "🧺", "😋"];
+const stagesFor = (p) => (isFlower(p) ? ["🌰", "🌱", "🌿", "🌸"] : STAGES);  // flowers flower - nothing to eat
 const KIND_WORD = { sow_in: "Sow indoors", sow_out: "Sow outside", plant_out: "Plant out", harvest: "Pick" };
 
 async function api(method, path, body) {
@@ -321,9 +334,10 @@ function onboarding() {
   $("#done").onclick = () => { onb.step = 1; go("#/"); };
 }
 
-function filteredPlants(filter) {
+function filteredPlants(filter, group = "veg") {
   const now = today();
-  return S.cat.plants.filter((p) => {
+  return S.cat.plants.filter((p) => p.group === group).filter((p) => {
+    if (["sun", "part", "shade"].includes(filter)) return p.sun.includes(filter);
     if (filter === "1" || filter === "2" || filter === "3") return p.level === Number(filter);
     if (filter === "pot") return p.where.includes("pot");
     if (filter === "now") return Object.values(p.next).some((w) => w && daysBetween(now, d(w[0])) <= 30);
@@ -331,15 +345,17 @@ function filteredPlants(filter) {
   }).sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
 }
 
-function filterBar(current) {
-  const opts = [["all", "All"], ["1", "🟢 Easy peasy"], ["2", "🟠 A bit more care"], ["3", "🔴 More care"], ["pot", "🪴 Good in pots"], ["now", "📅 Can start soon"]];
+function filterBar(current, group = "veg") {
+  const opts = group === "flower" ? [["all", "All"], ["sun", "☀️ Sunny spot"], ["part", "⛅ Half shade"], ["shade", "🌥️ Shady spot"], ["pot", "🪴 Good in pots"]] : [["all", "All"], ["1", "🟢 Easy peasy"], ["2", "🟠 A bit more care"], ["3", "🔴 More care"], ["pot", "🪴 Good in pots"], ["now", "📅 Can start soon"]];
   return `<div class="filter">${opts.map(([k, l]) => `<button data-filter="${k}" class="${current === k ? "on" : ""}">${l}</button>`).join("")}</div>`;
 }
 
 function tile(p, picked, have) {
   const lv = S.cat.levels[p.level];
+  const extra = p.group === "companion" ? `<span class="when">Helps ${helpsWhat(p).slice(0, 5).map((x) => plant(x.plant_id).emoji).join("")}</span>`
+    : p.group === "flower" ? `<span class="when">${p.sun.map((x) => SUN_EMOJI[x]).join("")} · ${p.height_cm >= 100 ? p.height_cm / 100 + "m" : p.height_cm + "cm"} tall</span>` : "";
   return `<button class="tile ${picked ? "picked" : ""}" data-plant="${p.id}">${have ? `<span class="have" title="In your garden">🌱</span>` : ""}
-    <span class="blob l${p.level}">${p.emoji}</span><span class="n">${esc(p.name)}</span><span class="chip l${p.level}">${lv.emoji} ${esc(lv.name)}</span></button>`;
+    <span class="blob l${p.level}">${p.emoji}</span><span class="n">${esc(p.name)}</span>${extra}<span class="chip l${p.level}">${lv.emoji} ${esc(lv.name)}</span></button>`;
 }
 
 // ---- jobs ------------------------------------------------------------------------------------------
@@ -421,6 +437,13 @@ document.addEventListener("click", async (e) => {
   if (batch) { await change("POST", "/api/done", { key: batch.dataset.batch }, "Added another batch 🔁"); return; }
   const replan = e.target.closest("[data-replan]");
   if (replan) { await change("POST", `/api/crops/${replan.dataset.replan}/replan`, null, "Moved to the next chance 📅"); return; }
+  const ac = e.target.closest("[data-addcomp]");
+  if (ac) {
+    if (await addCompanion(ac.dataset.addcomp, Number(ac.dataset.space))) ac.outerHTML = `<span class="chip grey">✅ Added</span>`;
+    return;
+  }
+  const fp = e.target.closest("[data-flowers]");
+  if (fp) { openFlowerPlan(Number(fp.dataset.flowers)); return; }
   const pl = e.target.closest("[data-open-plant]");
   if (pl) { openPlant(pl.dataset.openPlant, pl.dataset.space ? Number(pl.dataset.space) : null, pl.dataset.method, pl.dataset.after); return; }
   const cr = e.target.closest("[data-open-crop]");
@@ -496,7 +519,7 @@ function plantNow() {
   const t = today();
   const out = [];
   for (const p of S.cat.plants) {
-    if (have.has(p.id) || !p.where.some((w) => fits.has(w))) continue;
+    if (p.group !== "veg" || have.has(p.id) || !p.where.some((w) => fits.has(w))) continue;
     let best = null;
     for (const m of p.methods) {
       const w = p.next[m];
@@ -613,7 +636,7 @@ function cropRow(c, opts = {}) {
   return `<div class="crop-row" data-open-crop="${c.id}">
     <span class="e">${p.emoji}</span>
     <div class="n">${esc(p.name)}${row ? ` <span class="chip grey">${row}${when ? " · " + when : ""}</span>` : ""}<div class="small muted" style="font-weight:600">${j ? esc(j.title) + " · " + whenText(j) : c.finished_on ? "Finished" : "All done 🎉"}</div></div>
-    <div class="stage" aria-label="Stage ${c.stage + 1} of 5">${STAGES.map((e, i) => `<span class="${i <= c.stage ? "on" : ""}">${e}</span>`).join("")}</div>
+    <div class="stage" aria-label="Stage ${c.stage + 1} of ${stagesFor(plant(c.plant_id)).length}">${stagesFor(plant(c.plant_id)).map((e, i) => `<span class="${i <= c.stage ? "on" : ""}">${e}</span>`).join("")}</div>
     ${opts.unplace && c.space_id ? `<button class="unplace" data-unplace="${c.id}" aria-label="Take ${esc(p.name)} out of this bed" title="Take out of this bed">✕</button>` : ""}
   </div>`;
 }
@@ -682,6 +705,30 @@ function spaceSize(s) {
   const def = s.kind === "allotment" ? { w: 5, h: 25 } : { w: 1.2, h: 2.4 };
   return { w: s.width_m || def.w, h: s.length_m || def.h };
 }
+
+// Bed shapes: a rectangle unless it's been made round, a triangle, a corner bed, or any shape you like.
+// Freeform corners are stored in the bed's own box and stretch with it.
+const SHAPES = [["rect", "▭", "Rectangle"], ["circle", "◯", "Round"], ["triangle", "△", "Triangle"], ["corner", "◺", "Corner"], ["free", "✏️", "Any shape"]];
+const FREE_START = [[0.3, 0], [1, 0.1], [0.9, 0.75], [0.45, 1], [0, 0.6]];
+const shapeType = (s) => (s.kind === "pot" ? "pot" : (s.shape && s.shape.type) || "rect");  // pots are drawn round
+function outlinePts(s, w, h) {
+  const t = shapeType(s);
+  if (t === "circle" || t === "pot") return Array.from({ length: 32 }, (_, i) => { const a = (i / 32) * 2 * Math.PI - Math.PI / 2; return [w / 2 + (Math.cos(a) * w) / 2, h / 2 + (Math.sin(a) * h) / 2]; });
+  if (t === "triangle") return [[w / 2, 0], [w, h], [0, h]];
+  if (t === "corner") return [[0, 0], [w, 0], [0, h]];
+  if (t === "free") {
+    const P = s.shape.pts, sx = Math.max(...P.map((q) => q[0])) || 1, sy = Math.max(...P.map((q) => q[1])) || 1;
+    return P.map(([x, y]) => [(x * w) / sx, (y * h) / sy]);
+  }
+  return [[0, 0], [w, 0], [w, h], [0, h]];
+}
+function shapeSvg(s, x, y, w, h, attrs) {
+  const t = shapeType(s);
+  if (t === "rect") return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${Math.min(0.08, w / 10)}" ${attrs}/>`;
+  if (t === "circle" || t === "pot") return `<ellipse cx="${x + w / 2}" cy="${y + h / 2}" rx="${w / 2}" ry="${h / 2}" ${attrs}/>`;
+  return `<polygon points="${outlinePts(s, w, h).map(([px, py]) => `${x + px},${y + py}`).join(" ")}" ${attrs}/>`;
+}
+const polyArea = (P) => Math.abs(P.reduce((a, [x1, y1], k) => { const [x2, y2] = P[(k + 1) % P.length]; return a + x1 * y2 - x2 * y1; }, 0)) / 2;
 
 // Beds without a saved spot sit side by side, left to right in the order they were added (pots at the end),
 // to the right of anything already placed
@@ -946,7 +993,9 @@ function plotSvg() {
       const across = w <= h, long = across ? h : w, short = across ? w : h;
       const need = now.reduce((n, c) => n + c.area / short, 0), scale = need > long ? long / need : 1;
       let at = 0;
-      inner = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="0.08" class="bed ${s.built === 0 ? "unbuilt" : ""} ${need > long ? "over" : ""}"/>` + now.map((c) => {
+      const clipped = shapeType(s) !== "rect";
+      inner = shapeSvg(s, x, y, w, h, `class="bed ${s.built === 0 ? "unbuilt" : ""} ${need > long ? "over" : ""}"`)
+        + (clipped ? `<clipPath id="bc${s.id}">${shapeSvg(s, x, y, w, h, "")}</clipPath><g clip-path="url(#bc${s.id})">` : "") + now.map((c) => {
         const p = plant(c.plant_id), depth = Math.max(0.14, (c.area / short) * scale), start = at;
         at += depth;
         const rx = across ? x + 0.04 : x + start + 0.02, ry = across ? y + start + 0.02 : y + 0.04;
@@ -956,12 +1005,12 @@ function plotSvg() {
           ? `<text x="${x + (w / n) * (k + 0.5)}" y="${ry + rh / 2 + fs * 0.35}" font-size="${fs}" text-anchor="middle">${p.emoji}</text>`
           : `<text x="${rx + rw / 2}" y="${y + (h / n) * (k + 0.5) + fs * 0.35}" font-size="${fs}" text-anchor="middle">${p.emoji}</text>`).join("");
         return `<g class="crop" data-open-crop="${c.id}"><rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" rx="0.06" fill="${FAMILY_COLOUR[p.family] || "#9fd88f"}"/>${emojis}</g>`;
-      }).join("") + (need < long * 0.9 && !plotEdit ? `<text x="${across ? x + w / 2 : x + at + (w - at) / 2}" y="${across ? y + at + (h - at) / 2 + 0.1 : y + h / 2 + 0.1}" font-size="${Math.min(0.3, px(22))}" text-anchor="middle" class="plus">＋</text>` : "");
+      }).join("") + (clipped ? "</g>" : "") + (need < long * 0.9 && !plotEdit ? `<text x="${across ? x + w / 2 : x + at + (w - at) / 2}" y="${across ? y + at + (h - at) / 2 + 0.1 : y + h / 2 + 0.1}" font-size="${Math.min(0.3, px(22))}" text-anchor="middle" class="plus">＋</text>` : "");
     }
     const lab = fitLabel(s.name + (later ? `  +${later}` : ""), w + 0.1, ppm), bb = box(i);
     return `<g class="item space ${isSel(i) ? "sel" : ""} ${placing ? (target ? "target" : "nope") : ""}" data-item="space" data-id="${s.id}" data-space-id="${s.id}" data-x="${x}" data-y="${y}" data-w="${w}" data-h="${h}" data-a="${i.a}">
       <title>${esc(s.name)}</title><g class="turn" transform="rotate(${i.a} ${x + w / 2} ${y + h / 2})"><rect x="${x - 0.1}" y="${y - 0.1}" width="${w + 0.2}" height="${h + 0.2}" rx="0.12" class="hit"/>
-      ${inner}${s.kind === "pot" ? "" : sizeMarks(i, ppm)}</g><text x="${i.a ? (bb.x0 + bb.x1) / 2 : x}" y="${bb.y0 - lab.size * 0.45}" font-size="${lab.size}" ${i.a ? 'text-anchor="middle"' : ""} class="label">${esc(lab.text)}</text></g>`;
+      ${inner}${s.kind === "pot" || shapeType(s) === "free" ? "" : sizeMarks(i, ppm)}${bedHandles(i, ppm)}</g><text x="${i.a ? (bb.x0 + bb.x1) / 2 : x}" y="${bb.y0 - lab.size * 0.45}" font-size="${lab.size}" ${i.a ? 'text-anchor="middle"' : ""} class="label">${esc(lab.text)}</text></g>`;
   }).join("");
 
   // grid squares that stay readable whatever the zoom: 50cm up close, 1m, 5m or 10m across a field
@@ -979,6 +1028,17 @@ function plotSvg() {
     <rect x="${b.x0}" y="${b.y0}" width="${b.W}" height="${b.H}" fill="url(#grid)"/>
     ${fence}${showPaths ? pathsBetween(items) : ""}${features}${beds}${edgeMarks(ppm)}${boundaryEdit ? boundaryHandles(ppm) : ""}
     <g class="scalebar" style="stroke-width:${px(2)}"><path d="M ${b.x0 + px(12)} ${b.y0 + b.H - px(12)} h ${bar}"/><text x="${b.x0 + px(12) + bar / 2}" y="${b.y0 + b.H - px(17)}" font-size="${px(11)}" text-anchor="middle">${bar} m</text></g></svg>`;
+}
+
+// A freeform bed, selected while editing: red dots on its corners to drag, ＋ halfway along each side to add one
+let bedVtx = null;  // {id, k}: a corner tapped, ready to remove
+function bedHandles(i, ppm) {
+  if (!plotEdit || boundaryEdit || !selected || selected.type !== "space" || selected.id !== i.id || shapeType(i.s) !== "free") return "";
+  const P = outlinePts(i.s, i.w, i.h).map(([px, py]) => [i.x + px, i.y + py]), n = P.length, r = (k) => k / ppm;
+  const mids = P.map(([x1, y1], k) => { const [x2, y2] = P[(k + 1) % n], mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    return `<g class="bmid" data-bmid="${k}"><circle cx="${mx}" cy="${my}" r="${r(10)}"/><text x="${mx}" y="${my + r(5)}" font-size="${r(15)}" text-anchor="middle">+</text></g>`; }).join("");
+  const dots = P.map(([x, y], k) => `<circle cx="${x}" cy="${y}" r="${r(11)}" class="bvtx ${bedVtx && bedVtx.id === i.id && bedVtx.k === k ? "on" : ""}" data-bvtx="${k}"/>`).join("");
+  return `<g class="bedit">${mids}${dots}</g>`;
 }
 
 function plotPage() {
@@ -1070,8 +1130,9 @@ function selToolbar() {
   const tw = Math.min(330, visW - 8), lo = Math.max(4, plotScroll.l + 4), hi = Math.min(W - tw - 4, plotScroll.l + visW - tw - 4);
   const left = Math.max(lo, Math.min(hi, ((bb.x0 + bb.x1) / 2 - b.x0) * ppm - tw / 2));
   const tb = it.type === "feature" && ["tree", "bush"].includes(it.f.kind), fr = tb && fruitOf(it.f);
-  const th = it.type === "space" || tb ? 140 : 100, above = (bb.y0 - b.y0) * ppm - th, top = above > 4 ? above : (bb.y1 - b.y0) * ppm + 10;
-  return `<div class="seltools" style="left:${left}px;top:${top}px;width:${tw}px">
+  const free = it.type === "space" && shapeType(it.s) === "free";
+  const th = it.type === "space" ? (free ? 230 : 185) : tb ? 140 : 100, above = (bb.y0 - b.y0) * ppm - th, top = above > 4 ? above : (bb.y1 - b.y0) * ppm + 10;
+  return `<div class="seltools" data-above="${(bb.y0 - b.y0) * ppm}" data-below="${(bb.y1 - b.y0) * ppm}" style="left:${left}px;top:${top}px;width:${tw}px">
     <button class="btn small" data-rot="-15" aria-label="Turn 15 degrees left">↺15°</button>
     <input type="range" id="ang" min="-180" max="180" step="1" value="${Math.round(it.a)}" aria-label="Angle">
     <button class="btn small" data-rot="15" aria-label="Turn 15 degrees right">↻15°</button>
@@ -1081,7 +1142,10 @@ function selToolbar() {
     <div class="sizerow"><span>📏</span><input id="sz-w" type="number" step="0.1" min="0.2" max="100" inputmode="decimal" value="${it.w}" aria-label="Width in metres">
       <span>×</span><input id="sz-h" type="number" step="0.1" min="0.2" max="100" inputmode="decimal" value="${it.h}" aria-label="Length in metres"><span>m</span><span class="small muted" id="sz-state"></span></div>
     ${it.type === "space" ? `<div class="copyrow"><span>⧉ Copy to:</span><button class="btn small" data-copy-bed="left" aria-label="Copy to the left">◀</button><button class="btn small" data-copy-bed="right" aria-label="Copy to the right">▶</button>
-      <button class="btn small" data-copy-bed="up" aria-label="Copy above">▲</button><button class="btn small" data-copy-bed="down" aria-label="Copy below">▼</button></div>` : ""}
+      <button class="btn small" data-copy-bed="up" aria-label="Copy above">▲</button><button class="btn small" data-copy-bed="down" aria-label="Copy below">▼</button></div>
+    <div class="copyrow"><span>Shape:</span>${SHAPES.map(([k, e, l]) => `<button class="btn small ${shapeType(it.s) === k ? "primary" : ""}" data-bshape="${k}" aria-label="${l}" title="${l}">${e}</button>`).join("")}</div>
+    ${free ? `<p class="small muted" style="margin:2px 0 0;width:100%">Drag the red dots to reshape it · tap ＋ to add a corner · tap a dot to remove it
+      ${bedVtx && bedVtx.id === it.id ? `<button class="btn small danger" id="bv-del">🗑️ Remove corner ${bedVtx.k + 1}</button>` : ""}</p>` : ""}` : ""}
     ${tb ? `<div class="copyrow">${fr && !fr.plain ? `<span>${fr.emoji} ${esc(fr.name)} · pick ${pickMonths(fr)}</span><button class="btn small" data-fruitinfo>ℹ️ Info</button>`
       : `<span>${fr ? esc(fr.name) : "What kind is it?"}</span>`}<button class="btn small" data-fruitpick>${fr ? "Change" : "🍎 Choose"}</button></div>` : ""}</div>`;
 }
@@ -1140,6 +1204,9 @@ function editPanel() {
 
 function wirePlot() {
   const svg = view.querySelector("svg.plot");
+  // now the toolbar's drawn we know how tall it really is: sit it just above the thing, or below if there's no room
+  const tools = view.querySelector(".seltools[data-above]");
+  if (tools) { const above = Number(tools.dataset.above) - tools.offsetHeight - 8; tools.style.top = (above > 4 ? above : Number(tools.dataset.below) + 10) + "px"; }
   const redraw = () => { const y = window.scrollY; plotPage(); window.scrollTo(0, y); };
   // stay looking at the same part of the garden: remember the scroll, and put it back after every redraw
   const wrap = view.querySelector(".plot-wrap");
@@ -1304,7 +1371,62 @@ function wireItemDrag(svg) {
         };
       };
     });
+    wireBedCorners(svg);
   }
+
+// Dragging a freeform bed's corners (in the bed's own turned frame), and adding new ones
+function wireBedCorners(svg) {
+  const it = selected && selected.type === "space" && planItems().find((i) => i.type === "space" && i.id === selected.id);
+  if (!it || shapeType(it.s) !== "free") return;
+  const P = outlinePts(it.s, it.w, it.h);
+  const g = svg.querySelector(`[data-item="space"][data-id="${it.id}"]`);
+  const pt = (ev) => { const q = svg.createSVGPoint(); q.x = ev.clientX; q.y = ev.clientY; return q.matrixTransform(svg.getScreenCTM().inverse()); };
+  const local = (ev) => { const q = pt(ev), { lx, ly } = localOf(it, q.x, q.y); return [lx + it.w / 2, ly + it.h / 2]; };
+  const show = (Q) => { const txt = Q.map(([x, y]) => `${it.x + x},${it.y + y}`).join(" "); g.querySelectorAll("polygon").forEach((pg) => pg.setAttribute("points", txt)); };
+  g.querySelectorAll("[data-bvtx]").forEach((c) => {
+    c.onpointerdown = (ev) => {
+      ev.preventDefault(); ev.stopPropagation(); c.setPointerCapture(ev.pointerId);
+      const k = Number(c.dataset.bvtx), start = local(ev), [x0, y0] = P[k];
+      let moved = false;
+      c.onpointermove = (mv) => {
+        const q = local(mv), nx = x0 + q[0] - start[0], ny = y0 + q[1] - start[1];
+        if (Math.abs(q[0] - start[0]) + Math.abs(q[1] - start[1]) > 0.05) moved = true;
+        c.setAttribute("cx", it.x + nx); c.setAttribute("cy", it.y + ny);
+        show(P.map((q2, n) => (n === k ? [nx, ny] : q2)));
+      };
+      c.onpointerup = (up) => {
+        c.onpointermove = c.onpointerup = null;
+        if (!moved) { bedVtx = bedVtx && bedVtx.id === it.id && bedVtx.k === k ? null : { id: it.id, k }; planWire.redraw(); return; }
+        const q = local(up);
+        P[k] = [x0 + q[0] - start[0], y0 + q[1] - start[1]]; bedVtx = null;
+        saveBedShape(it, P);
+      };
+    };
+  });
+  g.querySelectorAll("[data-bmid]").forEach((m) => {
+    m.onpointerdown = (ev) => { ev.preventDefault(); ev.stopPropagation(); };
+    m.onpointerup = (ev) => {
+      ev.stopPropagation();
+      if (P.length >= 40) { toast("That's plenty of corners!"); return; }
+      const k = Number(m.dataset.bmid), [x1, y1] = P[k], [x2, y2] = P[(k + 1) % P.length];
+      P.splice(k + 1, 0, [(x1 + x2) / 2, (y1 + y2) / 2]); bedVtx = null;
+      saveBedShape(it, P, "Corner added - drag it into place");
+    };
+  });
+}
+
+// Save a freeform bed's corners: its box grows or shrinks to fit them, so work out where the box now sits
+async function saveBedShape(it, P, message) {
+  const r2 = (v) => Math.round(v * 100) / 100;
+  const xs = P.map((q) => q[0]), ys = P.map((q) => q[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const w = Math.max(0.2, x1 - x0), h = Math.max(0.2, y1 - y0);
+  const dx = (x0 + x1) / 2 - it.w / 2, dy = (y0 + y1) / 2 - it.h / 2, t = rad(it.a || 0);  // the middle moves in the bed's own turned frame
+  const cx = it.x + it.w / 2 + dx * Math.cos(t) - dy * Math.sin(t), cy = it.y + it.h / 2 + dx * Math.sin(t) + dy * Math.cos(t);
+  const pos = plotPositions();  // pin the others first, so the auto-arranged ones don't shuffle round
+  await api("POST", "/api/spaces/positions", { positions: Object.entries(pos).map(([id, q]) => ({ id: Number(id), x: q.x, y: q.y })) });
+  return patchSpace(it.s, { width_m: r2(w), length_m: r2(h), shape: { type: "free", pts: P.map(([x, y]) => [r2(x - x0), r2(y - y0)]) },
+    pos_x: Math.max(0, r2(cx - w / 2)), pos_y: Math.max(0, r2(cy - h / 2)) }, message);
+}
 
 // Width/length boxes: the plan changes as you type, and saves itself a moment after you stop
 function wireSize(wEl, hEl, it) {
@@ -1394,6 +1516,20 @@ function wireEdit(svg, redraw) {
         if (!confirm(`Remove the ${it.f.name.toLowerCase()} from your plan?`)) return;
         selected = null; await change("DELETE", `/api/features/${it.id}`, null, "Removed");
       }
+    };
+    view.querySelectorAll("[data-bshape]").forEach((b) => (b.onclick = () => {
+      const k = b.dataset.bshape, cur = shapeType(it.s), r2 = (v) => Math.round(v * 100) / 100;
+      if (k === cur) return;
+      // to "any shape": start from the shape it is now (a round bed becomes 8 corners), then drag the dots
+      const shape = k === "free" ? { type: "free", pts: outlinePts(it.s, it.w, it.h).filter((_, n) => cur !== "circle" || n % 4 === 0).map(([x, y]) => [r2(x), r2(y)]) } : { type: k };
+      bedVtx = null;
+      patchSpace(it.s, { width_m: it.w, length_m: it.h, shape }, k === "free" ? "✏️ Now drag the red dots to make any shape" : `${b.title} bed`);
+    }));
+    const bvDel = $("#bv-del");
+    if (bvDel) bvDel.onclick = () => {
+      const P = outlinePts(it.s, it.w, it.h);
+      if (P.length <= 3) { toast("A bed needs at least 3 corners"); return; }
+      P.splice(bedVtx.k, 1); bedVtx = null; saveBedShape(it, P, "Corner removed");
     };
     view.querySelectorAll("[data-copy-bed]").forEach((b) => (b.onclick = async () => {
       const spot = copySpot(it, b.dataset.copyBed), items = planItems(), twin = { ...it, ...spot, id: -1 };
@@ -1647,17 +1783,24 @@ function usageBar(s) {
 // The details of a bed or pot: name, kind, size and soil - shared by "add" and the bed's own page
 function spaceForm(s) {
   const kind = s ? s.kind : "bed", soil = (s && s.soil) || (kind === "pot" ? "compost" : "unknown");
+  const shp = s && s.kind !== "pot" ? shapeType(s) : "rect", sunv = s && s.sun;
   return `<label class="field" for="sn">Name</label><input id="sn" type="text" maxlength="40" value="${esc(s ? s.name : "")}" placeholder="e.g. Back bed, Patio pots">
     <label class="field">What kind?</label>
     <div class="kinds">${Object.entries(SPACE_KINDS).map(([k, v]) => `<label class="kind ${kind === k ? "on" : ""}"><input type="radio" name="kind" value="${k}" ${kind === k ? "checked" : ""}><span class="e">${v.emoji}</span><b>${v.label}</b></label>`).join("")}</div>
-    <div id="size"><label class="field">How big is it? <span class="muted small">(so we can check what fits)</span></label>
+    <div id="size"><label class="field">What shape?</label>
+      <div class="kinds shapes">${SHAPES.map(([k, e, l]) => `<label class="kind ${shp === k ? "on" : ""}"><input type="radio" name="shape" value="${k}" ${shp === k ? "checked" : ""}><span class="e">${e}</span><b>${l}</b></label>`).join("")}</div>
+      <p class="small muted" style="margin:6px 0 0" id="shapehint"></p>
+      <label class="field">How big is it? <span class="muted small">(so we can check what fits)</span></label>
       <div class="size-row">
         <label class="big-num"><span>Width</span><input id="sw" type="number" step="0.1" min="0.1" inputmode="decimal" placeholder="1.2" value="${s && s.width_m ? s.width_m : ""}"><em>m</em></label>
         <span class="times">×</span>
         <label class="big-num"><span>Length</span><input id="sl" type="number" step="0.1" min="0.1" inputmode="decimal" placeholder="2.4" value="${s && s.length_m ? s.length_m : ""}"><em>m</em></label>
       </div>
       <p class="area" id="area"></p>
-      <p class="small muted" style="margin:4px 0 0">Measure with a tape measure in metres (100cm = 1m). A standard raised bed is 1.2 × 2.4 m. A half allotment plot is about 5 × 25 m.</p></div>
+      <p class="small muted" style="margin:4px 0 0">Measure with a tape measure in metres (100cm = 1m). A standard raised bed is 1.2 × 2.4 m. A half allotment plot is about 5 × 25 m. For any other shape, measure the widest bits.</p></div>
+    <label class="field">How sunny is it?</label>
+    <div class="kinds">${Object.entries(S.cat.sun_spots).map(([k, v]) => `<label class="kind ${sunv === k ? "on" : ""}"><input type="radio" name="sun" value="${k}" ${sunv === k ? "checked" : ""}><span class="e">${v.emoji}</span><b>${esc(v.name)}</b></label>`).join("")}</div>
+    <p class="small muted" style="margin:6px 0 0">Most veg want sun for 6 hours a day. Shady spots are great for flowers - see 🌸 Flower ideas in the bed.</p>
     <div id="builtq"><label class="field">Is it already built?</label>
     <div class="kinds two">${[[1, "✅", "Yes, it's ready"], [0, "🛠️", "Not yet - show me how"]].map(([v, e, t]) => `<label class="kind ${s && s.built === v ? "on" : ""}"><input type="radio" name="built" value="${v}" ${s && s.built === v ? "checked" : ""}><span class="e">${e}</span><b>${t}</b></label>`).join("")}</div></div>
     <label class="field">What's the soil like?</label>
@@ -1668,14 +1811,24 @@ function spaceForm(s) {
 function wireSpaceForm(s, afterSave) {
   const card = $("#sheet-card");
   const val = (n) => { const el = card.querySelector(`input[name=${n}]:checked`); return el && el.value; };
+  const shapeBody = () => {
+    const t = val("shape") || "rect";
+    if (t !== "free") return { type: t };
+    return s && shapeType(s) === "free" ? s.shape : { type: "free", pts: FREE_START };
+  };
   const refresh = () => {
     if (!$("#size")) return;  // the pop-up now shows something else
     card.querySelectorAll(".kind").forEach((el) => el.classList.toggle("on", el.querySelector("input").checked));
     card.querySelectorAll(".soilopt").forEach((el) => el.classList.toggle("on", el.querySelector("input").checked));
     $("#size").hidden = $("#builtq").hidden = val("kind") === "pot";
     card.querySelectorAll("#builtq .kind").forEach((el) => el.classList.toggle("on", el.querySelector("input").checked));
-    const w = Number($("#sw").value), l = Number($("#sl").value);
-    $("#area").innerHTML = w && l ? `= <b>${(w * l).toFixed(2).replace(/\.?0+$/, "")} m²</b> of growing space` : "";
+    const w = Number($("#sw").value), l = Number($("#sl").value), shape = shapeBody();
+    const area = !(w && l) ? 0 : shape.type === "circle" ? (Math.PI * w * l) / 4 : polyArea(outlinePts({ kind: "bed", shape }, w, l));
+    $("#area").innerHTML = area ? `= <b>${area.toFixed(2).replace(/\.?0+$/, "")} m²</b> of growing space` : "";
+    $("#shapehint").textContent = { rect: "", circle: "Round or oval - measure across both ways.", triangle: "A triangle with its point at the back.",
+      corner: "A triangle that fits into a corner, like the corner of a fence.",
+      free: s && shapeType(s) === "free" ? "Change its shape on the plan: ✏️ Edit plan, tap the bed, then drag the red dots."
+        : "After saving, go to ✏️ Edit plan, tap the bed and drag the red dots to make any shape." }[shape ? shape.type : "rect"];
     const t = S.cat.soil_types[val("soil") || "unknown"];
     $("#soiltip").innerHTML = `<div><b>${t.emoji} How to tell:</b> ${esc(t.test)}</div><div><b>🌱 What to do:</b> ${esc(t.tips)}</div>`;
   };
@@ -1684,7 +1837,8 @@ function wireSpaceForm(s, afterSave) {
   $("#save").onclick = async () => {
     const b = val("built");
     const body = { name: $("#sn").value || "My bed", kind: val("kind"), soil: val("soil"), built: b == null ? null : b === "1",
-                   width_m: Number($("#sw").value) || null, length_m: Number($("#sl").value) || null };
+                   width_m: Number($("#sw").value) || null, length_m: Number($("#sl").value) || null,
+                   shape: shapeBody(), sun: val("sun") || null };
     if (await change(s ? "PATCH" : "POST", s ? `/api/spaces/${s.id}` : "/api/spaces", body, s ? "Saved ✅" : "Added ✅") && afterSave) afterSave();
   };
 }
@@ -1707,6 +1861,16 @@ function drawSpace(id) {
   const steps = pot ? S.cat.pot_steps : S.cat.nodig_steps;
   const done = new Set(s.nodig_done);
   const here = activeCrops().filter((c) => c.space_id === s.id);
+  const inGroup = (g) => here.filter((c) => plant(c.plant_id).group === g);
+  const veg = inGroup("veg"), comps = inGroup("companion"), flowers = inGroup("flower");
+  // companions that would help the veg in this bed, and aren't here yet
+  const helpers = {};
+  veg.forEach((c) => companionsFor(plant(c.plant_id)).forEach((x) => {
+    if (comps.some((k) => k.plant_id === x.plant_id)) return;
+    const list = (helpers[x.plant_id] = helpers[x.plant_id] || []);
+    if (!list.includes(plant(c.plant_id))) list.push(plant(c.plant_id));
+  }));
+  const helpList = Object.entries(helpers).sort((a, b) => b[1].length - a[1].length).slice(0, 4);
   const stepList = (ticks) => `<div class="card">${steps.map((st, i) => `<div class="nodig-step"><span class="e">${st.emoji}</span><div style="flex:1"><b>${i + 1}. ${esc(st.title)}</b><div class="small">${esc(st.text)}</div></div>
       ${ticks ? `<button class="tick ${done.has(i) ? "done" : ""}" data-tick="s${s.id}:nodig${i}" ${done.has(i) ? 'data-undo="1"' : ""} aria-label="Done">${done.has(i) ? "✓" : ""}</button>` : ""}</div>`).join("")}</div>`;
   const tips = `<details class="card" data-key="tips-${s.id}"><summary><b>🌱 Planting into a no-dig bed - tips</b></summary><ol class="steps">${S.cat.nodig_planting.map((t) => `<li>${esc(t)}</li>`).join("")}</ol></details>`;
@@ -1720,10 +1884,18 @@ function drawSpace(id) {
       <div class="row" style="margin-top:8px"><button class="btn small primary" data-setbuilt="${s.id}" data-v="1">✅ Yes, it's ready</button><button class="btn small" data-setbuilt="${s.id}" data-v="0">🛠️ Not yet - show me how</button></div></div>`;
   openSheet(`<div class="plant-head"><span class="e">${SPACE_KINDS[s.kind].emoji}</span><div><h2 style="margin:0">${esc(s.name)}</h2>
       <div class="muted">${pot ? "Growing in pots" : s.built === 1 ? "Built and ready to plant ✅" : s.built === 0 ? "Let's build it" : "Your bed"}</div></div></div>
-    <div class="card"><h3>🌱 Growing here</h3>${here.map(inBedRow).join("") || `<p class="small muted" style="margin:0">Nothing yet.</p>`}
+    <div class="card"><h3>🌱 Growing here</h3>${veg.map(inBedRow).join("") || (here.length ? "" : `<p class="small muted" style="margin:0">Nothing yet.</p>`)}
+      ${comps.length ? `<h3 style="margin-top:14px">🐞 Companion plants</h3>${comps.map(inBedRow).join("")}` : ""}
+      ${flowers.length ? `<h3 style="margin-top:14px">🌸 Flowers</h3>${flowers.map(inBedRow).join("")}` : ""}
       <div class="row" style="margin-top:10px"><a class="btn small" href="#/plants" data-close>➕ Add plants</a><button class="btn small" data-layout="all">🧩 Suggest a layout</button>
       ${here.length ? `<button class="btn small ghost" data-empty="${s.id}">📤 Take everything out</button>` : ""}</div>
       ${here.length ? `<p class="small muted" style="margin:8px 0 0">✕ takes a plant out of this bed - it stays in your plan under "Not placed yet".</p>` : ""}</div>
+    ${helpList.length ? `<div class="card tint-leaf"><h3>🐞 Keep pests off</h3><p class="small" style="margin:0 0 8px">Flowers to grow among what's in this bed:</p>
+      <div class="nbs">${helpList.map(([id2, veg2]) => { const q = plant(id2); return `<div class="nb comp"><span class="e">${q.emoji}</span><span style="flex:1"><b>${esc(q.name)}</b>
+        <small>Helps your ${veg2.map((v) => esc(v.name.toLowerCase())).join(", ")}</small></span>
+        <button class="btn small" data-addcomp="${id2}" data-space="${s.id}">➕ Add</button></div>`; }).join("")}</div></div>` : ""}
+    <div class="card tint-plum row" style="justify-content:space-between"><div><b>🌸 Flower ideas</b><div class="small">Flowers that go together, laid out for this ${pot ? "pot" : "bed's shape"}${s.sun ? ` (${S.cat.sun_spots[s.sun].emoji} ${S.cat.sun_spots[s.sun].name.toLowerCase()})` : ""}</div></div>
+      <button class="btn small" data-flowers="${s.id}">Show me 👉</button></div>
     <details class="card" data-key="about-${s.id}" ${s.width_m || s.built !== null ? "" : "open"}><summary><b>✏️ About this ${pot ? "space" : "bed"}</b> <span class="small muted">name, size, soil${pot ? "" : ", built?"}</span></summary>${spaceForm(s)}
       <div class="row" style="margin-top:14px"><button class="btn primary" id="save">Save</button><button class="btn danger small" id="del">🗑️ Delete</button></div></details>
     ${build}`);
@@ -1786,7 +1958,7 @@ function drawCrop(id) {
   const near = new Set(activeCrops().filter((x) => x.space_id && x.space_id === c.space_id && x.id !== c.id).map((x) => x.plant_id));
   const row = rowLabel(c);
   openSheet(`<div class="plant-head"><span class="blob l${p.level}">${p.emoji}</span><div><h2 style="margin:0">${esc(p.name)}${row ? ` <span class="chip grey" style="vertical-align:middle">${row}</span>` : ""}</h2>
-      <div class="stage" style="font-size:20px;margin-top:4px">${STAGES.map((e, i) => `<span class="${i <= c.stage ? "on" : ""}">${e}</span>`).join("")}</div></div></div>
+      <div class="stage" style="font-size:20px;margin-top:4px">${stagesFor(plant(c.plant_id)).map((e, i) => `<span class="${i <= c.stage ? "on" : ""}">${e}</span>`).join("")}</div></div></div>
     <div class="seg sticky-tabs" role="tablist">
       <button role="tab" data-pane="jobs" class="on">📋 Jobs</button><button role="tab" data-pane="details">⚙️ Details</button><button role="tab" data-pane="next">🔁 What next</button></div>
     <div data-panel="jobs">
@@ -1839,28 +2011,35 @@ function drawCrop(id) {
 
 // ---- plants ----------------------------------------------------------------------------------------
 
-let plantFilter = "all", plantSearch = "";
+let plantFilter = "all", plantSearch = "", plantGroup = "veg";
 function plantsPage() {
   const have = new Set(activeCrops().map((c) => c.plant_id));
   const q = plantSearch.toLowerCase();
-  const list = filteredPlants(plantFilter).filter((p) => !q || p.name.toLowerCase().includes(q));
-  view.innerHTML = `<h1>🥕 What would you like to grow?</h1>
-    <p class="muted">Pick things you love to eat. Start with green ones if you're new.</p>
-    ${plantFilter === "all" && !plantSearch ? plantNowStrip() : ""}
-    <input type="text" id="q" placeholder="🔍 Search, e.g. tomatoes" value="${esc(plantSearch)}" style="margin-bottom:10px">
-    ${filterBar(plantFilter)}
+  const list = filteredPlants(plantFilter, plantGroup).filter((p) => !q || p.name.toLowerCase().includes(q));
+  const head = {
+    veg: `<h1>🥕 What would you like to grow?</h1><p class="muted">Pick things you love to eat. Start with green ones if you're new.</p>`,
+    companion: `<h1>🐞 Companion plants</h1><p class="muted">Flowers to grow in among your veg. They bring in bees to pollinate, and bugs that eat greenfly - or lure pests away from your crops.</p>`,
+    flower: `<h1>🌸 Flower garden</h1><p class="muted">Just for colour, smell and bees. Choose by how sunny your spot is. For a whole bed of flowers that go together, open a bed and tap 🌸 Flower ideas.</p>`,
+  }[plantGroup];
+  view.innerHTML = `<div class="seg" role="tablist" style="margin-bottom:12px">${Object.entries(GROUPS).map(([k, g]) => `<button data-pgroup="${k}" class="${plantGroup === k ? "on" : ""}">${g.emoji} ${g.name}</button>`).join("")}</div>
+    ${head}
+    ${plantGroup === "veg" && plantFilter === "all" && !plantSearch ? plantNowStrip() : ""}
+    <input type="text" id="q" placeholder="🔍 Search, e.g. ${plantGroup === "veg" ? "tomatoes" : plantGroup === "flower" ? "sunflowers" : "marigolds"}" value="${esc(plantSearch)}" style="margin-bottom:10px">
+    ${plantGroup === "companion" ? "" : filterBar(plantFilter, plantGroup)}
     <div class="grid">${list.map((p) => tile(p, false, have.has(p.id))).join("") || `<p class="muted">Nothing matches.</p>`}</div>`;
   $("#q").oninput = (e) => { plantSearch = e.target.value; const pos = e.target.selectionStart; plantsPage(); const q2 = $("#q"); q2.focus(); q2.setSelectionRange(pos, pos); };
   view.onclick = (e) => {
     const f = e.target.closest("[data-filter]");
     if (f) { plantFilter = f.dataset.filter; plantsPage(); return; }
+    const g = e.target.closest("[data-pgroup]");
+    if (g) { plantGroup = g.dataset.pgroup; plantFilter = "all"; plantSearch = ""; plantsPage(); return; }
     const t = e.target.closest(".tile[data-plant]");
     if (t) openPlant(t.dataset.plant);
   };
 }
 
 function monthChart(p) {
-  const rows = [["sow_in", "🏠 Indoors"], ["sow_out", "🌱 Sow"], ["plant_out", "🌿 Plant"], ["harvest", "🧺 Pick"]].filter(([k]) => p.months[k].length);
+  const rows = [["sow_in", "🏠 Indoors"], ["sow_out", "🌱 Sow"], ["plant_out", "🌿 Plant"], ["harvest", isFlower(p) ? "🌸 Flowers" : "🧺 Pick"]].filter(([k]) => p.months[k].length);
   const nowM = today().getMonth() + 1;
   return `<div class="months"><span></span>${MONTHS.map((m, i) => `<span class="m ${i + 1 === nowM ? "now" : ""}">${m[0]}</span>`).join("")}
     ${rows.map(([k, l]) => `<span class="lab">${l}</span>${MONTHS.map((_, i) => `<span class="cell ${p.months[k].includes(i + 1) ? k : ""}"></span>`).join("")}`).join("")}</div>`;
@@ -1987,16 +2166,21 @@ function openPlant(id, spaceId, startMethod, after) {
   openSheet(`<div class="plant-head"><span class="blob l${p.level}">${p.emoji}</span><div><h2 style="margin:0">${esc(p.name)}</h2>
       <div class="chips" style="margin-top:6px"><span class="chip l${p.level}">${lv.emoji} ${esc(lv.name)}</span>
       ${p.where.includes("pot") ? `<span class="chip sky">🪴 Pots OK</span>` : `<span class="chip grey">🟫 Beds only</span>`}
-      ${p.tender ? `<span class="chip grey">❄️ Hates frost</span>` : ""}${p.perennial ? `<span class="chip grey">♻️ Comes back every year</span>` : ""}</div></div></div>
+      ${p.tender ? `<span class="chip grey">❄️ Hates frost</span>` : ""}${p.perennial ? `<span class="chip grey">♻️ Comes back every year</span>` : ""}
+      ${p.sun ? `<span class="chip grey">${p.sun.map((x) => SUN_EMOJI[x]).join("")} ${p.sun.includes("sun") ? (p.sun.length > 1 ? "Sun or part shade" : "Needs sun") : "Happy in shade"}</span><span class="chip grey">📏 ${p.height_cm}cm tall</span>` : ""}
+      ${p.group !== "veg" ? `<span class="chip sky">${GROUPS[p.group].emoji} ${p.group === "flower" ? "Flower" : "Companion plant"}</span>` : ""}</div></div></div>
     <p><b>${esc(p.blurb)}</b></p>
     <div class="seg sticky-tabs" role="tablist">
-      <button role="tab" data-pane="grow" class="on">🌱 Grow it</button><button role="tab" data-pane="how">📖 How to</button><button role="tab" data-pane="pick">🧺 Pick & keep</button></div>
+      <button role="tab" data-pane="grow" class="on">🌱 Grow it</button><button role="tab" data-pane="how">📖 How to</button>
+      ${p.group === "veg" && companionsFor(p).length ? `<button role="tab" data-pane="comp">🐞 Companions</button>` : ""}
+      ${p.group === "companion" ? `<button role="tab" data-pane="helps">🥕 Helps</button>` : ""}
+      <button role="tab" data-pane="pick">${isFlower(p) ? "🌸 Flowers" : "🧺 Pick & keep"}</button></div>
     <div data-panel="grow">
     ${after ? `<div class="card tint-sun"><b>🔁 Following on from another crop</b><p class="small" style="margin:4px 0 0">${method === "sow_in"
       ? `Give it a head start: sow it indoors (windowsill or greenhouse) a few weeks early, so it's ready to plant out the day the bed is free - <b>${fmt(after)}</b>. No gap, no empty bed!`
       : `We'll plan this to go in once the bed is free, from <b>${fmt(after)}</b>.`}</p></div>` : ""}
     <div class="card"><h3>📅 When</h3>${monthChart(p)}
-      <div class="legend">${p.months.sow_in.length ? `<span><i style="background:var(--sky)"></i>Sow indoors</span>` : ""}${p.months.sow_out.length ? `<span><i style="background:var(--leaf)"></i>Sow / plant outside</span>` : ""}${p.months.plant_out.length ? `<span><i style="background:var(--soil)"></i>Plant out</span>` : ""}<span><i style="background:var(--marigold)"></i>Pick</span></div>
+      <div class="legend">${p.months.sow_in.length ? `<span><i style="background:var(--sky)"></i>Sow indoors</span>` : ""}${p.months.sow_out.length ? `<span><i style="background:var(--leaf)"></i>Sow / plant outside</span>` : ""}${p.months.plant_out.length ? `<span><i style="background:var(--soil)"></i>Plant out</span>` : ""}<span><i style="background:var(--marigold)"></i>${isFlower(p) ? "Flowers" : "Pick"}</span></div>
       <p class="small muted" style="margin:8px 0 0">Dates for ${esc(S.me.region.name)}. Ready about ${p.weeks} weeks after ${p.methods.includes("plants") && p.methods.length === 1 ? "planting" : "sowing"}.</p></div>
     <div class="card" id="addcard"><h3>🌱 Add to my garden</h3>
       ${already.length ? `<p class="small muted">You're already growing ${already.length === 1 ? "this" : already.length + " lots of these"}. Add another?</p>` : ""}
@@ -2020,11 +2204,14 @@ function openPlant(id, spaceId, startMethod, after) {
     ${neighboursCard(p)}
     ${pestsCard(p)}
     </div>
+    ${p.group === "veg" ? `<div data-panel="comp" hidden>${companionPanel(p, spaceId)}</div>` : ""}
+    ${p.group === "companion" ? `<div data-panel="helps" hidden><div class="card tint-leaf"><h3>🥕 Grow it next to</h3>
+      <div class="nbs">${helpsWhat(p).map((x) => { const q = plant(x.plant_id); return `<button class="nb" data-open-plant="${q.id}"><span class="e">${q.emoji}</span><span><b>${esc(q.name)}</b><small>${esc(x.why)}</small></span></button>`; }).join("")}</div></div></div>` : ""}
     <div data-panel="pick" hidden>
-    <div class="card tint-leaf"><h3>🧺 Picking</h3><p style="margin:0">${esc(p.harvest_tip)}</p></div>
-    <div class="card tint-tomato"><h3>😋 Eat it!</h3><p style="margin:0">${esc(p.eat)}</p></div>
-    ${storeCard(p)}
-    ${after ? "" : thenCard(p.then && dict(p.then, { family: p.family_name }), "After picking, grow next", spaceId)}
+    <div class="card tint-leaf"><h3>${isFlower(p) ? "🌸 Flowers" : "🧺 Picking"}</h3><p style="margin:0">${esc(p.harvest_tip)}</p></div>
+    ${p.eat ? `<div class="card tint-tomato"><h3>😋 Eat it!</h3><p style="margin:0">${esc(p.eat)}</p></div>` : ""}
+    ${p.store ? storeCard(p) : ""}
+    ${after || !p.then ? "" : thenCard(dict(p.then, { family: p.family_name }), "After picking, grow next", spaceId)}
     </div>`);
   wirePanes();
 
@@ -2077,6 +2264,94 @@ function openPlant(id, spaceId, startMethod, after) {
     if (await change("POST", "/api/crops", { plant_id: p.id, method, quantity: qty, after: after || null, space_id: sp && sp.value ? Number(sp.value) : null,
       batches: many ? batches : 1, every_weeks: every }, many ? `${batches} rows of ${p.name.toLowerCase()} planned 🌱` : `${p.name} added to your plan! 🌱`)) closeSheet();
   };
+}
+
+// "Grow these next to it": companion plants for a veg, with one-tap adding to the beds it's in
+function companionPanel(p, spaceId) {
+  const list = companionsFor(p), name = p.name.toLowerCase();
+  const ids = new Set(activeCrops().filter((c) => c.plant_id === p.id && c.space_id).map((c) => c.space_id));
+  if (spaceId) ids.add(spaceId);
+  const beds = [...ids].map(space).filter(Boolean);
+  const has = (b, q) => activeCrops().some((c) => c.space_id === b.id && c.plant_id === q.id);
+  return `<div class="card tint-leaf"><h3>🐞 Companion plants</h3>
+    <p class="small" style="margin:0 0 10px">Grow these in the same bed to help keep pests off your ${esc(name)}. They're listed separately in the bed, so your veg list stays tidy.</p>
+    <div class="nbs">${list.map((x) => { const q = plant(x.plant_id); return `<div class="nb comp"><span class="e">${q.emoji}</span><span style="flex:1"><b>${esc(q.name)}</b><small>${esc(x.why)}</small>
+      <span class="row" style="margin-top:6px;gap:6px">${beds.map((b) => has(b, q) ? `<span class="chip grey">✅ In ${esc(b.name)}</span>`
+        : `<button class="btn small" data-addcomp="${q.id}" data-space="${b.id}">➕ Add to ${esc(b.name)}</button>`).join("")}
+      <button class="btn small ghost" data-open-plant="${q.id}">More</button></span></span></div>`; }).join("")}</div>
+    ${beds.length ? "" : `<p class="small muted" style="margin:10px 0 0">Once your ${esc(name)} are in a bed, you can add these next to them in one tap.</p>`}</div>`;
+}
+
+// The flower garden: flowers that go together, laid out to suit the bed's shape and sun
+async function openFlowerPlan(id, sun) {
+  const s = space(id);
+  sun = sun || s.sun || "sun";
+  let plan;
+  try { plan = await api("GET", `/api/spaces/${id}/flowers?sun=${sun}`); } catch (e) { toast(e.message); return; }
+  S.sheet = null;
+  openSheet(`<h2>🌸 Flower ideas for ${esc(s.name)}</h2>
+    <label class="field">How sunny is it?</label>
+    <div class="chips">${Object.entries(S.cat.sun_spots).map(([k, v]) => `<button class="btn small ${k === sun ? "primary" : ""}" data-fsun="${k}">${v.emoji} ${esc(v.name)}</button>`).join("")}</div>
+    <p class="small muted" style="margin:6px 0 10px">${esc(S.cat.sun_spots[sun].text)}</p>
+    <div class="card tint-sky small" style="margin-bottom:12px">📐 ${esc(plan.tip)}</div>
+    ${plan.combos.map((c) => `<div class="card combo"><h3>${c.emoji} ${esc(c.name)}</h3><p class="small" style="margin:0 0 8px">${esc(c.why)}</p>
+      ${flowerDiagram(s, plan, c)}
+      ${c.zones.map((z) => `<div class="zone"><b class="small">${esc(z.label)}</b><div class="chips">${z.plants.map((x) => { const q = plant(x.plant_id);
+        return `<button class="btn small ghost" data-open-plant="${q.id}" data-space="${s.id}">${q.emoji} ${x.qty} × ${esc(q.name)}${x.sunny_end ? " ☀️" : ""}</button>`; }).join("")}</div></div>`).join("")}
+      <button class="btn primary small" data-addcombo="${c.id}" style="margin-top:10px">➕ Add these to ${esc(s.name)}</button></div>`).join("")
+      || `<p class="muted">No ideas for this spot yet.</p>`}
+    <p class="small muted">Numbers are worked out to fill the ${s.kind === "pot" ? "pot" : "bed"}${s.width_m || s.kind === "pot" ? "" : " (a standard 1.2 × 2.4 m bed - add its size for a better guess)"}. ☀️ = put it at the sunniest end.</p>`);
+  const card = $("#sheet-card");
+  card.querySelectorAll("[data-fsun]").forEach((b) => (b.onclick = async () => {
+    if (b.dataset.fsun !== s.sun) await patchSpace(s, { sun: b.dataset.fsun });
+    openFlowerPlan(id, b.dataset.fsun);
+  }));
+  card.querySelectorAll("[data-addcombo]").forEach((b) => (b.onclick = async () => {
+    const c = plan.combos.find((x) => x.id === b.dataset.addcombo);
+    const crops = c.zones.flatMap((z) => z.plants.map((x) => ({ plant_id: x.plant_id, quantity: x.qty })));
+    if (await change("POST", "/api/crops/bulk", { crops, space_id: id }, `${c.emoji} ${c.name} added to ${s.name} - the dates are on your calendar 📅`)) openSpace(id);
+  }));
+}
+
+// A little picture of the bed with the flowers laid out: bands from back to front, or rings round the middle
+function flowerDiagram(s, plan, combo) {
+  const sz = spaceSize(s), w = sz.w, h = sz.h, pad = Math.max(w, h) * 0.04, fs = Math.min(w, h) * 0.13;
+  const clip = `fd${s.id}${combo.id}`, zs = combo.zones, n = zs.length, tones = ["fd-z0", "fd-z1", "fd-z2"];
+  const round = ["pot", "circle", "free"].includes(plan.shape);
+  const emojis = (z) => z.plants.map((x) => plant(x.plant_id).emoji);
+  let bands = "", marks = "";
+  const mark = (x, y, e) => { marks += `<text x="${x}" y="${y + fs * 0.35}" font-size="${fs}" text-anchor="middle">${e}</text>`; };
+  if (round) {
+    // rings: the outside zone is the whole shape, the inner ones smaller copies of it round the middle
+    const P = outlinePts(s, w, h), cx = P.reduce((a, q) => a + q[0], 0) / P.length, cy = P.reduce((a, q) => a + q[1], 0) / P.length;
+    const scale = n === 1 ? [1] : n === 2 ? [0.55, 1] : [0.4, 0.72, 1];
+    for (let k = n - 1; k >= 0; k--) bands += `<polygon points="${P.map(([x, y]) => `${cx + (x - cx) * scale[k]},${cy + (y - cy) * scale[k]}`).join(" ")}" class="${tones[k]}"/>`;
+    zs.forEach((z, k) => {
+      const em = emojis(z), r = n > 1 && k === 0 ? scale[0] * 0.5 : ((k ? scale[k - 1] : 0) + scale[k]) / 2, m = n > 1 && k === 0 ? em.length : Math.max(em.length * 3, 6);
+      if (m === 1) { mark(cx, cy, em[0]); return; }
+      for (let i = 0; i < m; i++) { const q = P[Math.floor((i / m) * P.length)]; mark(cx + (q[0] - cx) * r, cy + (q[1] - cy) * r, em[i % em.length]); }
+    });
+  } else {
+    // bands from the back (top of the picture) to the front; a corner bed fans out from its corner
+    const corner = plan.shape === "corner";
+    zs.forEach((z, k) => {
+      const a = k / n, b = (k + 1) / n, mid = (a + b) / 2, em = emojis(z);
+      bands += corner ? `<polygon points="${a * w},0 ${b * w},0 0,${b * h} 0,${a * h}" class="${tones[k]}"/>`
+        : `<rect x="0" y="${a * h}" width="${w}" height="${(b - a) * h}" class="${tones[k]}"/>`;
+      const span = corner ? mid * Math.hypot(w, h) : plan.shape === "triangle" ? mid * w : w, m = Math.max(em.length, Math.round(span / (fs * 1.5)));
+      for (let i = 0; i < m; i++) {
+        const t = (i + 0.5) / m;
+        if (corner) mark(mid * w * (1 - t), mid * h * t, em[i % em.length]);
+        else if (plan.shape === "triangle") { const y = mid * h, half = (y / h) * (w / 2); mark(w / 2 - half + t * 2 * half, y, em[i % em.length]); }
+        else mark(t * w, mid * h, em[i % em.length]);
+      }
+    });
+  }
+  return `<svg class="fdiagram" viewBox="${-pad} ${-pad - fs * 0.8} ${w + 2 * pad} ${h + 2 * pad + fs * 1.6}" role="img" aria-label="Where each flower goes">
+    <defs><clipPath id="${clip}">${shapeSvg(s, 0, 0, w, h, "")}</clipPath></defs>${shapeSvg(s, 0, 0, w, h, 'class="fd-bed"')}
+    <g clip-path="url(#${clip})">${bands}${marks}</g>
+    ${round ? "" : `<text x="${plan.shape === "corner" ? 0 : w / 2}" y="${-fs * 0.3}" font-size="${fs * 0.55}" text-anchor="${plan.shape === "corner" ? "start" : "middle"}" class="fd-lab">${plan.shape === "corner" ? "↖ the corner (back)" : "back ↑"}</text>
+    <text x="${w / 2}" y="${h + fs * 0.75}" font-size="${fs * 0.55}" text-anchor="middle" class="fd-lab">front - where you stand</text>`}</svg>`;
 }
 
 // Tabs inside a pop-up: show one panel at a time, so there's less to scroll through

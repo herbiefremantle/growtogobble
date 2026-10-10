@@ -7,6 +7,8 @@ A crop is anchored on the sowing/planting window the user is aiming for (crops.a
 the crop is added). Later jobs are worked out from what has actually happened (sown_on, planted_on) where we
 know it, and from the plan where we don't - so if the carrots go in late, the harvest date moves with them.
 """
+import json
+import math
 from datetime import date, timedelta
 
 from . import plants as catalogue
@@ -185,9 +187,10 @@ def crop_jobs(crop, shift, done_keys, today):
     win = next_window(plant["harvest"], base, shift) or (base, base + 6 * WEEK)
     h_start = max(base, win[0])
     h_end = win[1] if win[1] >= h_start else h_start + 6 * WEEK
-    add("harvest", "harvest", "🧺", "Pick your %s!" % name.lower(), h_start, h_end,
-        steps=[plant["harvest_tip"]], action="harvest", done=bool(harvested), waiting=not in_ground)
-    if harvested:
+    flower = plant.get("group") != "veg" and not plant.get("eat")  # flowers you look at, not eat
+    add("harvest", "harvest", "🌸" if flower else "🧺", ("Your %s are flowering!" if flower else "Pick your %s!") % name.lower(),
+        h_start, h_end, steps=[plant["harvest_tip"]], action="harvest", done=bool(harvested), waiting=not in_ground)
+    if harvested and plant.get("eat"):
         add("eat", "eat", "😋", "Taste your %s" % name.lower(), harvested, max(h_end, harvested + WEEK),
             steps=[plant["eat"]])
         # keeping the harvest: drying first for the ones that need it, then storing or freezing the extras
@@ -195,8 +198,9 @@ def crop_jobs(crop, shift, done_keys, today):
             weeks, title, steps = catalogue.CURE[plant["id"]]
             add("cure", "store", "🌬️", title, harvested, harvested + (weeks + 1) * WEEK, steps=steps)
         store = plant["store"]
-        add("store", "store", "🫙", "Got extra %s? Keep or freeze them" % name.lower(), harvested, max(h_end, harvested + 2 * WEEK),
-            steps=store["how"] + ["❄️ " + store["freeze"], "⏳ Keeps for " + store["keeps"]])
+        if store:
+            add("store", "store", "🫙", "Got extra %s? Keep or freeze them" % name.lower(), harvested, max(h_end, harvested + 2 * WEEK),
+                steps=store["how"] + ["❄️ " + store["freeze"], "⏳ Keeps for " + store["keeps"]])
 
     # 4. another batch, for a steady supply
     if plant.get("succession") and method != "plants" and sown:
@@ -274,12 +278,87 @@ def quantity(crop):
     return crop.get("quantity") or default_quantity(catalogue.BY_ID[crop["plant_id"]])
 
 
+def shape_of(space):
+    """A bed's shape as a dict, or None for a plain rectangle. Stored as JSON text."""
+    shape = space.get("shape")
+    if isinstance(shape, str):
+        try:
+            shape = json.loads(shape)
+        except ValueError:
+            shape = None
+    return shape if isinstance(shape, dict) else None
+
+
+def polygon_area(pts):
+    return abs(sum(x1 * y2 - x2 * y1 for (x1, y1), (x2, y2) in zip(pts, pts[1:] + pts[:1]))) / 2
+
+
 def space_area(space):
     if space["kind"] == "pot":
         return None
     if space.get("width_m") and space.get("length_m"):
-        return round(space["width_m"] * space["length_m"], 2)
+        w, h, shape = space["width_m"], space["length_m"], shape_of(space)
+        kind = shape and shape.get("type")
+        if kind == "circle":
+            return round(math.pi * w * h / 4, 2)
+        if kind in ("triangle", "corner"):
+            return round(w * h / 2, 2)
+        if kind == "free" and len(shape.get("pts") or []) >= 3:
+            # the corners stretch with the bed's box, so resizing it resizes the shape
+            pts = shape["pts"]
+            sx, sy = max(p[0] for p in pts) or 1, max(p[1] for p in pts) or 1
+            return round(polygon_area([[x * w / sx, y * h / sy] for x, y in pts]), 2)
+        return round(w * h, 2)
     return DEFAULT_AREA[space["kind"]]
+
+
+# ---- the flower garden: plants that go together, laid out to suit the bed --------------------------------
+
+def _tier(plant):
+    h = plant.get("height_cm") or 50
+    return 0 if h >= 80 else 1 if h >= 35 else 2  # tall, middle, short
+
+
+def flower_plan(space, sun):
+    """Groups of flowers that suit this spot, each laid out by height to suit the bed's shape: tall at the back of
+    a border (or the middle of an island bed you walk round), short at the front or edge. How many of each fills it."""
+    sun = sun if sun in catalogue.SUN_SPOTS else "sun"
+    shape = shape_of(space)
+    kind = "pot" if space["kind"] == "pot" else (shape or {}).get("type", "rect")
+    island = kind in ("circle", "free")
+    zones = (("pot", "In the pot", 1.0),) if kind == "pot" else (
+        (("centre", "In the middle", 0.25), ("ring", "Around them", 0.45), ("edge", "Round the edge", 0.3)) if island else
+        (("back", "At the back", 0.35), ("middle", "In the middle", 0.35), ("front", "At the front", 0.3)))
+    area = space_area(space) or 0.3
+    need = {"sun": "sun", "shade": "shade", "mixed": None}[sun]
+    combos = []
+    for combo in catalogue.COMBOS:
+        if sun not in combo["sun"]:
+            continue
+        plants = [catalogue.BY_ID[p] for p in combo["plants"] if not need or need in catalogue.BY_ID[p]["sun"]]
+        if kind == "pot":
+            plants = [p for p in plants if "pot" in p["where"]][:3]
+        if len(plants) < 2:
+            continue
+        groups = [[p for p in plants if _tier(p) == t] for t in range(3)] if kind != "pot" else [plants]
+        present = [(z, g) for z, g in zip(zones, groups) if g]
+        total = sum(z[2] for z, _ in present)
+        laid = []
+        for (zid, label, frac), group in present:
+            share = area * frac / total / len(group)
+            laid.append({"zone": zid, "label": label, "plants": [
+                {"plant_id": p["id"], "qty": max(1, min(50, int(round(share / area_each(p))))),
+                 "sunny_end": sun == "mixed" and "part" not in p["sun"] and "shade" not in p["sun"]} for p in group]})
+        combos.append({"id": combo["id"], "name": combo["name"], "emoji": combo["emoji"], "why": combo["why"], "zones": laid})
+    tips = {"pot": "Tallest in the middle, and trailing or short ones round the edge to spill over.",
+            "island": "You can walk all the way round, so the tall ones go in the middle and the short ones round the edge.",
+            "border": "Tall at the back (against a fence or wall, or the north side), short at the front - so nothing hides."}
+    tip = tips["pot" if kind == "pot" else "island" if island else "border"]
+    if kind in ("triangle", "corner"):
+        tip += " In a corner bed, the tallest go in the pointy corner."
+    if sun == "mixed":
+        tip += " Put the ☀️ sun-lovers at the sunniest end."
+    return {"sun": sun, "shape": kind, "area": area, "tip": tip, "combos": combos}
 
 
 def harvest_estimate(plant, qty):
@@ -406,7 +485,7 @@ def follow_ons(free_from, kind, liked, shift, not_families=(), limit=6, today=No
     plant within 3 weeks. Skips perennials (they'd move in for good) and the families that were just there."""
     picks = []
     for plant in catalogue.PLANTS:
-        if kind not in plant["where"] or plant.get("perennial") or plant["family"] in not_families:
+        if kind not in plant["where"] or plant.get("perennial") or plant["family"] in not_families or plant["group"] != "veg":
             continue
         if head_start_ok(plant, free_from, today):
             sow = next_window(plant["sow_in"], free_from - plant.get("grow_on", 5) * WEEK - 14 * DAY, shift)
