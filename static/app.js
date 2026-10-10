@@ -702,7 +702,39 @@ function localOf(A, px, py) {
   const t = rad(A.a || 0), cx = A.x + A.w / 2, cy = A.y + A.h / 2, dx = px - cx, dy = py - cy;
   return { lx: dx * Math.cos(t) + dy * Math.sin(t), ly: -dx * Math.sin(t) + dy * Math.cos(t) };
 }
-let boundaryEdit = false, bSel = null;  // editing the garden's outline: which corner or side is picked
+let boundaryEdit = false, bSel = null;
+// The satellite view under the plan. Where the plan sits on the map is remembered ON THIS DEVICE ONLY
+// (localStorage) - it's never sent to the server. {lat0, lng0, ox, oy}: the first tap of the trace, and how far
+// the plan's own corner is from it in metres.
+const satKey = () => "gtg-sat-" + (S.me && S.me.id);
+function satAnchor() { try { return JSON.parse(localStorage.getItem(satKey()) || "null"); } catch (e) { return null; } }
+function setSatAnchor(a) { try { if (a) localStorage.setItem(satKey(), JSON.stringify(a)); else localStorage.removeItem(satKey()); } catch (e) { /* private mode */ } }
+let showSat = false;
+try { showSat = localStorage.getItem("gtg-satview") === "1"; } catch (e) { /* private mode */ }
+
+// Live satellite tiles laid under the plan, lined up with the traced outline (the tiles are shown, not stored)
+function satTiles(b, ppm) {
+  const A = satAnchor();
+  if (!showSat || !A) return "";
+  const k = Math.cos((A.lat0 * Math.PI) / 180);
+  const toPlan = (lat, lng) => [(lng - A.lng0) * 111320 * k - A.ox, (A.lat0 - lat) * 110574 - A.oy];
+  const toLatLng = (X, Y) => [A.lat0 - (Y + A.oy) / 110574, A.lng0 + (X + A.ox) / (111320 * k)];
+  const tx = (lng, z) => Math.floor(((lng + 180) / 360) * 2 ** z);
+  const ty = (lat, z) => { const r = (lat * Math.PI) / 180; return Math.floor(((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * 2 ** z); };
+  const lng = (x, z) => (x / 2 ** z) * 360 - 180;
+  const lat = (y, z) => (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / 2 ** z))) * 180) / Math.PI;
+  const [north, west] = toLatLng(b.x0, b.y0), [south, east] = toLatLng(b.x0 + b.W, b.y0 + b.H);
+  let z = Math.max(12, Math.min(19, Math.ceil(Math.log2(156543.03 * k * ppm))));
+  while (z > 12 && (tx(east, z) - tx(west, z) + 1) * (ty(south, z) - ty(north, z) + 1) > 48) z--;  // not too many tiles
+  const imgs = [];
+  for (let x = tx(west, z); x <= tx(east, z); x++) for (let y = ty(north, z); y <= ty(south, z); y++) {
+    const [X0, Y0] = toPlan(lat(y, z), lng(x, z)), [X1, Y1] = toPlan(lat(y + 1, z), lng(x + 1, z));
+    imgs.push(`<image href="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}" x="${X0}" y="${Y0}" width="${X1 - X0}" height="${Y1 - Y0}" preserveAspectRatio="none"/>`);
+  }
+  return `<g class="sat">${imgs.join("")}</g>`;
+}
+
+  // editing the garden's outline: which corner or side is picked
 let snapOn = true, showPaths = true, showSizes = false, plotScroll = { l: 0, t: 0 }, lastPlan = null;
 try {
   snapOn = localStorage.getItem("gtg-snap") !== "0";
@@ -906,10 +938,11 @@ function plotSvg() {
   const shape = S.g.garden.shape && S.g.garden.shape.map((p) => p.join(",")).join(" ");
   const fence = b.fenced ? (shape ? `<polygon points="${shape}" class="fence"/>` : `<rect x="0" y="0" width="${S.g.garden.w}" height="${S.g.garden.h}" class="fence"/>`) + `
     <text x="${S.g.garden.w}" y="${-px(6)}" font-size="${px(11)}" text-anchor="end" class="label dim">${S.g.garden.w} × ${S.g.garden.h} m</text>` : "";
-  return `<svg class="plot" viewBox="${b.x0} ${b.y0} ${b.W} ${b.H}" width="${Math.round(b.W * ppm)}" height="${Math.round(b.H * ppm)}" role="img" aria-label="Plan of your garden">
+  return `<svg class="plot ${showSat && satAnchor() ? "withsat" : ""}" viewBox="${b.x0} ${b.y0} ${b.W} ${b.H}" width="${Math.round(b.W * ppm)}" height="${Math.round(b.H * ppm)}" role="img" aria-label="Plan of your garden">
     <defs><pattern id="grid" x="0" y="0" width="${step}" height="${step}" patternUnits="userSpaceOnUse"><path d="M ${step} 0 L 0 0 0 ${step}" class="gridline" style="stroke-width:${px(1)}"/></pattern></defs>
     <rect x="${b.x0}" y="${b.y0}" width="${b.W}" height="${b.H}" class="${b.fenced ? "outside" : "grass"}"/>
-    ${b.fenced ? (shape ? `<polygon points="${shape}" class="grass"/>` : `<rect x="0" y="0" width="${S.g.garden.w}" height="${S.g.garden.h}" class="grass"/>`) : ""}
+    ${satTiles(b, ppm)}
+    ${b.fenced ? (shape ? `<polygon points="${shape}" class="grass ${showSat && satAnchor() ? "seethru" : ""}"/>` : `<rect x="0" y="0" width="${S.g.garden.w}" height="${S.g.garden.h}" class="grass ${showSat && satAnchor() ? "seethru" : ""}"/>`) : ""}
     <rect x="${b.x0}" y="${b.y0}" width="${b.W}" height="${b.H}" fill="url(#grid)"/>
     ${fence}${showPaths ? pathsBetween(items) : ""}${features}${beds}${edgeMarks(ppm)}${boundaryEdit ? boundaryHandles(ppm) : ""}
     <g class="scalebar" style="stroke-width:${px(2)}"><path d="M ${b.x0 + px(12)} ${b.y0 + b.H - px(12)} h ${bar}"/><text x="${b.x0 + px(12) + bar / 2}" y="${b.y0 + b.H - px(17)}" font-size="${px(11)}" text-anchor="middle">${bar} m</text></g></svg>`;
@@ -922,10 +955,11 @@ function plotPage() {
   view.innerHTML = `<h1>🪴 My garden</h1>${gardenTabs()}
     ${placing ? `<div class="card tint-sun row placing" style="justify-content:space-between"><b>👆 Tap a bed to put ${plant(crop(placing).plant_id).emoji} ${esc(plant(crop(placing).plant_id).name)} in it</b><button class="btn small ghost" id="cancel-place">Cancel</button></div>` : ""}
     <div class="plan-bar"><button class="btn small ${plotEdit ? "primary" : ""}" id="edit">${plotEdit ? "✅ Done editing" : "✏️ Edit plan"}</button>
-      <span class="toggles"><button class="btn small ${showSizes ? "primary" : ""}" id="t-sizes" aria-pressed="${showSizes}">📏</button><button class="btn small ${showPaths ? "primary" : ""}" id="t-paths" aria-pressed="${showPaths}" title="Paths between beds">🚶</button></span>
+      <span class="toggles">${satAnchor() ? `<button class="btn small ${showSat ? "primary" : ""}" id="t-sat" aria-pressed="${showSat}" title="Satellite view">🛰️</button>` : ""}<button class="btn small ${showSizes ? "primary" : ""}" id="t-sizes" aria-pressed="${showSizes}">📏</button><button class="btn small ${showPaths ? "primary" : ""}" id="t-paths" aria-pressed="${showPaths}" title="Paths between beds">🚶</button></span>
       <span class="zoom"><button class="btn small" data-zoom="-1" aria-label="Zoom out">➖</button><button class="btn small ghost" data-zoom="0" aria-label="Fit the whole garden">${Math.round(plotZoom * 100)}%</button><button class="btn small" data-zoom="1" aria-label="Zoom in">➕</button></span></div>
     ${plotEdit ? `<div class="card tint-sky small" style="margin-bottom:10px"><b>✏️ Editing:</b> drag anything to move it - zoom in for a finer grid (down to 50cm squares). Tap something to change, turn or remove it.</div>` : ""}
     ${boundaryEdit ? `<div class="card tint-sun small row" style="justify-content:space-between;margin-bottom:10px"><span><b>📐 Editing the boundary:</b> drag a corner · tap ＋ to add a corner · tap a corner to remove it · tap a side to type its real length</span><button class="btn small primary" id="b-done">✅ Done</button></div>` : ""}
+    ${showSat && satAnchor() ? `<p class="small muted" style="margin:0 0 4px;text-align:right">🛰️ Imagery © Esri · Powered by Esri · location kept on this device only</p>` : ""}
     <div class="plot-wrap ${plotEdit ? "moving" : ""}"><div class="plot-inner">${plotSvg()}${plotEdit ? (boundaryEdit ? boundaryToolbar() : selToolbar()) : ""}</div></div>
     ${plotEdit ? editPanel() : `
     <div class="month-row"><b>📅 ${esc(label)}</b><input type="range" id="month" min="0" max="11" value="${plotMonth}" aria-label="Show the garden in a later month">
@@ -966,7 +1000,14 @@ function boundaryToolbar() {
   const W = b.W * ppm, tw = 280, left = Math.max(4, Math.min(W - tw - 4, (at[0] - b.x0) * ppm - tw / 2)), y = (at[1] - b.y0) * ppm;
   return `<div class="seltools btools" style="left:${left}px;top:${y > 70 ? y - 62 : y + 18}px;width:${tw}px">${html}<button class="btn small ghost" id="b-close" aria-label="Close">✕</button></div>`;
 }
-const saveOutline = (P, message) => change("POST", "/api/garden/shape", { points: P.map(([x, y]) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100]), keep_beds: true }, message);
+const saveOutline = async (P, message) => {
+  const pts = P.map(([x, y]) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100]);
+  const mx = Math.min(...pts.map((p) => p[0])), my = Math.min(...pts.map((p) => p[1]));
+  const ok = await change("POST", "/api/garden/shape", { points: pts, keep_beds: true }, message);
+  const A = satAnchor();
+  if (ok && A && (mx || my)) { setSatAnchor({ ...A, ox: A.ox + mx, oy: A.oy + my }); render(); }  // the plan's corner moved by (mx, my)
+  return ok;
+};
 
 // Turn buttons right next to whatever's selected, so you don't have to scroll down to them
 function selToolbar() {
@@ -1049,6 +1090,8 @@ function wirePlot() {
     wrap.onscroll = () => { plotScroll = { l: wrap.scrollLeft, t: wrap.scrollTop }; };
   }
   $("#edit").onclick = () => { plotEdit = !plotEdit; placing = null; selected = null; boundaryEdit = false; bSel = null; plotPage(); };
+  const ts = $("#t-sat");
+  if (ts) ts.onclick = () => { showSat = !showSat; remember("gtg-satview", showSat); redraw(); toast(showSat ? "🛰️ Satellite view on" : "Satellite view off"); };
   $("#t-sizes").onclick = () => { showSizes = !showSizes; remember("gtg-sizes", showSizes); redraw(); toast(showSizes ? "📏 Measurements on" : "Measurements off"); };
   $("#t-paths").onclick = () => { showPaths = !showPaths; remember("gtg-paths", showPaths); redraw(); toast(showPaths ? "🚶 Paths shown" : "Paths hidden"); };
   const more = $("#seldetails"); if (more) more.onclick = () => { const c = view.querySelector(".sel-card"); if (c) c.scrollIntoView({ behavior: "smooth", block: "center" }); };
@@ -1297,7 +1340,7 @@ function shapeStats(pts) {
 async function openMapTrace() {
   S.sheet = null;
   openSheet(`<h2>🗺️ Trace your garden</h2>
-    <p class="small" style="margin:0 0 8px">Find your garden or field, zoom in, then <b>tap each corner</b> round its edge. 🔒 We only keep the shape and size - <b>never where it is</b>, and the postcode isn't saved.</p>
+    <p class="small" style="margin:0 0 8px">Find your garden or field, zoom in, then <b>tap each corner</b> round its edge. 🔒 Grow to Gobble only keeps the shape and size - <b>never where it is</b>. This phone remembers the spot so it can show the satellite picture under your plan.</p>
     <form id="m-find" class="row" style="flex-wrap:nowrap;margin-bottom:8px"><input id="m-pc" type="text" autocomplete="postal-code" placeholder="Full postcode, e.g. LS6 2AB" aria-label="Postcode to find on the map">
       <button class="btn small primary" type="submit">🔍 Find</button></form>
     <div id="map" class="map"><p class="muted" style="padding:20px">Loading the map…</p></div>
@@ -1361,7 +1404,12 @@ async function openMapTrace() {
   };
   $("#m-save").onclick = async () => {
     const pts = toMetres(taps).map(([x, y]) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100]);
-    if (await change("POST", "/api/garden/shape", { points: pts }, "Outline saved 📐 - now place your beds inside it")) { map.remove(); closeSheet(); }
+    const anchor = { lat0: taps[0].lat, lng0: taps[0].lng, ox: Math.min(...pts.map((p) => p[0])), oy: Math.min(...pts.map((p) => p[1])) };
+    if (await change("POST", "/api/garden/shape", { points: pts }, "Outline saved 📐 - tap 🛰️ to see the satellite picture under your plan")) {
+      setSatAnchor(anchor);  // only on this device - the server only ever gets the shape
+      showSat = true; remember("gtg-satview", true);
+      map.remove(); closeSheet(); render();
+    }
   };
 }
 

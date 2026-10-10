@@ -55,6 +55,8 @@ Notifications need HTTPS (Railway gives you that). On iPhone they work once the 
 The Garden tab is a plan of the garden or field: beds, pots and features (trees, shed, path...) in metres.
 "Trace it on a satellite map" uses Leaflet (cdnjs) with Esri World Imagery - no API key. Only the traced
 **shape** is sent to the server (as metres from its own corner); the map location never leaves the phone.
+The 🛰️ satellite view under the plan shows live Esri tiles; where the plan sits on the map is kept in that
+device's localStorage only (never sent to the server), and no imagery is stored anywhere.
 Esri requires the "Powered by Esri" credit shown on the map. Their terms leave it to Esri whether a money-making
 app is "commercial"; swapping to Google Maps would need a Maps JavaScript API key.
 

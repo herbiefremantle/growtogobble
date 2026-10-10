@@ -504,3 +504,9 @@ svg.plot .bvtx.on { fill: #f2b01e; }
 /* corner markers on the satellite map */
 .vtx-icon { background: #e4572e; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
 .mid-icon { background: rgba(255,255,255,.85); border: 2px solid #2e7a4d; border-radius: 50%; color: #2e7a4d; font-weight: 900; font-size: 14px; line-height: 14px; text-align: center; }
+svg.plot .grass.seethru { fill-opacity: 0.08; }
+svg.plot .sat image { opacity: 0.95; }
+svg.plot .fence { vector-effect: non-scaling-stroke; stroke-width: 2.5px; stroke-dasharray: 8 4; }
+svg.plot.withsat .fence { stroke: #ffd34d; stroke-width: 3px; }
+svg.plot.withsat .label { fill: #fff; paint-order: stroke; stroke: rgba(0,0,0,.65); stroke-width: 0.04; }
+svg.plot.withsat .gridline { stroke: rgba(255,255,255,.18); }
