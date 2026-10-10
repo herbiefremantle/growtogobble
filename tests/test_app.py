@@ -539,3 +539,15 @@ def test_garden_plan_size_features_and_turning(client):
     g = client.delete("/api/features/%d" % tree["id"]).json()
     assert g["garden"]["features"] == []
     assert client.post("/api/features", json={"kind": "rocket"}).status_code == 400
+
+
+def test_map_outline_keeps_shape_not_location(client):
+    _join(client)
+    # an L-shaped plot, as metres from wherever the first tap was (the browser does that sum)
+    pts = [[100, 50], [130, 50], [130, 60], [115, 60], [115, 70], [100, 70]]
+    g = client.post("/api/garden/shape", json={"points": pts}).json()["garden"]
+    assert (g["w"], g["h"]) == (30, 20)
+    assert g["shape"][0] == [0, 0] and [30, 10] in g["shape"]   # moved to its own top-left corner
+    assert client.post("/api/garden/shape", json={"points": [[0, 0], [5, 5]]}).status_code == 400
+    g = client.post("/api/garden/size", json={"w": 12, "h": 8}).json()["garden"]
+    assert g["shape"] is None   # typing a size replaces the outline

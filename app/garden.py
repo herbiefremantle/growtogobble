@@ -1,5 +1,6 @@
 """One user's whole garden, worked out from the database: spaces, crops, every job, suggestions and badges.
 Used by the API, the push alerts and the calendar feed, so they always agree with each other."""
+import json
 from datetime import date
 
 from . import clock, planner, regions, shops
@@ -124,6 +125,7 @@ def payload(conn, user):
     return {
         "today": today.isoformat(),
         "garden": {"w": user.get("garden_w"), "h": user.get("garden_h"),
+                   "shape": json.loads(user["garden_shape"]) if user.get("garden_shape") else None,
                    "features": rows(conn, "SELECT id, kind, name, x, y, w, h FROM features WHERE user_id = ? ORDER BY id", user["id"])},
         "spaces": spaces_out,
         "crops": crops_out,

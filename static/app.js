@@ -756,16 +756,19 @@ function plotSvg() {
       ${inner}<text x="${x}" y="${y - lab.size * 0.45}" font-size="${lab.size}" class="label">${esc(lab.text)}</text></g>`;
   }).join("");
 
-  const step = plotEdit ? 0.5 : 1;
-  const fence = b.fenced ? `<rect x="0" y="0" width="${S.g.garden.w}" height="${S.g.garden.h}" class="fence"/>
+  // grid squares that stay readable whatever the zoom: 50cm up close, 1m, 5m or 10m across a field
+  const step = ppm >= 40 && plotEdit ? 0.5 : ppm >= 9 ? 1 : ppm >= 2 ? 5 : 10;
+  const bar = Math.max(1, step);
+  const shape = S.g.garden.shape && S.g.garden.shape.map((p) => p.join(",")).join(" ");
+  const fence = b.fenced ? (shape ? `<polygon points="${shape}" class="fence"/>` : `<rect x="0" y="0" width="${S.g.garden.w}" height="${S.g.garden.h}" class="fence"/>`) + `
     <text x="${S.g.garden.w}" y="${-px(6)}" font-size="${px(11)}" text-anchor="end" class="label dim">${S.g.garden.w} × ${S.g.garden.h} m</text>` : "";
   return `<svg class="plot" viewBox="${b.x0} ${b.y0} ${b.W} ${b.H}" width="${Math.round(b.W * ppm)}" height="${Math.round(b.H * ppm)}" role="img" aria-label="Plan of your garden">
     <defs><pattern id="grid" x="0" y="0" width="${step}" height="${step}" patternUnits="userSpaceOnUse"><path d="M ${step} 0 L 0 0 0 ${step}" class="gridline" style="stroke-width:${px(1)}"/></pattern></defs>
     <rect x="${b.x0}" y="${b.y0}" width="${b.W}" height="${b.H}" class="${b.fenced ? "outside" : "grass"}"/>
-    ${b.fenced ? `<rect x="0" y="0" width="${S.g.garden.w}" height="${S.g.garden.h}" class="grass"/>` : ""}
+    ${b.fenced ? (shape ? `<polygon points="${shape}" class="grass"/>` : `<rect x="0" y="0" width="${S.g.garden.w}" height="${S.g.garden.h}" class="grass"/>`) : ""}
     <rect x="${b.x0}" y="${b.y0}" width="${b.W}" height="${b.H}" fill="url(#grid)"/>
     ${fence}${features}${beds}
-    <g class="scalebar" style="stroke-width:${px(2)}"><path d="M ${b.x0 + px(12)} ${b.y0 + b.H - px(12)} h 1"/><text x="${b.x0 + px(12) + 0.5}" y="${b.y0 + b.H - px(17)}" font-size="${px(11)}" text-anchor="middle">1 m</text></g></svg>`;
+    <g class="scalebar" style="stroke-width:${px(2)}"><path d="M ${b.x0 + px(12)} ${b.y0 + b.H - px(12)} h ${bar}"/><text x="${b.x0 + px(12) + bar / 2}" y="${b.y0 + b.H - px(17)}" font-size="${px(11)}" text-anchor="middle">${bar} m</text></g></svg>`;
 }
 
 function plotPage() {
@@ -776,12 +779,12 @@ function plotPage() {
     ${placing ? `<div class="card tint-sun row placing" style="justify-content:space-between"><b>👆 Tap a bed to put ${plant(crop(placing).plant_id).emoji} ${esc(plant(crop(placing).plant_id).name)} in it</b><button class="btn small ghost" id="cancel-place">Cancel</button></div>` : ""}
     <div class="plan-bar"><button class="btn small ${plotEdit ? "primary" : ""}" id="edit">${plotEdit ? "✅ Done editing" : "✏️ Edit plan"}</button>
       <span class="zoom"><button class="btn small" data-zoom="-1" aria-label="Zoom out">➖</button><button class="btn small ghost" data-zoom="0" aria-label="Fit the whole garden">${Math.round(plotZoom * 100)}%</button><button class="btn small" data-zoom="1" aria-label="Zoom in">➕</button></span></div>
-    ${plotEdit ? `<div class="card tint-sky small" style="margin-bottom:10px"><b>✏️ Editing:</b> drag anything to move it (each small square is 50cm). Tap something to change, turn or remove it.</div>` : ""}
+    ${plotEdit ? `<div class="card tint-sky small" style="margin-bottom:10px"><b>✏️ Editing:</b> drag anything to move it - zoom in for a finer grid (down to 50cm squares). Tap something to change, turn or remove it.</div>` : ""}
     <div class="plot-wrap ${plotEdit ? "moving" : ""}">${plotSvg()}</div>
     ${plotEdit ? editPanel() : `
     <div class="month-row"><b>📅 ${esc(label)}</b><input type="range" id="month" min="0" max="11" value="${plotMonth}" aria-label="Show the garden in a later month">
       ${plotMonth ? `<button class="btn small ghost" id="now">Today</button>` : ""}</div>
-    <p class="small muted" style="margin:0 0 12px">Each coloured strip is a crop, sized by the room it needs. Tap a crop or bed to open it. Slide to see later in the year. Grid squares are 1 m.</p>
+    <p class="small muted" style="margin:0 0 12px">Each coloured strip is a crop, sized by the room it needs. Tap a crop or bed to open it. Slide to see later in the year. The bar in the corner shows the grid size.</p>
     ${unplaced.length ? `<div class="card"><b>📍 Not in a bed yet</b> <span class="small muted">- tap one, then tap a bed</span>
       <div class="suggest">${unplaced.map((c) => `<button data-place="${c.id}" class="${placing === c.id ? "on" : ""}">${plant(c.plant_id).emoji} ${esc(plant(c.plant_id).name)}${rowLabel(c) ? " · " + rowLabel(c) : ""}</button>`).join("")}</div></div>` : ""}
     ${activeCrops().length ? `<div class="row"><button class="btn small" data-layout="all">🧩 Suggest a layout</button></div>` : ""}`}`;
@@ -820,7 +823,10 @@ function editPanel() {
       <div class="adds"><button class="btn small" id="add-space">🟫 Bed or pots</button>
         ${Object.entries(FEATURES).map(([k, f]) => `<button class="btn small" data-addfeat="${k}">${f.emoji} ${f.name}</button>`).join("")}</div></div>
     <div class="card"><b>📐 Your whole garden or field</b>
-      <p class="small muted" style="margin:4px 0 8px">Measure it once and the plan shows its edge, so you can place everything where it really is. Leave blank to fit the plan to what's in it.</p>
+      <p class="small muted" style="margin:4px 0 8px">Trace it on a satellite map, or type its size. The plan then shows its edge, so you can place everything where it really is.</p>
+      <button class="btn small primary" id="trace">🗺️ ${g.shape ? "Trace it again" : "Trace it on a satellite map"}</button>
+      ${g.shape ? `<p class="small" style="margin:8px 0 0">✅ Outline from the map: about ${g.w} × ${g.h} m. <button class="btn small ghost" id="gclear2">Remove outline</button></p>` : ""}
+      <p class="small muted" style="margin:12px 0 6px">Or type its size:</p>
       <div class="size-row"><label class="big-num"><span>Width</span><input id="gw" type="number" step="0.5" min="1" inputmode="decimal" value="${g.w || ""}" placeholder="e.g. 12"><em>m</em></label>
         <span class="times">×</span><label class="big-num"><span>Length</span><input id="gh" type="number" step="0.5" min="1" inputmode="decimal" value="${g.h || ""}" placeholder="e.g. 8"><em>m</em></label></div>
       <div class="row" style="margin-top:10px"><button class="btn small primary" id="gsave">Save size</button>${g.w ? `<button class="btn small ghost" id="gclear">No fixed size</button>` : ""}</div></div>`;
@@ -925,6 +931,76 @@ function wireEdit(svg, redraw) {
     change("POST", "/api/garden/size", { w, h }, `Garden set to ${w} × ${h} m 📐`);
   };
   const gc = $("#gclear"); if (gc) gc.onclick = () => change("POST", "/api/garden/size", {}, "The plan now fits to what's in it");
+  const gc2 = $("#gclear2"); if (gc2) gc2.onclick = () => change("POST", "/api/garden/size", {}, "Outline removed");
+  $("#trace").onclick = openMapTrace;
+}
+
+// ---- trace the garden on a satellite map. Only the SHAPE is saved (metres) - never where it is ---------------
+
+function loadLeaflet() {
+  if (window.L) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const css = document.createElement("link");
+    css.rel = "stylesheet"; css.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
+    document.head.appendChild(css);
+    const js = document.createElement("script");
+    js.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
+    js.onload = resolve; js.onerror = () => reject(new Error("Couldn't load the map - check your internet connection"));
+    document.head.appendChild(js);
+  });
+}
+
+// map taps (lat/lng) -> metres east (x) and south (y) of the first tap; good to centimetres over a garden or field
+function toMetres(latlngs) {
+  const lat0 = latlngs[0].lat, lng0 = latlngs[0].lng, k = Math.cos((lat0 * Math.PI) / 180);
+  return latlngs.map((p) => [(p.lng - lng0) * 111320 * k, (lat0 - p.lat) * 110574]);
+}
+function shapeStats(pts) {
+  if (pts.length < 3) return null;
+  let a = 0;
+  pts.forEach(([x1, y1], i) => { const [x2, y2] = pts[(i + 1) % pts.length]; a += x1 * y2 - x2 * y1; });
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  return { area: Math.abs(a) / 2, w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+}
+
+async function openMapTrace() {
+  S.sheet = null;
+  openSheet(`<h2>🗺️ Trace your garden</h2>
+    <p class="small" style="margin:0 0 8px">Zoom in on your garden or field, then <b>tap each corner</b> round its edge. 🔒 We only keep the shape and size - <b>never where it is</b>.</p>
+    <div id="map" class="map"><p class="muted" style="padding:20px">Loading the map…</p></div>
+    <p id="mapstats" class="small" style="margin:8px 0"><b>Tap the first corner.</b></p>
+    <div class="row"><button class="btn small" id="m-loc">📍 Go to where I am</button><button class="btn small" id="m-undo">↶ Undo</button><button class="btn small ghost" id="m-clear">Start again</button></div>
+    <button class="btn primary wide" id="m-save" style="margin-top:12px" disabled>Use this outline</button>`);
+  try { await loadLeaflet(); } catch (e) { $("#map").innerHTML = `<div class="error">${esc(e.message)}</div>`; return; }
+  $("#map").innerHTML = "";
+  const map = L.map("map", { zoomControl: true, attributionControl: true }).setView(S.me.map_start, 17);
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+    maxZoom: 20, maxNativeZoom: 19, attribution: "Powered by Esri · Imagery © Esri and its data providers",
+  }).addTo(map);
+  setTimeout(() => map.invalidateSize(), 250);
+  const taps = [];
+  const shape = L.polygon([], { color: "#f2b01e", weight: 3, fillColor: "#9fd88f", fillOpacity: 0.25 }).addTo(map);
+  const dots = L.layerGroup().addTo(map);
+  const draw = () => {
+    shape.setLatLngs(taps); dots.clearLayers();
+    taps.forEach((p, i) => L.circleMarker(p, { radius: i === 0 ? 7 : 5, color: "#fff", weight: 2, fillColor: "#e4572e", fillOpacity: 1 }).addTo(dots));
+    const st = taps.length >= 3 && shapeStats(toMetres(taps));
+    $("#mapstats").innerHTML = st ? `📐 About <b>${st.w.toFixed(1)} × ${st.h.toFixed(1)} m</b> across, <b>${Math.round(st.area)} m²</b> inside. Keep tapping corners, or use it.`
+      : `<b>${taps.length ? `${taps.length} corner${taps.length === 1 ? "" : "s"} - keep going` : "Tap the first corner."}</b>`;
+    $("#m-save").disabled = taps.length < 3;
+  };
+  map.on("click", (e) => { taps.push(e.latlng); draw(); });
+  $("#m-undo").onclick = () => { taps.pop(); draw(); };
+  $("#m-clear").onclick = () => { taps.length = 0; draw(); };
+  $("#m-loc").onclick = () => {
+    if (!navigator.geolocation) { toast("This phone can't share its location"); return; }
+    navigator.geolocation.getCurrentPosition((p) => map.setView([p.coords.latitude, p.coords.longitude], 19),
+      () => toast("Couldn't get your location - zoom in by hand instead"), { enableHighAccuracy: true, timeout: 10000 });
+  };
+  $("#m-save").onclick = async () => {
+    const pts = toMetres(taps).map(([x, y]) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100]);
+    if (await change("POST", "/api/garden/shape", { points: pts }, "Outline saved 📐 - now place your beds inside it")) { map.remove(); closeSheet(); }
+  };
 }
 
 function gardenList() {

@@ -50,6 +50,14 @@ Code: https://github.com/herbiefremantle/growtogobble - every push to `main` red
 
 Notifications need HTTPS (Railway gives you that). On iPhone they work once the app is added to the Home Screen (iOS 16.4+).
 
+## Garden plan & satellite tracing
+
+The Garden tab is a plan of the garden or field: beds, pots and features (trees, shed, path...) in metres.
+"Trace it on a satellite map" uses Leaflet (cdnjs) with Esri World Imagery - no API key. Only the traced
+**shape** is sent to the server (as metres from its own corner); the map location never leaves the phone.
+Esri requires the "Powered by Esri" credit shown on the map. Their terms leave it to Esri whether a money-making
+app is "commercial"; swapping to Google Maps would need a Maps JavaScript API key.
+
 ## Not done yet
 
 - Password reset by email (needs an email service such as Postmark or Resend) - for now an admin makes a

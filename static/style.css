@@ -468,3 +468,5 @@ svg.plot .item.sel > :first-child, svg.plot .item.sel .hit { stroke: #e4572e !im
 .sel-card { border: 2px solid var(--terra); }
 .mini { display: flex; flex-direction: column; font-size: 12px; font-weight: 800; color: var(--muted); gap: 2px; flex: 1; }
 .mini input { padding: 8px; font-size: 16px; }
+.map { height: 58vh; min-height: 300px; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); background: var(--bg-2); }
+.leaflet-container { font-family: inherit; }

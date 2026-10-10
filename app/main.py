@@ -3,6 +3,7 @@
 Run locally:  .venv/bin/python -m app     then open http://localhost:8000
 """
 import asyncio
+import json
 import logging
 import os
 import re
@@ -127,6 +128,7 @@ def _me(user):
         "region": dict(region, id=user["region"]),
         "calendar_path": "/calendar/%s.ics" % user["cal_token"],
         "push_key": alerts.public_key(), "is_admin": bool(user["is_admin"]),
+        "map_start": [user["lat"], user["lon"]] if user["lat"] is not None else [region["lat"], region["lon"]],
     }
 
 
@@ -499,10 +501,36 @@ class GardenSize(BaseModel):
 
 @app.post("/api/garden/size")
 def garden_size(body: GardenSize, user=Depends(auth.current_user)):
-    """The whole garden or field, in metres - or blank to fit the plan to what's in it."""
+    """The whole garden or field, in metres - or blank to fit the plan to what's in it. Typing a size replaces any
+    outline traced from a map."""
     with db.connect() as conn:
-        conn.execute("UPDATE users SET garden_w = ?, garden_h = ? WHERE id = ?",
+        conn.execute("UPDATE users SET garden_w = ?, garden_h = ?, garden_shape = NULL WHERE id = ?",
                      (_metres(body.w, 1) if body.w else None, _metres(body.h, 1) if body.h else None, user["id"]))
+        user = dict(conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone())
+        return garden.payload(conn, user)
+
+
+class GardenShape(BaseModel):
+    points: list   # [[x, y], ...] in metres - the browser converts the map taps, the location never reaches us
+
+
+@app.post("/api/garden/shape")
+def garden_shape(body: GardenShape, user=Depends(auth.current_user)):
+    """Save an outline traced on a satellite map, as a shape in metres (north at the top)."""
+    try:
+        pts = [(float(x), float(y)) for x, y in body.points]
+    except (TypeError, ValueError):
+        raise HTTPException(400, "That outline doesn't look right.")
+    if not 3 <= len(pts) <= 80:
+        raise HTTPException(400, "Tap at least 3 corners round the edge.")
+    x0, y0 = min(p[0] for p in pts), min(p[1] for p in pts)
+    pts = [(round(x - x0, 2), round(y - y0, 2)) for x, y in pts]   # top-left corner at 0, 0
+    w, h = max(p[0] for p in pts), max(p[1] for p in pts)
+    if w < 1 or h < 1 or w > 2000 or h > 2000:
+        raise HTTPException(400, "That outline is too small or too big - between 1m and 2km across.")
+    with db.connect() as conn:
+        conn.execute("UPDATE users SET garden_w = ?, garden_h = ?, garden_shape = ? WHERE id = ?",
+                     (round(w, 2), round(h, 2), json.dumps(pts), user["id"]))
         user = dict(conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone())
         return garden.payload(conn, user)
 

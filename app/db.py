@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS users (
     invited_by INTEGER,               -- who invited them (users.id), if they came from an invite link
     garden_w REAL,                    -- the whole garden / field, for the plan (metres); NULL = fit to what's in it
     garden_h REAL,
+    garden_shape TEXT,                -- outline traced on a satellite map, as JSON [[x, y], ...] in metres from its
+                                      -- top-left corner. Only the shape - where it is on the map is never stored.
     invite_token TEXT,                -- which invite link they used
     created_at TEXT NOT NULL
 );
@@ -126,7 +128,8 @@ MIGRATIONS = [("spaces", "width_m", "REAL"), ("spaces", "length_m", "REAL"), ("c
               ("crops", "bed_free_on", "TEXT"), ("users", "is_admin", "INTEGER NOT NULL DEFAULT 0"),
               ("users", "last_active", "TEXT"), ("spaces", "soil", "TEXT"),
               ("spaces", "built", "INTEGER"), ("users", "invited_by", "INTEGER"), ("users", "invite_token", "TEXT"),
-              ("spaces", "pos_x", "REAL"), ("spaces", "pos_y", "REAL"), ("users", "garden_w", "REAL"), ("users", "garden_h", "REAL")]
+              ("spaces", "pos_x", "REAL"), ("spaces", "pos_y", "REAL"), ("users", "garden_w", "REAL"), ("users", "garden_h", "REAL"),
+              ("users", "garden_shape", "TEXT")]
 
 
 def init():
