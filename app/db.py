@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS spaces (
     pos_x REAL,                       -- where it sits on the bird's-eye plot (metres); NULL = arranged automatically
     pos_y REAL,
     angle REAL,                       -- turned on the plan, degrees clockwise round its middle
+    grp INTEGER,                      -- grouped with other beds/features on the plan, to move together
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS crops (
@@ -89,6 +90,7 @@ CREATE TABLE IF NOT EXISTS features (       -- things on the garden plan that ar
     name TEXT NOT NULL,
     x REAL NOT NULL, y REAL NOT NULL, w REAL NOT NULL, h REAL NOT NULL,
     angle REAL,
+    grp INTEGER,
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS invites (        -- each time someone taps "Invite a friend"
@@ -133,7 +135,7 @@ MIGRATIONS = [("spaces", "width_m", "REAL"), ("spaces", "length_m", "REAL"), ("c
               ("spaces", "built", "INTEGER"), ("users", "invited_by", "INTEGER"), ("users", "invite_token", "TEXT"),
               ("spaces", "pos_x", "REAL"), ("spaces", "pos_y", "REAL"), ("users", "garden_w", "REAL"), ("users", "garden_h", "REAL"),
               ("users", "garden_shape", "TEXT"), ("spaces", "angle", "REAL"), ("features", "angle", "REAL"),
-              ("users", "path_w", "REAL")]
+              ("users", "path_w", "REAL"), ("spaces", "grp", "INTEGER"), ("features", "grp", "INTEGER")]
 
 
 def init():

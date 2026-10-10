@@ -671,8 +671,8 @@ function plotPositions() {
 function planItems() {
   const pos = plotPositions();
   return [
-    ...S.g.spaces.map((s) => ({ type: "space", id: s.id, ...pos[s.id], ...spaceSize(s), a: s.angle || 0, s })),
-    ...S.g.garden.features.map((f) => ({ type: "feature", id: f.id, x: f.x, y: f.y, w: f.w, h: f.h, a: f.angle || 0, f })),
+    ...S.g.spaces.map((s) => ({ type: "space", id: s.id, ...pos[s.id], ...spaceSize(s), a: s.angle || 0, grp: s.grp, s })),
+    ...S.g.garden.features.map((f) => ({ type: "feature", id: f.id, x: f.x, y: f.y, w: f.w, h: f.h, a: f.angle || 0, grp: f.grp, f })),
   ];
 }
 
@@ -703,6 +703,11 @@ function localOf(A, px, py) {
   return { lx: dx * Math.cos(t) + dy * Math.sin(t), ly: -dx * Math.sin(t) + dy * Math.cos(t) };
 }
 let boundaryEdit = false, bSel = null;
+let multi = false, picked = new Set();  // "Select several": picked things, as "space:3" / "feature:7"
+const itemKey = (i) => `${i.type}:${i.id}`;
+// is this thing part of what's selected? (one thing, a whole saved group, or the several picked)
+const inSelection = (i) => (selected && selected.type === i.type && selected.id === i.id)
+  || (selected && selected.type === "group" && i.grp === selected.grp) || picked.has(itemKey(i));
 // The satellite view under the plan. Where the plan sits on the map is remembered ON THIS DEVICE ONLY
 // (localStorage) - it's never sent to the server. {lat0, lng0, ox, oy}: the first tap of the trace, and how far
 // the plan's own corner is from it in metres.
@@ -880,7 +885,7 @@ function fitLabel(text, widthM, ppm, maxPx = 13, minPx = 9) {
 function plotSvg() {
   const T = plotDate(), crops = activeCrops(), items = planItems(), b = planBounds(items), ppm = planScale(b);
   const px = (n) => n / ppm;  // a size in screen pixels, in metres
-  const isSel = (i) => selected && selected.type === i.type && selected.id === i.id;
+  const isSel = inSelection;
 
   const features = items.filter((i) => i.type === "feature").map((i) => {
     const k = FEATURES[i.f.kind] || FEATURES.bush, lab = fitLabel(i.f.name, i.w + 0.2, ppm, 12, 8);
@@ -954,10 +959,11 @@ function plotPage() {
   const label = plotMonth === 0 ? "Today" : `${MONTHS_LONG[T.getMonth()]}${T.getFullYear() !== today().getFullYear() ? " " + T.getFullYear() : ""}`;
   view.innerHTML = `<h1>🪴 My garden</h1>${gardenTabs()}
     ${placing ? `<div class="card tint-sun row placing" style="justify-content:space-between"><b>👆 Tap a bed to put ${plant(crop(placing).plant_id).emoji} ${esc(plant(crop(placing).plant_id).name)} in it</b><button class="btn small ghost" id="cancel-place">Cancel</button></div>` : ""}
+    ${plotEdit && !boundaryEdit ? `<div class="card tint-sky small" style="margin-bottom:10px"><b>✏️ Editing:</b> drag anything to move it - zoom in for a finer grid (down to 50cm squares). Tap something to change, turn or remove it. Use ☑️ to pick several and group them.</div>` : ""}
     <div class="plan-bar"><button class="btn small ${plotEdit ? "primary" : ""}" id="edit">${plotEdit ? "✅ Done editing" : "✏️ Edit plan"}</button>
+      ${plotEdit && !boundaryEdit ? `<button class="btn small ${multi ? "primary" : ""}" id="t-multi" aria-pressed="${multi}" title="Select several">☑️</button>` : ""}
       <span class="toggles">${satAnchor() ? `<button class="btn small ${showSat ? "primary" : ""}" id="t-sat" aria-pressed="${showSat}" title="Satellite view">🛰️</button>` : ""}<button class="btn small ${showSizes ? "primary" : ""}" id="t-sizes" aria-pressed="${showSizes}">📏</button><button class="btn small ${showPaths ? "primary" : ""}" id="t-paths" aria-pressed="${showPaths}" title="Paths between beds">🚶</button></span>
       <span class="zoom"><button class="btn small" data-zoom="-1" aria-label="Zoom out">➖</button><button class="btn small ghost" data-zoom="0" aria-label="Fit the whole garden">${Math.round(plotZoom * 100)}%</button><button class="btn small" data-zoom="1" aria-label="Zoom in">➕</button></span></div>
-    ${plotEdit ? `<div class="card tint-sky small" style="margin-bottom:10px"><b>✏️ Editing:</b> drag anything to move it - zoom in for a finer grid (down to 50cm squares). Tap something to change, turn or remove it.</div>` : ""}
     ${boundaryEdit ? `<div class="card tint-sun small row" style="justify-content:space-between;margin-bottom:10px"><span><b>📐 Editing the boundary:</b> drag a corner · tap ＋ to add a corner · tap a corner to remove it · tap a side to type its real length</span><button class="btn small primary" id="b-done">✅ Done</button></div>` : ""}
     ${showSat && satAnchor() ? `<p class="small muted" style="margin:0 0 4px;text-align:right">🛰️ Imagery © Esri · Powered by Esri · location kept on this device only</p>` : ""}
     <div class="plot-wrap ${plotEdit ? "moving" : ""}"><div class="plot-inner">${plotSvg()}${plotEdit ? (boundaryEdit ? boundaryToolbar() : selToolbar()) : ""}</div></div>
@@ -1009,8 +1015,21 @@ const saveOutline = async (P, message) => {
   return ok;
 };
 
+// Several picked, or a group: a small bar at the top of what you're looking at
+function groupToolbar() {
+  const n = multi ? picked.size : selected && selected.type === "group" ? planItems().filter((i) => i.grp === selected.grp).length : 0;
+  if (!multi && !(selected && selected.type === "group")) return "";
+  const at = `left:${plotScroll.l + 8}px;top:${plotScroll.t + 8}px;width:auto`;
+  if (multi) return `<div class="seltools grouptools" style="${at}"><b>☑️ ${n} picked</b>
+    ${n >= 2 ? `<button class="btn small primary" id="g-make">🔗 Group them</button>` : `<span class="small">Tap things to pick them</span>`}
+    ${n ? `<button class="btn small ghost" id="g-clear">Clear</button>` : ""}</div>`;
+  return `<div class="seltools grouptools" style="${at}"><b>🔗 Group of ${n}</b> <span class="small">drag to move them all</span>
+    <button class="btn small" id="g-un">Ungroup</button><button class="btn small ghost" id="g-close" aria-label="Close">✕</button></div>`;
+}
+
 // Turn buttons right next to whatever's selected, so you don't have to scroll down to them
 function selToolbar() {
+  if (multi || (selected && selected.type === "group")) return groupToolbar();
   if (!selected || !lastPlan) return "";
   const it = planItems().find((i) => i.type === selected.type && i.id === selected.id);
   if (!it || (it.type === "space" && it.s.kind === "pot")) return "";
@@ -1089,7 +1108,9 @@ function wirePlot() {
     wrap.scrollLeft = plotScroll.l; wrap.scrollTop = plotScroll.t;
     wrap.onscroll = () => { plotScroll = { l: wrap.scrollLeft, t: wrap.scrollTop }; };
   }
-  $("#edit").onclick = () => { plotEdit = !plotEdit; placing = null; selected = null; boundaryEdit = false; bSel = null; plotPage(); };
+  $("#edit").onclick = () => { plotEdit = !plotEdit; placing = null; selected = null; boundaryEdit = false; bSel = null; multi = false; picked.clear(); plotPage(); };
+  const tm = $("#t-multi");
+  if (tm) tm.onclick = () => { multi = !multi; picked.clear(); selected = null; redraw(); if (multi) toast("☑️ Tap the beds and things you want to pick"); };
   const ts = $("#t-sat");
   if (ts) ts.onclick = () => { showSat = !showSat; remember("gtg-satview", showSat); redraw(); toast(showSat ? "🛰️ Satellite view on" : "Satellite view off"); };
   $("#t-sizes").onclick = () => { showSizes = !showSizes; remember("gtg-sizes", showSizes); redraw(); toast(showSizes ? "📏 Measurements on" : "Measurements off"); };
@@ -1189,14 +1210,17 @@ function wireEdit(svg, redraw) {
     if (svg) svg.addEventListener("click", (e) => e.stopPropagation(), true);  // editing the outline: don't open beds or crops
     wireBoundary(svg, redraw); return;
   }
-  const save = async (moved, message) => {
-    // pin every bed where it is now, so only what you dragged (or turned) moves
+  // save where things are: pin every bed where it is now, so only what you dragged (or turned) moves
+  const saveMany = async (movedList, message) => {
     const pos = plotPositions();
     const list = Object.entries(pos).map(([id, p]) => ({ id: Number(id), x: p.x, y: p.y }));
-    if (moved.type === "space") Object.assign(list.find((e) => e.id === moved.id), { x: moved.x, y: moved.y, angle: moved.a });
-    else list.push({ feature: moved.id, x: moved.x, y: moved.y, angle: moved.a });
+    movedList.forEach((mv) => {
+      if (mv.type === "space") Object.assign(list.find((e) => e.id === mv.id), { x: mv.x, y: mv.y, angle: mv.a });
+      else list.push({ feature: mv.id, x: mv.x, y: mv.y, angle: mv.a });
+    });
     await change("POST", "/api/spaces/positions", { positions: list }, message);
   };
+  const save = (mv, message) => saveMany([mv], message);
   // turning the selected thing
   const it = selected && planItems().find((i) => i.type === selected.type && i.id === selected.id);
   const setAngle = (a) => {
@@ -1253,34 +1277,60 @@ function wireEdit(svg, redraw) {
     svg.querySelectorAll("[data-item]").forEach((g) => {
       g.onpointerdown = (ev) => {
         ev.preventDefault(); g.setPointerCapture(ev.pointerId);
-        const start = pt(ev), x0 = Number(g.dataset.x), y0 = Number(g.dataset.y), w = Number(g.dataset.w), h = Number(g.dataset.h);
-        const type = g.dataset.item, id = Number(g.dataset.id);
+        const type = g.dataset.item, id = Number(g.dataset.id), start = pt(ev);
+        const items = planItems(), me = items.find((i) => i.type === type && i.id === id);
+        // what moves: the several picked, or this thing's whole group, or just this thing
+        const singleInGroup = selected && selected.type === type && selected.id === id;
+        let movers = [me];
+        if (multi && picked.has(itemKey(me))) movers = items.filter((i) => picked.has(itemKey(i)));
+        else if (!multi && me.grp && !singleInGroup) movers = items.filter((i) => i.grp === me.grp);
+        const els = movers.map((i) => svg.querySelector(`[data-item="${i.type}"][data-id="${i.id}"]`));
         let dx = 0, dy = 0;
-        g.onpointermove = (mv) => { const p = pt(mv); dx = p.x - start.x; dy = p.y - start.y; g.setAttribute("transform", `translate(${dx} ${dy})`); };
+        g.onpointermove = (mv) => { const p = pt(mv); dx = p.x - start.x; dy = p.y - start.y; els.forEach((el) => el && el.setAttribute("transform", `translate(${dx} ${dy})`)); };
         g.onpointerup = async () => {
           g.onpointermove = g.onpointerup = null;
-          if (Math.abs(dx) + Math.abs(dy) < 0.08) { g.removeAttribute("transform"); selected = { type, id }; redraw(); return; }
-          const snap = (v) => Math.round(v * 10) / 10, gw = S.g.garden.w, gh = S.g.garden.h;
-          let x = Math.max(0, snap(x0 + dx)), y = Math.max(0, snap(y0 + dy));
-          if (gw && gh) { x = Math.min(x, Math.max(0, gw - w)); y = Math.min(y, Math.max(0, gh - h)); }
-          const items = planItems(), me = items.find((i) => i.type === type && i.id === id);
-          let moved = { ...me, x, y }, message;
-          const lined = type === "space" && snapNextTo(moved, items);
-          if (lined) {
-            moved = { ...moved, x: lined.x, y: lined.y, a: lined.a };
-            message = `🧲 Lined up next to ${lined.to.s.name}${S.g.garden.path_w ? ` with a ${Math.round(S.g.garden.path_w * 100)}cm path` : ""}`;
+          if (Math.abs(dx) + Math.abs(dy) < 0.08) {  // a tap, not a drag
+            els.forEach((el) => el && el.removeAttribute("transform"));
+            if (multi) { const k = itemKey(me); picked.has(k) ? picked.delete(k) : picked.add(k); }
+            else if (me.grp && !(selected && selected.type === "group" && selected.grp === me.grp)) selected = { type: "group", grp: me.grp };
+            else selected = { type, id };  // a second tap on a grouped thing picks just that one
+            redraw(); return;
           }
-          if (type === "space") {
-            const hit = items.find((o) => o.type === "space" && o.id !== id && overlaps(moved, o));
-            if (hit) { g.removeAttribute("transform"); toast(`That's on top of ${hit.s.name} - drag it to a clear spot`); return; }
+          const step = (v) => Math.round(v * 10) / 10;
+          let sx = step(dx), sy = step(dy), message;
+          let moved = movers.map((i) => ({ ...i, x: i.x + sx, y: i.y + sy }));
+          // keep everything on the plan
+          const minX = Math.min(...moved.map((i) => box(i).x0)), minY = Math.min(...moved.map((i) => box(i).y0));
+          if (minX < 0 || minY < 0) moved = moved.map((i) => ({ ...i, x: i.x - Math.min(0, minX), y: i.y - Math.min(0, minY) }));
+          const gw = S.g.garden.w, gh = S.g.garden.h;
+          if (movers.length === 1 && gw && gh) moved[0] = { ...moved[0], x: Math.min(moved[0].x, Math.max(0, gw - moved[0].w)), y: Math.min(moved[0].y, Math.max(0, gh - moved[0].h)) };
+          if (movers.length === 1 && type === "space") {
+            const lined = snapNextTo(moved[0], items);
+            if (lined) {
+              moved[0] = { ...moved[0], x: lined.x, y: lined.y, a: lined.a };
+              message = `🧲 Lined up next to ${lined.to.s.name}${S.g.garden.path_w ? ` with a ${Math.round(S.g.garden.path_w * 100)}cm path` : ""}`;
+            }
           }
-          selected = { type, id };
-          await save({ type, id, x: moved.x, y: moved.y, a: moved.a }, message);
+          const moving = new Set(movers.map(itemKey));
+          const hit = moved.filter((i) => i.type === "space").map((i) => items.find((o) => o.type === "space" && !moving.has(itemKey(o)) && overlaps(i, o))).find(Boolean);
+          if (hit) { els.forEach((el) => el && el.removeAttribute("transform")); toast(`That's on top of ${hit.s.name} - drag to a clear spot`); return; }
+          if (!multi && movers.length === 1) selected = { type, id };
+          await saveMany(moved, message);
         };
       };
     });
   }
   const desel = $("#desel"); if (desel) desel.onclick = () => { selected = null; redraw(); };
+  const grpMake = $("#g-make");
+  if (grpMake) grpMake.onclick = async () => {
+    const list = [...picked].map((k) => k.split(":"));
+    const ok = await change("POST", "/api/plan/group", { spaces: list.filter(([t]) => t === "space").map(([, id]) => Number(id)),
+      features: list.filter(([t]) => t === "feature").map(([, id]) => Number(id)) }, `🔗 Grouped ${list.length} - they'll move together now`);
+    if (ok) { const first = list[0], it0 = planItems().find((i) => i.type === first[0] && i.id === Number(first[1])); multi = false; picked.clear(); selected = { type: "group", grp: it0.grp }; plotPage(); }
+  };
+  const grpClear = $("#g-clear"); if (grpClear) grpClear.onclick = () => { picked.clear(); redraw(); };
+  const grpUn = $("#g-un"); if (grpUn) grpUn.onclick = async () => { const g = selected.grp; selected = null; await change("POST", "/api/plan/ungroup", { grp: g }, "Ungrouped"); };
+  const grpClose = $("#g-close"); if (grpClose) grpClose.onclick = () => { selected = null; redraw(); };
 
   const f = selected && selected.type === "feature" && S.g.garden.features.find((x) => x.id === selected.id);
   if (f) {

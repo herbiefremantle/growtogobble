@@ -508,6 +508,41 @@ def turn_space(space_id: int, user=Depends(auth.current_user)):
         return garden.payload(conn, user)
 
 
+class Group(BaseModel):
+    spaces: list = []
+    features: list = []
+
+
+@app.post("/api/plan/group")
+def group_items(body: Group, user=Depends(auth.current_user)):
+    """Group beds and features so they move together on the plan."""
+    if len(body.spaces) + len(body.features) < 2:
+        raise HTTPException(400, "Pick at least two things to group.")
+    with db.connect() as conn:
+        top = conn.execute("SELECT MAX(g) FROM (SELECT grp AS g FROM spaces WHERE user_id = ? UNION ALL "
+                           "SELECT grp FROM features WHERE user_id = ?)", (user["id"], user["id"])).fetchone()[0]
+        g = (top or 0) + 1
+        for sid in body.spaces[:100]:
+            _own(conn, "spaces", int(sid), user)
+            conn.execute("UPDATE spaces SET grp = ? WHERE id = ?", (g, int(sid)))
+        for fid in body.features[:100]:
+            _own(conn, "features", int(fid), user)
+            conn.execute("UPDATE features SET grp = ? WHERE id = ?", (g, int(fid)))
+        return garden.payload(conn, user)
+
+
+class Ungroup(BaseModel):
+    grp: int
+
+
+@app.post("/api/plan/ungroup")
+def ungroup_items(body: Ungroup, user=Depends(auth.current_user)):
+    with db.connect() as conn:
+        conn.execute("UPDATE spaces SET grp = NULL WHERE user_id = ? AND grp = ?", (user["id"], body.grp))
+        conn.execute("UPDATE features SET grp = NULL WHERE user_id = ? AND grp = ?", (user["id"], body.grp))
+        return garden.payload(conn, user)
+
+
 class GardenSize(BaseModel):
     w: Optional[float] = None
     h: Optional[float] = None

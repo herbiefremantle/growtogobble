@@ -583,3 +583,16 @@ def test_editing_the_outline_keeps_beds_in_place(client):
     assert g["garden"]["shape"][0] == [0, 0] and (g["garden"]["w"], g["garden"]["h"]) == (11, 9)
     bed = g["spaces"][0]
     assert (bed["pos_x"], bed["pos_y"]) == (4, 3)   # moved with the outline, so it's in the same real spot
+
+
+def test_group_and_ungroup(client):
+    _join(client)
+    a = client.post("/api/spaces", json={"name": "A", "kind": "bed"}).json()["spaces"][0]["id"]
+    b = client.post("/api/spaces", json={"name": "B", "kind": "bed"}).json()["spaces"][-1]["id"]
+    f = client.post("/api/features", json={"kind": "path"}).json()["garden"]["features"][0]["id"]
+    assert client.post("/api/plan/group", json={"spaces": [a]}).status_code == 400
+    g = client.post("/api/plan/group", json={"spaces": [a, b], "features": [f]}).json()
+    grp = g["spaces"][0]["grp"]
+    assert grp and all(s["grp"] == grp for s in g["spaces"]) and g["garden"]["features"][0]["grp"] == grp
+    g = client.post("/api/plan/ungroup", json={"grp": grp}).json()
+    assert all(s["grp"] is None for s in g["spaces"]) and g["garden"]["features"][0]["grp"] is None

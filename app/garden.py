@@ -127,7 +127,7 @@ def payload(conn, user):
         "garden": {"w": user.get("garden_w"), "h": user.get("garden_h"),
                    "shape": json.loads(user["garden_shape"]) if user.get("garden_shape") else None,
                    "path_w": user.get("path_w") if user.get("path_w") is not None else 0.5,
-                   "features": rows(conn, "SELECT id, kind, name, x, y, w, h, angle FROM features WHERE user_id = ? ORDER BY id", user["id"])},
+                   "features": rows(conn, "SELECT id, kind, name, x, y, w, h, angle, grp FROM features WHERE user_id = ? ORDER BY id", user["id"])},
         "spaces": spaces_out,
         "crops": crops_out,
         "shopping": shopping,
