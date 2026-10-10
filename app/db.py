@@ -140,7 +140,8 @@ MIGRATIONS = [("spaces", "width_m", "REAL"), ("spaces", "length_m", "REAL"), ("c
               ("users", "garden_shape", "TEXT"), ("spaces", "angle", "REAL"), ("features", "angle", "REAL"),
               ("users", "path_w", "REAL"), ("spaces", "grp", "INTEGER"), ("features", "grp", "INTEGER"),
               ("features", "variety", "TEXT"), ("spaces", "shape", "TEXT"), ("spaces", "sun", "TEXT"),
-              ("crops", "variety", "TEXT"), ("features", "cultivar", "TEXT")]
+              ("crops", "variety", "TEXT"), ("features", "cultivar", "TEXT"),
+              ("spaces", "pot_size", "TEXT"), ("spaces", "pot_count", "INTEGER")]
 
 
 def init():

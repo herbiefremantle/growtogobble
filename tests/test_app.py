@@ -725,3 +725,23 @@ def test_seed_saving(client):
     assert any(j["kind"] == "seeds" for j in g["crops"][0]["jobs"])
     g = client.post("/api/crops", json={"plant_id": "carrots"}).json()
     assert not any(j["kind"] == "seeds" for j in next(c for c in g["crops"] if c["plant_id"] == "carrots")["jobs"])
+
+
+def test_pot_sizes_and_overwintering(client):
+    _join(client)
+    cat = client.get("/api/plants").json()
+    assert any(z["key"] == "p30" for z in cat["pot_sizes"])
+    plants = {p["id"]: p for p in cat["plants"]}
+    assert plants["tomatoes"]["pot_fits"]["growbag"] == 3 and plants["tomatoes"]["pot_fits"]["p20"] == 0
+    assert plants["potatoes"]["pot_fits"]["sack"] == 3 and plants["chillies"]["overwinter"]
+    g = client.post("/api/spaces", json={"name": "Patio pots", "kind": "pot", "pot_size": "p30", "pot_count": 3}).json()
+    pots = g["spaces"][0]
+    assert pots["pot_size"] == "p30" and pots["pot_count"] == 3 and pots["usage"]["unit"] == "pots" and pots["usage"]["area"] == 3
+    g = client.post("/api/crops", json={"plant_id": "chillies", "space_id": pots["id"], "quantity": 2, "method": "plants"}).json()
+    assert g["spaces"][0]["usage"]["peak"] == 2.0  # one chilli per 30cm pot
+    chilli = g["crops"][0]
+    assert any(j["kind"] == "overwinter" for j in chilli["jobs"])
+    check = client.get("/api/check", params={"plant_id": "courgette", "space_id": pots["id"], "quantity": 1}).json()
+    assert check["space"]["fits"] is False  # a courgette needs a much bigger pot
+    g = client.patch("/api/spaces/%d" % pots["id"], json={"name": "Patio pots", "kind": "pot", "pot_size": "p50", "pot_count": 1}).json()
+    assert g["spaces"][0]["pot_size"] == "p50" and g["spaces"][0]["usage"]["area"] == 1

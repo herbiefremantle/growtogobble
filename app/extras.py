@@ -517,3 +517,91 @@ SEED_STORE = ["Put each kind in its own paper envelope - never plastic, they go 
               "Write the name and the date on it 🏷️",
               "Keep them somewhere cool, dark and dry - a tin or jar with a lid in a cupboard is perfect",
               "Most seeds keep 2-3 years (parsnips only 1). Swap your spares with friends at a seed swap! 🔁"]
+
+
+# ---- pots: common UK sizes, and what each plant needs ---------------------------------------------------
+# key: (name, label, litres of compost, depth cm, surface m2, picture size)
+POT_SIZES = [
+    ("p15", "Small pot", "15cm across", 1.5, 13, 0.018, 15),
+    ("p20", "Medium pot", "20cm across", 3, 17, 0.031, 20),
+    ("p25", "25cm pot", "25cm across", 6, 21, 0.049, 25),
+    ("p30", "30cm pot", "30cm across", 10, 25, 0.071, 30),
+    ("p35", "35cm pot", "35cm across", 15, 28, 0.096, 35),
+    ("p40", "Large pot", "40cm across", 25, 32, 0.126, 40),
+    ("p50", "Big tub", "50cm across", 45, 38, 0.196, 50),
+    ("barrel", "Half barrel", "60cm across", 80, 40, 0.283, 60),
+    ("trough", "Window box", "60 × 18cm", 12, 16, 0.108, 0),
+    ("growbag", "Grow bag", "90 × 35cm", 35, 10, 0.315, 0),
+    ("sack", "Grow sack", "40 litres", 40, 40, 0.13, 40),
+]
+# id: (litres of compost each plant needs, how deep (cm) the pot must be[, how many in a grow bag])
+POT_NEED = {
+    "radish": (0.15, 10), "salad": (1, 12, 8), "peas": (1.5, 20), "broad_beans": (3, 25), "garlic": (0.8, 15), "onions": (0.8, 15),
+    "spring_onions": (0.1, 12), "potatoes": (13, 30), "courgette": (40, 30, 1), "strawberries": (2.5, 15, 8), "nasturtium": (2, 12),
+    "chives": (1.5, 12), "mint": (5, 15), "chard": (3, 20), "beetroot": (0.8, 20), "runner_beans": (5, 30), "french_beans": (3, 20, 6),
+    "carrots": (0.4, 25), "tomatoes": (8, 10, 3), "tomatoes_big": (12, 10, 2), "summer_squash": (40, 30, 1), "sweet_potatoes": (15, 30, 3),
+    "cucumber": (15, 20, 2), "kale": (12, 25), "basil": (1.5, 12), "raspberries": (30, 30), "blueberries": (30, 30), "chillies": (5, 15, 3),
+    "peppers": (8, 20, 3), "melon": (20, 20, 2), "aubergine": (10, 20, 2), "parsley": (2, 20), "coriander": (0.5, 15), "dill": (2, 20),
+    "thyme": (2, 12), "rosemary": (15, 25), "sage": (6, 20), "oregano": (3, 15),
+    "french_marigold": (1, 10), "calendula": (2, 15), "borage": (8, 20), "poached_egg": (0.5, 10), "alyssum": (0.3, 8),
+    "sweet_pea": (2, 20), "sunflower": (10, 25), "cosmos": (5, 20), "zinnia": (2, 15), "cornflower": (1.5, 15), "nigella": (0.8, 12),
+    "dahlia": (15, 30), "lavender": (10, 20), "salvia": (6, 20), "rose": (30, 35), "tulip": (0.3, 15), "daffodil": (0.3, 15),
+    "viola": (0.6, 10), "geranium": (8, 20), "fuchsia": (8, 20), "forget_me_not": (0.5, 10), "hydrangea": (30, 30), "hosta": (10, 20),
+    "fern": (8, 20), "hellebore": (8, 20), "snowdrop": (0.1, 10), "sweet_william": (1.5, 15), "snapdragon": (1.5, 15),
+    "petunia": (1.5, 12), "bedding_geranium": (2, 12), "lobelia": (0.5, 10), "begonia": (1.5, 12), "busy_lizzie": (1.2, 12),
+    "allium": (1, 20), "crocus": (0.1, 10), "hyacinth": (0.4, 15), "bluebell": (0.2, 12), "lily": (3, 25), "gladiolus": (1, 20),
+    "echinacea": (8, 20), "rudbeckia": (8, 20), "verbena": (5, 20), "hollyhock": (15, 30), "delphinium": (15, 30), "aquilegia": (4, 20),
+    "astilbe": (5, 20), "heuchera": (3, 15), "primrose": (0.8, 10), "poppy": (1, 12), "clematis": (40, 40), "honeysuckle": (40, 40),
+    "buddleja": (40, 35),
+}
+
+# ---- keeping tender plants alive over winter, so you don't start again from seed ----------------------------
+OVERWINTER = {
+    "chillies": {"years": "3-5 years - some people keep the same chilli plant for 10!",
+                 "steps": ["Before the first frost (October), pick the last chillies and bring the plant indoors in its pot",
+                           "Cut it back hard to a 'Y' shape - just the main stem and two or three branches, about 15-20cm tall ✂️",
+                           "Keep it somewhere bright and cool but frost-free (10-15°C) - a cool windowsill, porch or frost-free greenhouse",
+                           "Water only a little - just when the compost is dry. It'll drop its leaves, that's normal",
+                           "In March, move it somewhere warmer, pot it into fresh compost and start feeding - it grows back fast",
+                           "Overwintered chillies flower earlier and give a bigger crop than new plants 🌶️"]},
+    "peppers": {"years": "2-3 years, but trickier than chillies",
+                "steps": ["Before the first frost, bring the plant in and cut it back to a few short branches",
+                          "Keep it bright, frost-free and on the dry side over winter", "In spring, repot it and start feeding again"]},
+    "aubergine": {"years": "a second year if you're lucky - a fun experiment",
+                  "steps": ["Bring it in before frost, cut it back by half", "Keep it warm (at least 12°C) and bright, water sparingly",
+                            "Repot in spring - it should fruit earlier"]},
+    "bedding_geranium": {"years": "for years and years",
+                         "steps": ["Before the first frost, bring pots indoors to a bright, frost-free windowsill or porch",
+                                   "Cut them back by half and water only now and then", "Or take 10cm cuttings in late summer - they root easily in a small pot",
+                                   "In spring, repot and put them out again after the last frost"]},
+    "fuchsia": {"years": "for years",
+                "steps": ["Hardy fuchsias can stay outside - cover the base with a thick layer of compost",
+                          "Fuchsias in pots: move them into a shed, garage or porch over winter and keep them just damp",
+                          "Cut back to a few buds on each stem in spring"]},
+    "begonia": {"years": "for years - the tubers come back",
+                "steps": ["After the first light frost, let the pot dry out and cut the stems off",
+                          "Lift the tuber (the lumpy round root), clean it and let it dry",
+                          "Store in a box of dry compost somewhere frost-free", "Plant it hollow side up in March for flowers again"]},
+    "basil": {"years": "through the winter, then start fresh in spring",
+              "steps": ["In September, snip a few 10cm shoots and stand them in a glass of water on the windowsill",
+                        "When they've grown roots (about 2 weeks), pot them up",
+                        "Keep them on a warm, sunny windowsill and pick a few leaves all winter"]},
+    "tomatoes": {"years": "through the winter - a fun experiment",
+                 "steps": ["In September, snap off a side shoot and stand it in a glass of water - it grows roots in days",
+                           "Pot it up and keep it on a warm, bright windowsill over winter",
+                           "In spring it's a ready-made plant - or take cuttings from it"]},
+    "mint": {"years": "fresh mint all winter",
+             "steps": ["In autumn, dig up a small piece with roots and pot it up", "Keep it on the kitchen windowsill and snip as needed"]},
+    "chives": {"years": "fresh chives through winter",
+               "steps": ["In autumn, pot up a small clump", "Bring it onto a bright windowsill - it sends up fresh shoots"]},
+    "dahlia": {"years": "for years - the tubers come back bigger",
+               "steps": ["After the first frost blackens the leaves, cut the stems down", "Dig up the tubers, dry them upside down for a week",
+                         "Store in a box of dry compost somewhere frost-free, and plant out again in May"]},
+}
+# known good numbers that the sums don't get right
+POT_OVERRIDE = {
+    "potatoes": {"sack": 3, "p50": 3, "barrel": 5},
+    "strawberries": {"p25": 2, "p30": 3, "p35": 4, "p40": 5, "p50": 7, "barrel": 10, "trough": 3},
+    "tomatoes": {"p50": 2, "barrel": 3},
+    "tomatoes_big": {"barrel": 2},
+}

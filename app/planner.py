@@ -208,6 +208,14 @@ def crop_jobs(crop, shift, done_keys, today):
         add("seeds", "seeds", "🌰", "Save seeds from your %s for next year" % name.lower(), s_start, h_end + 3 * WEEK,
             steps=plant["save"]["steps"] + catalogue._extras.SEED_STORE, waiting=not in_ground)
 
+    # tender plants worth keeping alive over winter (chillies!) - bring them in before the frost
+    if plant.get("overwinter") and plant["id"] != "dahlia":
+        year = h_end.year if h_end.month >= 8 else h_end.year - 1
+        w0, w1 = window_dates(["10-01", "10-25"], year, shift)
+        if w1 > h_start:
+            add("winter", "overwinter", "❄️", "Keep your %s over winter?" % name.lower(), w0, w1,
+                steps=["You can keep it for " + plant["overwinter"]["years"]] + plant["overwinter"]["steps"], waiting=not in_ground)
+
     # 4. another batch, for a steady supply
     if plant.get("succession") and method != "plants" and sown:
         start = sown + plant["succession"] * WEEK
@@ -424,7 +432,37 @@ def fill_quantity(plant, area, fraction):
     return max(1, int(area * fraction / area_each(plant)))
 
 
+def pot_fits(plant, size):
+    """How many of this plant fit in one pot of `size` (a key from POT_SIZES): enough compost each, a deep enough
+    pot, and room on top (pots can be planted a bit closer than a bed)."""
+    from . import extras
+    need = extras.POT_NEED.get(plant["id"])
+    pot = catalogue.POT_BY_KEY.get(size)
+    if not need or not pot or "pot" not in plant["where"]:
+        return 0
+    if size in extras.POT_OVERRIDE.get(plant["id"], {}):
+        return extras.POT_OVERRIDE[plant["id"]][size]
+    if size == "growbag" and len(need) > 2:
+        return need[2]
+    if pot["depth"] < need[1] or pot["litres"] < need[0]:
+        return 0
+    room = int(pot["surface"] / ((max(plant["sp_cm"], 4) / 100) ** 2 * 0.8))  # no paths between rows in a pot
+    return max(1, min(int(pot["litres"] / need[0]), room))
+
+
 def pot_advice(plant):
+    """The smallest common pot that takes one, and how many fit in an ordinary 30cm pot."""
+    fits = {p["key"]: pot_fits(plant, p["key"]) for p in catalogue.POT_SIZES}
+    first = next((p for p in catalogue.POT_SIZES if p["key"] != "growbag" and fits[p["key"]]), None)
+    if not first:
+        return "Too big for pots - grow it in a bed"
+    if fits["p30"] >= 2:
+        return "About %d fit in a 30cm pot (10 litres)" % fits["p30"]
+    name = first["name"].lower() if "cm" in first["name"] else "%s (%s)" % (first["name"].lower(), first["label"])
+    return "Needs at least a %s, %g litres, for each one" % (name, first["litres"])
+
+
+def _old_pot_advice(plant):
     """How many fit in an ordinary 30cm pot (about 0.07 m2), or how big a pot one plant needs."""
     per_pot = int(0.07 / area_each(plant))
     if per_pot >= 2:
@@ -432,6 +470,11 @@ def pot_advice(plant):
     if plant["sp_cm"] <= 45:
         return "1 per 30cm pot"
     return "1 per big pot or tub (45cm or wider)"
+
+
+def pot_capacity(space):
+    """Pots with a size set are measured in pots, not square metres."""
+    return space["kind"] == "pot" and space.get("pot_size") in catalogue.POT_BY_KEY
 
 
 def usage(space, crops_with_jobs, extra=None):
@@ -444,7 +487,11 @@ def usage(space, crops_with_jobs, extra=None):
         start, end = crop_starts(crop, jobs), crop_finishes(crop, jobs)
         if start and end:
             plant = catalogue.BY_ID[crop["plant_id"]]
-            spans.append((start, end, quantity(crop) * area_each(plant), crop.get("id")))
+            if pot_capacity(space):  # how many pots it fills
+                fits = pot_fits(plant, space["pot_size"])
+                spans.append((start, end, quantity(crop) / fits if fits else 99.0, crop.get("id")))
+            else:
+                spans.append((start, end, quantity(crop) * area_each(plant), crop.get("id")))
     points = [sp[0] for sp in spans]  # the busiest moment is always when something goes in
     if extra:  # only moments while the new crop would be in the ground matter
         new = [sp for sp in spans if sp[3] == extra[0].get("id")]
@@ -458,7 +505,10 @@ def usage(space, crops_with_jobs, extra=None):
             best = {"peak": used, "on": t, "crops": [sp[3] for sp in here]}
     best["peak"] = round(best["peak"], 2)
     best["on"] = best["on"].isoformat() if best["on"] else None
-    best["area"] = space_area(space)
+    if pot_capacity(space):
+        best.update(area=space.get("pot_count") or 1, unit="pots")
+    else:
+        best["area"] = space_area(space)
     return best
 
 

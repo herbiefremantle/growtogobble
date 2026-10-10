@@ -583,3 +583,11 @@ svg.plot.withsat .gridline { stroke: rgba(255,255,255,.18); }
 .hero-pic figcaption a { font-size: 11px; color: #fff; background: rgba(0,0,0,.55); padding: 2px 8px; border-radius: 999px; text-decoration: none;
   display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .sheet-close { position: relative; z-index: 5; }  /* stay on top of a photo at the top of the pop-up */
+
+/* pot sizes */
+.potsizes { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
+.potsize { padding: 8px 4px; gap: 2px; font: inherit; color: inherit; }
+.potsize .e { height: 36px; display: flex; align-items: flex-end; }
+.potsize b { font-size: 13px; }
+.potsize .small { font-size: 11px; }
+.potdraw { fill: #c0714a; stroke: #8e4f30; stroke-width: 1.5; }

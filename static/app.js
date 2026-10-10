@@ -460,6 +460,8 @@ document.addEventListener("click", async (e) => {
   if (bp) { openBedPlan(Number(bp.dataset.bedplan)); return; }
   const mx = e.target.closest("[data-open-mix]");
   if (mx) { openMix(mx.dataset.openMix); return; }
+  const sz = e.target.closest("[data-setpot]");
+  if (sz) { const sp = space(Number(sz.dataset.space)); await patchSpace(sp, { pot_size: sz.dataset.setpot, pot_count: sp.pot_count || 1 }, `🪴 ${potName(potSize(sz.dataset.setpot))} - here's what fits`); return; }
   const fp = e.target.closest("[data-flowers]");
   if (fp) { openFlowerPlan(Number(fp.dataset.flowers)); return; }
   const pl = e.target.closest("[data-open-plant]");
@@ -756,6 +758,23 @@ function spaceSize(s) {
   const def = s.kind === "allotment" ? { w: 5, h: 25 } : { w: 1.2, h: 2.4 };
   return { w: s.width_m || def.w, h: s.length_m || def.h };
 }
+
+// Pots: common sizes, and what fits in them
+const potSize = (key) => S.cat.pot_sizes.find((x) => x.key === key);
+const potName = (z) => (/cm/.test(z.name) ? z.name : `${z.name} (${z.label})`);
+function potIcon(z, max = 34) {  // a little drawing of the pot, to scale
+  if (!z.draw) return `<svg width="${max}" height="${max * 0.6}" viewBox="0 0 60 36"><rect x="2" y="${z.key === "growbag" ? 14 : 8}" width="56" height="${z.key === "growbag" ? 18 : 24}" rx="${z.key === "growbag" ? 9 : 3}" class="potdraw"/></svg>`;
+  const r = (z.draw / 60) * (max / 2);
+  return `<svg width="${max}" height="${max}" viewBox="0 0 ${max} ${max}"><path d="M ${max / 2 - r} ${max - r * 1.5} L ${max / 2 + r} ${max - r * 1.5} L ${max / 2 + r * 0.75} ${max - 1} L ${max / 2 - r * 0.75} ${max - 1} Z" class="potdraw"/></svg>`;
+}
+// what fits in one of these pots - fruit & veg and herbs first, easiest and soonest first
+function potFits(key, groups = ["veg", "herb", "companion", "flower"]) {
+  const t = today();
+  const soon = (p) => Object.values(p.next).some((w) => w && daysBetween(t, d(w[0])) <= 60);
+  return S.cat.plants.filter((p) => groups.includes(p.group) && p.pot_fits && p.pot_fits[key] > 0)
+    .sort((a, b) => soon(b) - soon(a) || a.level - b.level || a.name.localeCompare(b.name));
+}
+const fitChip = (p, key, spaceId) => `<button class="btn small ghost" data-open-plant="${p.id}" ${spaceId ? `data-space="${spaceId}"` : ""}>${p.emoji} ${esc(p.name)} <span class="muted">×${p.pot_fits[key]}</span></button>`;
 
 // Bed shapes: a rectangle unless it's been made round, a triangle, a corner bed, or any shape you like.
 // Freeform corners are stored in the bed's own box and stretch with it.
@@ -1830,6 +1849,11 @@ function gardenList() {
 function usageBar(s) {
   const u = s.usage;
   if (!u || !u.area) return "";
+  if (u.unit === "pots") {
+    const used = Math.round(u.peak * 10) / 10, pctp = Math.round((100 * u.peak) / u.area);
+    return `<div class="use ${pctp > 100 ? "over" : pctp > 85 ? "tight" : ""}"><div class="row" style="justify-content:space-between;gap:4px"><span class="small"><b>${pctp > 100 ? "⚠️ Too full" : pctp > 85 ? "Nearly full" : pctp ? "Room to spare" : "Empty"}</b>${u.on && pctp ? ` at the busiest (${fmt(u.on)})` : ""}</span>
+      <span class="small muted">${used} of ${u.area} pot${u.area > 1 ? "s" : ""} used</span></div><div class="progress"><i style="width:${Math.min(100, pctp)}%"></i></div></div>`;
+  }
   const pct = Math.round((100 * u.peak) / u.area);
   const size = s.width_m && s.length_m ? `${u.area} m² (${s.width_m} × ${s.length_m} m)` : `${u.area} m² (standard bed)`;
   const cls = pct > 100 ? "over" : pct > 85 ? "tight" : "";
@@ -1859,6 +1883,13 @@ function spaceForm(s) {
     <label class="field">How sunny is it?</label>
     <div class="kinds">${Object.entries(S.cat.sun_spots).map(([k, v]) => `<label class="kind ${sunv === k ? "on" : ""}"><input type="radio" name="sun" value="${k}" ${sunv === k ? "checked" : ""}><span class="e">${v.emoji}</span><b>${esc(v.name)}</b></label>`).join("")}</div>
     <p class="small muted" style="margin:6px 0 0">Most veg want sun for 6 hours a day. Shady spots are great for flowers - see 🌸 Flower ideas in the bed.</p>
+    <div id="potq"><label class="field">How big are your pots? <span class="muted small">(so we can say what fits)</span></label>
+      <div class="potsizes">${S.cat.pot_sizes.map((z) => `<label class="kind potsize ${s && s.pot_size === z.key ? "on" : ""}"><input type="radio" name="potsize" value="${z.key}" ${s && s.pot_size === z.key ? "checked" : ""}>
+        <span class="e">${potIcon(z)}</span><b>${esc(z.name)}</b><span class="small muted">${esc(z.label)} · ${z.litres}L</span></label>`).join("")}</div>
+      <label class="field" for="pc">How many of them?</label>
+      <div class="counter qty"><button type="button" class="btn small" data-pc="-1" aria-label="Fewer">−</button><input id="pc" type="number" inputmode="numeric" min="1" max="200" value="${(s && s.pot_count) || 1}"><button type="button" class="btn small" data-pc="1" aria-label="More">+</button></div>
+      <p class="small muted" style="margin:6px 0 0">Measure across the top inside the rim. Pots of different sizes? Add each size as its own space, e.g. "Big tubs" and "Herb pots".</p>
+      <div id="potfits"></div></div>
     <div id="builtq"><label class="field">Is it already built?</label>
     <div class="kinds two">${[[1, "✅", "Yes, it's ready"], [0, "🛠️", "Not yet - show me how"]].map(([v, e, t]) => `<label class="kind ${s && s.built === v ? "on" : ""}"><input type="radio" name="built" value="${v}" ${s && s.built === v ? "checked" : ""}><span class="e">${e}</span><b>${t}</b></label>`).join("")}</div></div>
     <label class="field">What's the soil like?</label>
@@ -1876,9 +1907,12 @@ function wireSpaceForm(s, afterSave) {
   };
   const refresh = () => {
     if (!$("#size")) return;  // the pop-up now shows something else
-    card.querySelectorAll(".kind").forEach((el) => el.classList.toggle("on", el.querySelector("input").checked));
+    card.querySelectorAll(".kind").forEach((el) => { const i = el.querySelector("input"); if (i) el.classList.toggle("on", i.checked); });
     card.querySelectorAll(".soilopt").forEach((el) => el.classList.toggle("on", el.querySelector("input").checked));
     $("#size").hidden = $("#builtq").hidden = val("kind") === "pot";
+    $("#potq").hidden = val("kind") !== "pot";
+    const pk = val("potsize");
+    $("#potfits").innerHTML = pk ? `<label class="field">🌱 Good in a ${esc(potName(potSize(pk)).toLowerCase())}:</label><div class="chips">${potFits(pk, ["veg", "herb"]).slice(0, 10).map((x) => `<span class="chip grey">${x.emoji} ${esc(x.name)} ×${x.pot_fits[pk]}</span>`).join("")}</div>` : "";
     card.querySelectorAll("#builtq .kind").forEach((el) => el.classList.toggle("on", el.querySelector("input").checked));
     const w = Number($("#sw").value), l = Number($("#sl").value), shape = shapeBody();
     const area = !(w && l) ? 0 : shape.type === "circle" ? (Math.PI * w * l) / 4 : polyArea(outlinePts({ kind: "bed", shape }, w, l));
@@ -1891,12 +1925,14 @@ function wireSpaceForm(s, afterSave) {
     $("#soiltip").innerHTML = `<div><b>${t.emoji} How to tell:</b> ${esc(t.test)}</div><div><b>🌱 What to do:</b> ${esc(t.tips)}</div>`;
   };
   card.oninput = card.onchange = refresh;  // replaced (not added to) each time a bed form opens
+  card.onclick = (e) => { const b = e.target.closest("[data-pc]"); if (b) { const el = $("#pc"); el.value = Math.max(1, Math.min(200, (Number(el.value) || 1) + Number(b.dataset.pc))); } };
   refresh();
   $("#save").onclick = async () => {
     const b = val("built");
     const body = { name: $("#sn").value || "My bed", kind: val("kind"), soil: val("soil"), built: b == null ? null : b === "1",
                    width_m: Number($("#sw").value) || null, length_m: Number($("#sl").value) || null,
-                   shape: shapeBody(), sun: val("sun") || null };
+                   shape: shapeBody(), sun: val("sun") || null,
+                   ...(val("kind") === "pot" ? { pot_size: val("potsize") || "", pot_count: Number($("#pc").value) || 1 } : {}) };
     if (await change(s ? "PATCH" : "POST", s ? `/api/spaces/${s.id}` : "/api/spaces", body, s ? "Saved ✅" : "Added ✅") && afterSave) afterSave();
   };
 }
@@ -1945,6 +1981,7 @@ function drawSpace(id) {
       <div class="muted">${pot ? "Growing in pots" : s.built === 1 ? "Built and ready to plant ✅" : s.built === 0 ? "Let's build it" : "Your bed"}</div></div></div>
     ${here.length ? `<button class="card tint-sun row costcard" data-bedplan="${s.id}" style="justify-content:space-between;width:100%">
       <span><b>💷 About ${money(s.cost.total)} to plant</b><span class="small" style="display:block">${s.cost.to_buy < s.cost.total ? `${money(s.cost.to_buy)} still to buy · ` : ""}seeds & plants, roughly</span></span><span class="btn small">See plan 👉</span></button>` : ""}
+    ${pot ? potCard(s) : ""}
     <div class="card"><h3>🌱 Growing here</h3>${veg.map(inBedRow).join("") || (here.length ? "" : `<p class="small muted" style="margin:0">Nothing yet.</p>`)}
       ${herbs.length ? `<h3 style="margin-top:14px">🌿 Herbs</h3>${herbs.map(inBedRow).join("")}` : ""}
       ${comps.length ? `<h3 style="margin-top:14px">🐞 Companion plants</h3>${comps.map(inBedRow).join("")}` : ""}
@@ -2223,7 +2260,8 @@ function saveCard(p) {
 function roomCard(p) {
   return `<div class="card tint-sky"><h3>📏 How much room?</h3>
     <p style="margin:0 0 4px">Each one needs <b>${p.sp_cm}cm</b> to its neighbour, with <b>${p.row_cm}cm</b> between rows. That's about <b>${Math.max(1, Math.floor(1 / p.area_each))} per square metre</b>.</p>
-    ${p.where.includes("pot") ? `<p class="small" style="margin:0">🪴 ${esc(p.pot_advice)}</p>` : ""}
+    ${p.where.includes("pot") ? `<p class="small" style="margin:0">🪴 ${esc(p.pot_advice)}.</p>
+      <div class="chips" style="margin-top:6px">${S.cat.pot_sizes.filter((z) => p.pot_fits[z.key]).slice(0, 6).map((z) => `<span class="chip grey">${esc(z.name)}: ${p.pot_fits[z.key]}</span>`).join("")}</div>` : ""}
     ${p.yield_each ? `<p class="small" style="margin:6px 0 0">🧺 Each of your ${esc(p.unit)} gives ${p.yield_each[0] === p.yield_each[1] ? p.yield_each[0] : p.yield_each[0] + "-" + p.yield_each[1]} ${esc(p.yield_each[2])}.</p>`
       : p.yield_text ? `<p class="small" style="margin:6px 0 0">🧺 You'll get ${esc(p.yield_text)}.</p>` : ""}
     ${p.pack_hint ? `<p class="small muted" style="margin:6px 0 0">💡 ${esc(p.pack_hint)}</p>` : ""}</div>`;
@@ -2316,6 +2354,8 @@ function openPlant(id, spaceId, startMethod, after) {
     ${p.eat ? `<div class="card tint-tomato"><h3>😋 Eat it!</h3><p style="margin:0">${esc(p.eat)}</p></div>` : ""}
     ${p.store ? storeCard(p) : ""}
     ${saveCard(p)}
+    ${p.overwinter ? `<div class="card tint-sky"><h3>❄️ Keep it over winter - no need to start again from seed</h3>
+      <p style="margin:0 0 6px"><b>How long:</b> ${esc(p.overwinter.years)}</p><ol class="steps">${p.overwinter.steps.map((t) => `<li>${esc(t)}</li>`).join("")}</ol></div>` : ""}
     ${after || !p.then ? "" : thenCard(dict(p.then, { family: p.family_name }), "After picking, grow next", spaceId)}
     </div>`);
   wirePanes();
@@ -2359,6 +2399,13 @@ function openPlant(id, spaceId, startMethod, after) {
   const drawFill = () => {
     const sp = $("#sp"), bed = sp && sp.value ? space(Number(sp.value)) : null;
     const area = bed && bed.usage && bed.usage.area;
+    if (bed && bed.usage && bed.usage.unit === "pots") {
+      const per = (p.pot_fits || {})[bed.pot_size] || 0, n = bed.pot_count || 1;
+      $("#fill").innerHTML = per ? `<div class="fillrow"><span class="small muted">${per} fit in each pot:</span><button class="btn small" data-fillpots="1">1 pot</button>${n > 1 ? `<button class="btn small" data-fillpots="${n}">All ${n} pots</button>` : ""}</div>`
+        : `<p class="small" style="margin:6px 0 0">⚠️ Too big for these pots - ${esc(p.pot_advice.toLowerCase())}.</p>`;
+      $("#fill").onclick = (e) => { const b = e.target.closest("[data-fillpots]"); if (!b) return; qty = per * Number(b.dataset.fillpots); $("#qty").value = qty; runCheck(); toast(`${b.textContent} = ${qty} ${p.unit}`); };
+      return;
+    }
     $("#fill").innerHTML = area ? `<div class="fillrow"><span class="small muted">Fill ${esc(bed.name)}:</span>${[[0.25, "¼"], [0.5, "½"], [0.75, "¾"], [1, "Whole bed"]]
       .map(([f, l]) => `<button class="btn small" data-fill="${f}">${l}</button>`).join("")}</div>` : "";
     $("#fill").onclick = (e) => {
@@ -2585,6 +2632,18 @@ async function openFlowerPlan(id, sun) {
   }));
 }
 
+// "What fits in your pots" - or, until we know the size, a quick way to tell us
+function potCard(s) {
+  if (!s.pot_size) return `<div class="card tint-sky"><h3>🪴 How big are your pots?</h3><p class="small" style="margin:0 0 8px">Tap the nearest size and we'll show what you can grow in them.</p>
+    <div class="potsizes">${S.cat.pot_sizes.map((z) => `<button class="kind potsize" data-setpot="${z.key}" data-space="${s.id}"><span class="e">${potIcon(z)}</span><b>${esc(z.name)}</b><span class="small muted">${esc(z.label)} · ${z.litres}L</span></button>`).join("")}</div></div>`;
+  const z = potSize(s.pot_size), n = s.pot_count || 1;
+  const group = (g, title) => { const list = potFits(z.key, [g]); return list.length ? `<h4 class="small" style="margin:10px 0 4px">${title}</h4><div class="chips">${list.slice(0, 12).map((x) => fitChip(x, z.key, s.id)).join("")}</div>` : ""; };
+  return `<div class="card tint-sky"><div class="row" style="justify-content:space-between"><h3 style="margin:0">${potIcon(z, 28)} ${n} × ${esc(potName(z).toLowerCase())}</h3>
+      <span class="small muted">${z.litres} litres each</span></div>
+    <p class="small" style="margin:6px 0 0">What grows well in one - the number is how many fit in each pot. Tap one to add it. Ones you can start soon come first.</p>
+    ${group("veg", "🥕 Fruit & veg")}${group("herb", "🌿 Herbs")}${group("flower", "🌸 Flowers")}${group("companion", "🐞 Companions")}</div>`;
+}
+
 // A little picture of the bed with the flowers laid out: bands from back to front, or rings round the middle
 function flowerDiagram(s, plan, combo) {
   const sz = spaceSize(s), w = sz.w, h = sz.h, pad = Math.max(w, h) * 0.04, fs = Math.min(w, h) * 0.13;
@@ -2650,7 +2709,15 @@ function checkHtml(p, r) {
     r.buy ? `🛒 <b>${esc(r.buy.text)}</b>${r.buy.seeds ? ` - enough to sow ${r.buy.seeds}` : ""}${r.buy.note ? ` <span class="muted">(${esc(r.buy.note)})</span>` : ""}` : "",
     r.cost ? `💷 About <b>${money(r.cost.total)}</b> - ${esc(r.cost.how)}. That's about <b>${pence(r.cost.per_plant)} a plant</b>.` : ""].filter(Boolean);
   let cls = "ok";
-  if (r.space && r.space.area) {
+  if (r.space && r.space.unit === "pots") {
+    const u = r.space, sp = space(Number(($("#sp") || {}).value)), per = sp && p.pot_fits ? p.pot_fits[sp.pot_size] : 0;
+    if (!per) { cls = "warn"; lines.push(`⚠️ Too big for these pots - ${esc(p.pot_advice.toLowerCase())}.`); }
+    else {
+      lines.push(`🪴 ${per} fit in each pot, so that's about <b>${Math.ceil(Math.round((r.qty || 1) / per * 10) / 10)} pot${Math.ceil((r.qty || 1) / per) > 1 ? "s" : ""}</b>.`);
+      if (u.fits) lines.push(`✅ Fits! At the busiest${u.on ? " (" + fmt(u.on) + ")" : ""}, ${Math.round(u.peak * 10) / 10} of your ${u.area} pots are used.`);
+      else { cls = "warn"; lines.push(`⚠️ That needs ${Math.round(u.peak * 10) / 10} pots${u.on ? " around " + fmt(u.on) : ""} - you have ${u.area}. Plant fewer, or add more pots.`); }
+    }
+  } else if (r.space && r.space.area) {
     const u = r.space;
     const pct = Math.min(100, Math.round((100 * u.peak) / u.area));
     lines.push(`📏 Needs about <b>${r.area} m²</b>. ${esc(u.name)} is ${u.area} m².`);

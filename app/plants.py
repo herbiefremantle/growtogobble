@@ -1106,8 +1106,11 @@ for _p in PLANTS:
     _p.setdefault("height_cm", _extras.HEIGHTS.get(_p["id"], 40))
     _kind = _extras.SEED_SAVE.get(_p["id"], "none")
     _p["save"] = dict(_extras.SAVE_KINDS[_kind], kind=_kind)
+    _p["overwinter"] = _extras.OVERWINTER.get(_p["id"])
     # flowers and herbs that also help the veg show up with the companion plants
     _p["helps"] = _p["group"] == "companion" or _p["id"] in _extras.MORE_HELPS
+POT_SIZES = [dict(zip(("key", "name", "label", "litres", "depth", "surface", "draw"), x)) for x in _extras.POT_SIZES]
+POT_BY_KEY = {x["key"]: x for x in POT_SIZES}
 ALL_ROUNDERS = _extras.ALL_ROUNDERS
 
 # Real photos, from Wikimedia Commons (free licences - each has its author and licence for the credit)

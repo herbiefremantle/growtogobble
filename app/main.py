@@ -412,6 +412,8 @@ class SpaceIn(BaseModel):
     pos_x: Optional[float] = None     # where it goes on the plan (e.g. a copy placed next door)
     pos_y: Optional[float] = None
     angle: Optional[float] = None
+    pot_size: Optional[str] = None    # pots: a common size (app/extras.py POT_SIZES)
+    pot_count: Optional[int] = None   # ...and how many of them
     shape: Optional[dict] = None      # {"type": "rect"|"circle"|"triangle"|"corner"|"free", "pts": [[x, y], ...]}
     sun: Optional[str] = None
 
@@ -433,6 +435,14 @@ def _shape(v):
             raise HTTPException(400, "Bad corner")
         return json.dumps({"type": "free", "pts": clean})
     raise HTTPException(400, "Unknown shape")
+
+
+def _pot_size(v):
+    return v if v in catalogue.POT_BY_KEY else None
+
+
+def _pot_count(n):
+    return max(1, min(int(n or 1), 200))
 
 
 def _sun(v):
@@ -460,6 +470,9 @@ def add_space(body: SpaceIn, user=Depends(auth.current_user)):
                       _metres(body.pos_x) if placed else None, _metres(body.pos_y) if placed else None,
                       _angle(body.angle) if body.angle is not None else None,
                       _shape(body.shape) if body.kind != "pot" else None, _sun(body.sun), clock.now().isoformat()))
+        if body.kind == "pot" and body.pot_size:
+            new_id = conn.execute("SELECT MAX(id) FROM spaces WHERE user_id = ?", (user["id"],)).fetchone()[0]
+            conn.execute("UPDATE spaces SET pot_size = ?, pot_count = ? WHERE id = ?", (_pot_size(body.pot_size), _pot_count(body.pot_count), new_id))
         return garden.payload(conn, user)
 
 
@@ -476,6 +489,8 @@ def rename_space(space_id: int, body: SpaceIn, user=Depends(auth.current_user)):
             conn.execute("UPDATE spaces SET shape = ? WHERE id = ?", (_shape(body.shape) if body.kind != "pot" else None, space_id))
         if body.sun is not None:
             conn.execute("UPDATE spaces SET sun = ? WHERE id = ?", (_sun(body.sun), space_id))
+        if body.pot_size is not None:
+            conn.execute("UPDATE spaces SET pot_size = ?, pot_count = ? WHERE id = ?", (_pot_size(body.pot_size), _pot_count(body.pot_count), space_id))
         if body.pos_x is not None and body.pos_y is not None:  # reshaping a bed can move its box
             conn.execute("UPDATE spaces SET pos_x = ?, pos_y = ? WHERE id = ?", (_metres(body.pos_x), _metres(body.pos_y), space_id))
         return garden.payload(conn, user)
@@ -856,7 +871,7 @@ def space_check(plant_id: str, space_id: Optional[int] = None, method: Optional[
     jobs = planner.crop_jobs(trial, shift, set(), today)
     out = {"quantity": qty, "area": round(qty * planner.area_each(plant), 2), "harvest": planner.harvest_estimate(plant, qty),
            "buy": planner.buy_estimate(plant, qty, method),
-           "cost": planner.cost_estimate(plant, qty, method),
+           "cost": planner.cost_estimate(plant, qty, method), "qty": qty,
            "plan": [{"kind": j["kind"], "title": j["title"], "start": j["start"], "end": j["end"]}
                     for j in jobs if j["kind"] in ("sow_in", "sow_out", "plant_out", "harvest")],
            "in_ground": [d.isoformat() if d else None for d in (planner.crop_starts(trial, jobs), planner.crop_finishes(trial, jobs))]}

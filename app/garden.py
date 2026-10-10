@@ -191,16 +191,17 @@ def catalogue_payload(user=None):
             free = min(harvest[1], harvest[0] + (plant.get("pick_weeks") or 99) * planner.WEEK)
             then = {"free_from": free.isoformat(),
                     "plants": planner.follow_ons(free, "bed", set(), shift, not_families=(plant["family"],), today=today)}
+        pot_fits = {p["key"]: planner.pot_fits(plant, p["key"]) for p in catalogue.POT_SIZES} if "pot" in plant["where"] else {}
         varieties = [dict(v, links=shops.search_links("%s %s %s" % (v["name"], plant["name"], plant.get("buy_word") or "seeds")))
                      for v in plant["varieties"]]
-        out.append(dict(plant, varieties=varieties, months=windows, methods=methods, next=next_by_method,
+        out.append(dict(plant, pot_fits=pot_fits, varieties=varieties, months=windows, methods=methods, next=next_by_method,
                         links={m: shops.links(plant, m) for m in methods},
                         area_each=round(planner.area_each(plant), 4), default_qty=planner.default_quantity(plant),
                         pot_advice=planner.pot_advice(plant), family_name=catalogue.GROUPS.get(plant["family"]), then=then))
     return {
         "plants": out, "levels": catalogue.LEVELS, "methods": planner.METHODS,
         "nodig_steps": catalogue.NODIG_STEPS, "pot_steps": catalogue.POT_STEPS,
-        "all_rounders": catalogue.ALL_ROUNDERS, "seed_store": catalogue._extras.SEED_STORE,
+        "all_rounders": catalogue.ALL_ROUNDERS, "pot_sizes": catalogue.POT_SIZES, "seed_store": catalogue._extras.SEED_STORE,
         "nodig_planting": catalogue.NODIG_PLANTING, "soil_types": catalogue.SOIL_TYPES, "fruit": catalogue.FRUIT, "mixes": catalogue.MIXES, "weed_tips": catalogue.WEED_TIPS,
         "combos": catalogue.COMBOS, "sun_spots": catalogue.SUN_SPOTS,
         "affiliate": shops.is_affiliate(),
