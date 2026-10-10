@@ -1054,7 +1054,7 @@ function selToolbar() {
 function editPanel() {
   const g = S.g.garden;
   let sel = "";
-  if (selected) {
+  if (selected && selected.type !== "group") {  // a whole group is handled by its own bar on the plan
     const items = planItems(), it = items.find((i) => i.type === selected.type && i.id === selected.id);
     if (!it) selected = null;
     else if (it.type === "space") {
