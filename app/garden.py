@@ -123,6 +123,8 @@ def payload(conn, user):
 
     return {
         "today": today.isoformat(),
+        "garden": {"w": user.get("garden_w"), "h": user.get("garden_h"),
+                   "features": rows(conn, "SELECT id, kind, name, x, y, w, h FROM features WHERE user_id = ? ORDER BY id", user["id"])},
         "spaces": spaces_out,
         "crops": crops_out,
         "shopping": shopping,

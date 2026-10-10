@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS users (
     is_admin INTEGER NOT NULL DEFAULT 0,
     last_active TEXT,
     invited_by INTEGER,               -- who invited them (users.id), if they came from an invite link
+    garden_w REAL,                    -- the whole garden / field, for the plan (metres); NULL = fit to what's in it
+    garden_h REAL,
     invite_token TEXT,                -- which invite link they used
     created_at TEXT NOT NULL
 );
@@ -76,6 +78,14 @@ CREATE TABLE IF NOT EXISTS sent (           -- alerts already sent, so nobody ge
     PRIMARY KEY (user_id, key)
 );
 CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS features (       -- things on the garden plan that aren't growing spaces: trees, sheds...
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    name TEXT NOT NULL,
+    x REAL NOT NULL, y REAL NOT NULL, w REAL NOT NULL, h REAL NOT NULL,
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS invites (        -- each time someone taps "Invite a friend"
     token TEXT PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -116,7 +126,7 @@ MIGRATIONS = [("spaces", "width_m", "REAL"), ("spaces", "length_m", "REAL"), ("c
               ("crops", "bed_free_on", "TEXT"), ("users", "is_admin", "INTEGER NOT NULL DEFAULT 0"),
               ("users", "last_active", "TEXT"), ("spaces", "soil", "TEXT"),
               ("spaces", "built", "INTEGER"), ("users", "invited_by", "INTEGER"), ("users", "invite_token", "TEXT"),
-              ("spaces", "pos_x", "REAL"), ("spaces", "pos_y", "REAL")]
+              ("spaces", "pos_x", "REAL"), ("spaces", "pos_y", "REAL"), ("users", "garden_w", "REAL"), ("users", "garden_h", "REAL")]
 
 
 def init():

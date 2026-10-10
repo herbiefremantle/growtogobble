@@ -522,3 +522,20 @@ def test_fill_a_bed_and_what_to_buy():
 def test_page_asks_for_the_newest_script(client):
     page = client.get("/").text
     assert "/static/app.js?v=" in page and "/static/style.css?v=" in page
+
+
+def test_garden_plan_size_features_and_turning(client):
+    _join(client)
+    sid = client.post("/api/spaces", json={"name": "Bed", "kind": "bed", "width_m": 1.2, "length_m": 3}).json()["spaces"][0]["id"]
+    g = client.post("/api/garden/size", json={"w": 30, "h": 20}).json()
+    assert (g["garden"]["w"], g["garden"]["h"]) == (30, 20)
+    g = client.post("/api/features", json={"kind": "tree", "name": "Apple tree", "x": 5, "y": 2, "w": 3, "h": 3}).json()
+    tree = g["garden"]["features"][0]
+    assert tree["name"] == "Apple tree" and (tree["x"], tree["w"]) == (5, 3)
+    g = client.post("/api/spaces/positions", json={"positions": [{"feature": tree["id"], "x": 12, "y": 9}, {"id": sid, "x": 2, "y": 1}]}).json()
+    assert (g["garden"]["features"][0]["x"], g["spaces"][0]["pos_x"]) == (12, 2)
+    g = client.post("/api/spaces/%d/turn" % sid).json()
+    assert (g["spaces"][0]["width_m"], g["spaces"][0]["length_m"]) == (3, 1.2)
+    g = client.delete("/api/features/%d" % tree["id"]).json()
+    assert g["garden"]["features"] == []
+    assert client.post("/api/features", json={"kind": "rocket"}).status_code == 400

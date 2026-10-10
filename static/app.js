@@ -620,17 +620,31 @@ const inBedRow = (c) => cropRow(c, { unplace: true });
 
 // ---- the Garden tab: a bird's-eye plot (default) or a plain list -----------------------------------------
 
-let gardenView = "plot", plotMonth = 0, plotMove = false, placing = null, plotZoom = 1;
+let gardenView = "plot", plotMonth = 0, plotEdit = false, placing = null, plotZoom = 1, selected = null;
 const FAMILY_COLOUR = { cabbage: "#7fb06b", onion: "#d8c48a", bean: "#a6d98f", potato: "#e0ad74", squash: "#f2c45a", carrot: "#f2a564",
   beet: "#c07a9c", leaf: "#93d07f", corn: "#f5d76e", fruit: "#e88a8a", herb: "#7cc4a0", flower: "#f4a3b8", sweetpotato: "#dc9466" };
+// Things on the plan that aren't growing spaces: default size in metres, round or not, colour
+const FEATURES = {
+  tree: { emoji: "🌳", name: "Tree", w: 3, h: 3, round: true, fill: "#5f9f52" },
+  bush: { emoji: "🌿", name: "Bush", w: 1.2, h: 1.2, round: true, fill: "#7cb862" },
+  hedge: { emoji: "🌲", name: "Hedge", w: 4, h: 0.8, fill: "#4f8a45" },
+  shed: { emoji: "🛖", name: "Shed", w: 2, h: 2.5, fill: "#a07a55" },
+  greenhouse: { emoji: "🪟", name: "Greenhouse", w: 1.8, h: 2.4, fill: "#d5ecf2" },
+  compost: { emoji: "♻️", name: "Compost bin", w: 1, h: 1, fill: "#6e4a2e" },
+  water: { emoji: "💧", name: "Water butt", w: 0.7, h: 0.7, round: true, fill: "#5b9bc4" },
+  path: { emoji: "🚶", name: "Path", w: 1, h: 4, fill: "#ddd2b8" },
+  patio: { emoji: "🪑", name: "Patio", w: 3, h: 3, fill: "#cbc3b2" },
+  pond: { emoji: "🦆", name: "Pond", w: 1.6, h: 1.6, round: true, fill: "#72b6da" },
+  house: { emoji: "🏠", name: "House", w: 6, h: 3, fill: "#bfae95" },
+};
 
 function gardenTabs() {
-  return `<div class="seg" role="tablist"><button data-gview="plot" class="${gardenView === "plot" ? "on" : ""}">🗺️ My plot</button>
+  return `<div class="seg" role="tablist"><button data-gview="plot" class="${gardenView === "plot" ? "on" : ""}">🗺️ My plan</button>
     <button data-gview="list" class="${gardenView === "list" ? "on" : ""}">📋 List</button></div>`;
 }
 
 function gardenPage() {
-  view.onclick = (e) => { const b = e.target.closest("[data-gview]"); if (b) { gardenView = b.dataset.gview; placing = null; plotMove = false; gardenPage(); } };
+  view.onclick = (e) => { const b = e.target.closest("[data-gview]"); if (b) { gardenView = b.dataset.gview; placing = null; plotEdit = false; gardenPage(); } };
   if (gardenView === "plot") plotPage(); else gardenList();
 }
 
@@ -640,8 +654,8 @@ function spaceSize(s) {
   return { w: s.width_m || def.w, h: s.length_m || def.h };
 }
 
-// Beds without a saved spot sit side by side, left to right in the order they were added (beds first,
-// then pots), to the right of any that have been dragged into place
+// Beds without a saved spot sit side by side, left to right in the order they were added (pots at the end),
+// to the right of anything already placed
 function plotPositions() {
   const pos = {}, GAP = 0.6;
   const placed = S.g.spaces.filter((s) => s.pos_x != null);
@@ -652,52 +666,106 @@ function plotPositions() {
   return pos;
 }
 
+// Everything on the plan as boxes in metres: {type, id, x, y, w, h, ...}
+function planItems() {
+  const pos = plotPositions();
+  return [
+    ...S.g.spaces.map((s) => ({ type: "space", id: s.id, ...pos[s.id], ...spaceSize(s), s })),
+    ...S.g.garden.features.map((f) => ({ type: "feature", id: f.id, x: f.x, y: f.y, w: f.w, h: f.h, f })),
+  ];
+}
+
+function planBounds(items) {
+  const g = S.g.garden;
+  if (g.w && g.h) return { x0: -0.6, y0: -0.8, W: g.w + 1.2, H: g.h + 1.4, fenced: true };
+  const maxX = Math.max(6, ...items.map((i) => i.x + i.w)) + (plotEdit ? 3 : 0.6);
+  const maxY = Math.max(4, ...items.map((i) => i.y + i.h)) + (plotEdit ? 3 : 0.8);
+  return { x0: 0, y0: 0, W: maxX, H: maxY, fenced: false };
+}
+
 function plotDate() {
   const t = today();
   return plotMonth === 0 ? t : new Date(t.getFullYear(), t.getMonth() + plotMonth, 15);
 }
 const inGround = (c, T) => c.starts && c.finishes && d(c.starts) <= T && T < d(c.finishes);
 
+// pixels per metre: "fit" shows the whole plan; zoom multiplies that
+function planScale(b) {
+  const cs = getComputedStyle(view), inner = view.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const availW = Math.max(240, inner - 4), availH = Math.max(260, window.innerHeight * 0.62);
+  return Math.max(4, Math.min(availW / b.W, availH / b.H)) * plotZoom;
+}
+
+// A label that fits its box: shrinks to fit the width, and is shortened with "…" if it still won't fit
+function fitLabel(text, widthM, ppm, maxPx = 13, minPx = 9) {
+  const px = Math.min(maxPx, (widthM * ppm) / (Math.max(text.length, 1) * 0.56));
+  if (px >= minPx) return { text, size: px / ppm };
+  const chars = Math.max(1, Math.floor((widthM * ppm) / (minPx * 0.56)) - 1);
+  return { text: text.length > chars ? text.slice(0, chars) + "…" : text, size: minPx / ppm };
+}
+
 function plotSvg() {
-  const T = plotDate(), pos = plotPositions(), crops = activeCrops();
-  let maxX = 4.6, maxY = 3;
-  const beds = S.g.spaces.map((s) => {
-    const { w, h } = spaceSize(s), { x, y } = pos[s.id];
-    maxX = Math.max(maxX, x + w + 0.4); maxY = Math.max(maxY, y + h + 0.5);
+  const T = plotDate(), crops = activeCrops(), items = planItems(), b = planBounds(items), ppm = planScale(b);
+  const px = (n) => n / ppm;  // a size in screen pixels, in metres
+  const isSel = (i) => selected && selected.type === i.type && selected.id === i.id;
+
+  const features = items.filter((i) => i.type === "feature").map((i) => {
+    const k = FEATURES[i.f.kind] || FEATURES.bush, lab = fitLabel(i.f.name, i.w + 0.2, ppm, 12, 8);
+    const shape = k.round ? `<ellipse cx="${i.x + i.w / 2}" cy="${i.y + i.h / 2}" rx="${i.w / 2}" ry="${i.h / 2}" fill="${k.fill}" class="feat ${i.f.kind}"/>`
+      : `<rect x="${i.x}" y="${i.y}" width="${i.w}" height="${i.h}" rx="${Math.min(0.15, i.w / 6)}" fill="${k.fill}" class="feat ${i.f.kind}"/>`;
+    const es = Math.min(Math.min(i.w, i.h) * 0.55, px(30));
+    return `<g class="item feature ${isSel(i) ? "sel" : ""}" data-item="feature" data-id="${i.id}" data-x="${i.x}" data-y="${i.y}" data-w="${i.w}" data-h="${i.h}">
+      <title>${esc(i.f.name)}</title>${shape}<text x="${i.x + i.w / 2}" y="${i.y + i.h / 2 + es * 0.35}" font-size="${es}" text-anchor="middle">${k.emoji}</text>
+      <text x="${i.x + i.w / 2}" y="${i.y + i.h + lab.size * 1.1}" font-size="${lab.size}" text-anchor="middle" class="label">${esc(lab.text)}</text></g>`;
+  }).join("");
+
+  const beds = items.filter((i) => i.type === "space").map((i) => {
+    const s = i.s, { x, y, w, h } = i;
     const here = crops.filter((c) => c.space_id === s.id);
     const now = here.filter((c) => inGround(c, T)), later = here.length - now.length;
-    const target = placing && (() => { const p = plant(crop(placing).plant_id); return p.where.includes(s.kind === "pot" ? "pot" : "bed"); })();
+    const target = placing && plant(crop(placing).plant_id).where.includes(s.kind === "pot" ? "pot" : "bed");
     let inner = "";
     if (s.kind === "pot") {
       const show = now.slice(0, 4);
-      inner = `<circle cx="${x + w / 2}" cy="${y + h / 2}" r="${w / 2}" class="pot"/>` + (show.length ? show.map((c, i) => {
-        const cx = x + (show.length === 1 ? w / 2 : w * (0.3 + 0.4 * (i % 2))), cy = y + (show.length <= 2 ? h / 2 : h * (0.3 + 0.4 * Math.floor(i / 2)));
-        return `<g class="crop" data-open-crop="${c.id}"><circle cx="${cx}" cy="${cy}" r="${show.length === 1 ? 0.32 : 0.2}" fill="${FAMILY_COLOUR[plant(c.plant_id).family] || "#9fd88f"}"/>
-          <text x="${cx}" y="${cy + 0.09}" font-size="${show.length === 1 ? 0.34 : 0.22}" text-anchor="middle">${plant(c.plant_id).emoji}</text></g>`;
+      inner = `<circle cx="${x + w / 2}" cy="${y + h / 2}" r="${w / 2}" class="pot"/>` + (show.length ? show.map((c, n) => {
+        const cx = x + (show.length === 1 ? w / 2 : w * (0.3 + 0.4 * (n % 2))), cy = y + (show.length <= 2 ? h / 2 : h * (0.3 + 0.4 * Math.floor(n / 2)));
+        const r = show.length === 1 ? 0.32 : 0.2;
+        return `<g class="crop" data-open-crop="${c.id}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="${FAMILY_COLOUR[plant(c.plant_id).family] || "#9fd88f"}"/>
+          <text x="${cx}" y="${cy + r * 0.35}" font-size="${r}" text-anchor="middle">${plant(c.plant_id).emoji}</text></g>`;
       }).join("") : `<text x="${x + w / 2}" y="${y + h / 2 + 0.1}" font-size="0.3" text-anchor="middle" opacity=".35">🪴</text>`);
     } else {
-      const need = now.reduce((n, c) => n + c.area / w, 0), scale = need > h ? h / need : 1;
-      let yy = y;
-      inner = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="0.08" class="bed ${s.built === 0 ? "unbuilt" : ""} ${need > h ? "over" : ""}"/>` + now.map((c) => {
-        const p = plant(c.plant_id), bh = Math.max(0.14, (c.area / w) * scale), top = yy;
-        yy += bh;
-        const n = Math.max(1, Math.min(Math.floor(w / 0.3), c.qty, 8)), fs = Math.min(0.26, bh * 0.75);
-        const emojis = Array.from({ length: n }, (_, i) => `<text x="${x + (w / n) * (i + 0.5)}" y="${top + bh / 2 + fs * 0.35}" font-size="${fs}" text-anchor="middle">${p.emoji}</text>`).join("");
-        return `<g class="crop" data-open-crop="${c.id}"><rect x="${x + 0.04}" y="${top + 0.02}" width="${w - 0.08}" height="${bh - 0.04}" rx="0.06" fill="${FAMILY_COLOUR[p.family] || "#9fd88f"}"/>${emojis}</g>`;
-      }).join("") + (need < h * 0.9 && !plotMove ? `<text x="${x + w / 2}" y="${yy + (y + h - yy) / 2 + 0.1}" font-size="0.3" text-anchor="middle" class="plus">＋</text>` : "");
+      // crop rows run across the bed's short side, stacked along its long side
+      const across = w <= h, long = across ? h : w, short = across ? w : h;
+      const need = now.reduce((n, c) => n + c.area / short, 0), scale = need > long ? long / need : 1;
+      let at = 0;
+      inner = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="0.08" class="bed ${s.built === 0 ? "unbuilt" : ""} ${need > long ? "over" : ""}"/>` + now.map((c) => {
+        const p = plant(c.plant_id), depth = Math.max(0.14, (c.area / short) * scale), start = at;
+        at += depth;
+        const rx = across ? x + 0.04 : x + start + 0.02, ry = across ? y + start + 0.02 : y + 0.04;
+        const rw = across ? w - 0.08 : depth - 0.04, rh = across ? depth - 0.04 : h - 0.08;
+        const n = Math.max(1, Math.min(Math.floor(short / 0.3), c.qty, 8)), fs = Math.min(0.26, depth * 0.75, px(26));
+        const emojis = Array.from({ length: n }, (_, k) => across
+          ? `<text x="${x + (w / n) * (k + 0.5)}" y="${ry + rh / 2 + fs * 0.35}" font-size="${fs}" text-anchor="middle">${p.emoji}</text>`
+          : `<text x="${rx + rw / 2}" y="${y + (h / n) * (k + 0.5) + fs * 0.35}" font-size="${fs}" text-anchor="middle">${p.emoji}</text>`).join("");
+        return `<g class="crop" data-open-crop="${c.id}"><rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" rx="0.06" fill="${FAMILY_COLOUR[p.family] || "#9fd88f"}"/>${emojis}</g>`;
+      }).join("") + (need < long * 0.9 && !plotEdit ? `<text x="${across ? x + w / 2 : x + at + (w - at) / 2}" y="${across ? y + at + (h - at) / 2 + 0.1 : y + h / 2 + 0.1}" font-size="${Math.min(0.3, px(22))}" text-anchor="middle" class="plus">＋</text>` : "");
     }
-    const label = `${s.name}${later ? ` · +${later} later` : ""}`;
-    return `<g class="space ${plotMove ? "movable" : ""} ${placing ? (target ? "target" : "nope") : ""}" data-space-id="${s.id}" data-x="${x}" data-y="${y}">
-      <rect x="${x - 0.12}" y="${y - 0.12}" width="${w + 0.24}" height="${h + 0.24}" rx="0.14" class="hit"/>
-      ${inner}<text x="${x}" y="${y - 0.2}" font-size="0.2" class="label">${esc(label)}</text></g>`;
+    const lab = fitLabel(s.name + (later ? `  +${later}` : ""), w + 0.1, ppm);
+    return `<g class="item space ${isSel(i) ? "sel" : ""} ${placing ? (target ? "target" : "nope") : ""}" data-item="space" data-id="${s.id}" data-space-id="${s.id}" data-x="${x}" data-y="${y}" data-w="${w}" data-h="${h}">
+      <title>${esc(s.name)}</title><rect x="${x - 0.1}" y="${y - 0.1}" width="${w + 0.2}" height="${h + 0.2}" rx="0.12" class="hit"/>
+      ${inner}<text x="${x}" y="${y - lab.size * 0.45}" font-size="${lab.size}" class="label">${esc(lab.text)}</text></g>`;
   }).join("");
-  if (plotMove) { maxX += 2.5; maxY += 2; }  // spare grass to drag beds into
-  const W = Math.ceil(maxX), H = Math.ceil(maxY + 0.6), step = plotMove ? 0.5 : 1;
-  return `<svg class="plot" viewBox="0 0 ${W} ${H}" style="width:${plotZoom * 100}%" role="img" aria-label="Bird's-eye view of your garden">
-    <defs><pattern id="grid" width="${step}" height="${step}" patternUnits="userSpaceOnUse"><path d="M ${step} 0 L 0 0 0 ${step}" class="gridline"/></pattern></defs>
-    <rect x="0" y="0" width="${W}" height="${H}" class="grass"/><rect x="0" y="0" width="${W}" height="${H}" fill="url(#grid)"/>
-    ${beds}
-    <g class="scalebar"><path d="M 0.3 ${H - 0.25} h 1"/><text x="0.8" y="${H - 0.33}" font-size="0.18" text-anchor="middle">1 m</text></g></svg>`;
+
+  const step = plotEdit ? 0.5 : 1;
+  const fence = b.fenced ? `<rect x="0" y="0" width="${S.g.garden.w}" height="${S.g.garden.h}" class="fence"/>
+    <text x="${S.g.garden.w}" y="${-px(6)}" font-size="${px(11)}" text-anchor="end" class="label dim">${S.g.garden.w} × ${S.g.garden.h} m</text>` : "";
+  return `<svg class="plot" viewBox="${b.x0} ${b.y0} ${b.W} ${b.H}" width="${Math.round(b.W * ppm)}" height="${Math.round(b.H * ppm)}" role="img" aria-label="Plan of your garden">
+    <defs><pattern id="grid" x="0" y="0" width="${step}" height="${step}" patternUnits="userSpaceOnUse"><path d="M ${step} 0 L 0 0 0 ${step}" class="gridline" style="stroke-width:${px(1)}"/></pattern></defs>
+    <rect x="${b.x0}" y="${b.y0}" width="${b.W}" height="${b.H}" class="${b.fenced ? "outside" : "grass"}"/>
+    ${b.fenced ? `<rect x="0" y="0" width="${S.g.garden.w}" height="${S.g.garden.h}" class="grass"/>` : ""}
+    <rect x="${b.x0}" y="${b.y0}" width="${b.W}" height="${b.H}" fill="url(#grid)"/>
+    ${fence}${features}${beds}
+    <g class="scalebar" style="stroke-width:${px(2)}"><path d="M ${b.x0 + px(12)} ${b.y0 + b.H - px(12)} h 1"/><text x="${b.x0 + px(12) + 0.5}" y="${b.y0 + b.H - px(17)}" font-size="${px(11)}" text-anchor="middle">1 m</text></g></svg>`;
 }
 
 function plotPage() {
@@ -706,36 +774,82 @@ function plotPage() {
   const label = plotMonth === 0 ? "Today" : `${MONTHS_LONG[T.getMonth()]}${T.getFullYear() !== today().getFullYear() ? " " + T.getFullYear() : ""}`;
   view.innerHTML = `<h1>🪴 My garden</h1>${gardenTabs()}
     ${placing ? `<div class="card tint-sun row placing" style="justify-content:space-between"><b>👆 Tap a bed to put ${plant(crop(placing).plant_id).emoji} ${esc(plant(crop(placing).plant_id).name)} in it</b><button class="btn small ghost" id="cancel-place">Cancel</button></div>` : ""}
-    ${plotMove ? `<div class="card tint-sky"><b>✋ Drag your beds</b> to where they really are - each small square is 50cm. Tap Done when they match your garden.</div>` : ""}
-    <div class="plot-wrap ${plotMove ? "moving" : ""}">${S.g.spaces.length ? plotSvg() : `<div class="empty"><div class="big">🟫</div>No beds yet.</div>`}</div>
-    ${S.g.spaces.length ? `<div class="zoom"><button class="btn small" data-zoom="-1" aria-label="Zoom out">➖</button><span class="small muted">${Math.round(plotZoom * 100)}%</span>
-      <button class="btn small" data-zoom="1" aria-label="Zoom in">➕</button>${plotZoom !== 1 ? `<button class="btn small ghost" data-zoom="0">Fit</button>` : ""}</div>` : ""}
+    <div class="plan-bar"><button class="btn small ${plotEdit ? "primary" : ""}" id="edit">${plotEdit ? "✅ Done editing" : "✏️ Edit plan"}</button>
+      <span class="zoom"><button class="btn small" data-zoom="-1" aria-label="Zoom out">➖</button><button class="btn small ghost" data-zoom="0" aria-label="Fit the whole garden">${Math.round(plotZoom * 100)}%</button><button class="btn small" data-zoom="1" aria-label="Zoom in">➕</button></span></div>
+    ${plotEdit ? `<div class="card tint-sky small" style="margin-bottom:10px"><b>✏️ Editing:</b> drag anything to move it (each small square is 50cm). Tap something to change, turn or remove it.</div>` : ""}
+    <div class="plot-wrap ${plotEdit ? "moving" : ""}">${plotSvg()}</div>
+    ${plotEdit ? editPanel() : `
     <div class="month-row"><b>📅 ${esc(label)}</b><input type="range" id="month" min="0" max="11" value="${plotMonth}" aria-label="Show the garden in a later month">
       ${plotMonth ? `<button class="btn small ghost" id="now">Today</button>` : ""}</div>
-    <p class="small muted" style="margin:0 0 12px">Each coloured strip is a crop, sized by the room it needs. Tap a crop or a bed to open it. Slide to see your garden later in the year. Each grid square is 1 m.</p>
+    <p class="small muted" style="margin:0 0 12px">Each coloured strip is a crop, sized by the room it needs. Tap a crop or bed to open it. Slide to see later in the year. Grid squares are 1 m.</p>
     ${unplaced.length ? `<div class="card"><b>📍 Not in a bed yet</b> <span class="small muted">- tap one, then tap a bed</span>
       <div class="suggest">${unplaced.map((c) => `<button data-place="${c.id}" class="${placing === c.id ? "on" : ""}">${plant(c.plant_id).emoji} ${esc(plant(c.plant_id).name)}${rowLabel(c) ? " · " + rowLabel(c) : ""}</button>`).join("")}</div></div>` : ""}
-    <div class="row"><button class="btn small ${plotMove ? "primary" : ""}" id="move">${plotMove ? "✅ Done" : "✋ Move beds"}</button>
-      <button class="btn small" id="add-space">➕ Add a bed or pot</button>
-      ${activeCrops().length ? `<button class="btn small" data-layout="all">🧩 Suggest a layout</button>` : ""}</div>`;
-  $("#month").oninput = (e) => { plotMonth = Number(e.target.value); const y = window.scrollY; plotPage(); window.scrollTo(0, y); };
-  const nowBtn = $("#now"); if (nowBtn) nowBtn.onclick = () => { plotMonth = 0; plotPage(); };
-  $("#move").onclick = () => { plotMove = !plotMove; placing = null; plotPage(); };
-  view.querySelectorAll("[data-zoom]").forEach((b) => (b.onclick = () => {
-    const z = Number(b.dataset.zoom), levels = [1, 1.5, 2, 3, 4];
-    const i = levels.indexOf(plotZoom);
-    plotZoom = z === 0 ? 1 : levels[Math.max(0, Math.min(levels.length - 1, i + z))];
-    const y = window.scrollY; plotPage(); window.scrollTo(0, y);
-  }));
-  $("#add-space").onclick = addSpaceSheet;
-  const cp = $("#cancel-place"); if (cp) cp.onclick = () => { placing = null; plotPage(); };
+    ${activeCrops().length ? `<div class="row"><button class="btn small" data-layout="all">🧩 Suggest a layout</button></div>` : ""}`}`;
+  wirePlot();
+}
+
+// The edit tools: add things, set the garden's size, and change whatever is selected
+function editPanel() {
+  const g = S.g.garden;
+  let sel = "";
+  if (selected) {
+    const items = planItems(), it = items.find((i) => i.type === selected.type && i.id === selected.id);
+    if (!it) selected = null;
+    else if (it.type === "space") {
+      const shade = items.filter((t) => t.type === "feature" && ["tree", "hedge", "shed", "house"].includes(t.f.kind)).find((t) => {
+        const cx = t.x + t.w / 2, cy = t.y + t.h / 2, reach = Math.max(t.w, t.h) / 2 + 1.5;
+        const nx = Math.max(it.x, Math.min(cx, it.x + it.w)), ny = Math.max(it.y, Math.min(cy, it.y + it.h));
+        return Math.hypot(cx - nx, cy - ny) < reach;
+      });
+      sel = `<div class="card sel-card"><b>${SPACE_KINDS[it.s.kind].emoji} ${esc(it.s.name)}</b> <span class="small muted">${it.s.kind === "pot" ? "pots" : `${it.w} × ${it.h} m`}</span>
+        ${shade ? `<p class="small" style="margin:6px 0 0">🌥️ It's close to the ${esc(shade.f.name.toLowerCase())} - it may get shade. Most veg want 6+ hours of sun a day.</p>` : ""}
+        <div class="row" style="margin-top:8px"><button class="btn small" data-open-space="${it.id}">✏️ Name, size & soil</button>
+        ${it.s.kind !== "pot" ? `<button class="btn small" id="turn-space">↻ Turn</button>` : ""}<button class="btn small ghost" id="desel">Done</button></div></div>`;
+    } else {
+      const k = FEATURES[it.f.kind] || FEATURES.bush;
+      sel = `<div class="card sel-card"><b>${k.emoji} ${esc(it.f.name)}</b>
+        <div class="row" style="margin-top:8px;flex-wrap:nowrap"><input id="fname" type="text" maxlength="40" value="${esc(it.f.name)}" aria-label="Name"></div>
+        <div class="row" style="margin-top:8px;flex-wrap:nowrap"><label class="mini">Width<input id="fw" type="number" step="0.1" min="0.2" value="${it.w}"></label><span>×</span>
+          <label class="mini">${k.round ? "Height" : "Length"}<input id="fh" type="number" step="0.1" min="0.2" value="${it.h}"></label><span class="small muted">m</span></div>
+        <div class="row" style="margin-top:8px"><button class="btn small primary" id="fsave">Save</button><button class="btn small" id="fturn">↻ Turn</button>
+          <button class="btn small danger" id="fdel">🗑️ Remove</button><button class="btn small ghost" id="desel">Done</button></div></div>`;
+    }
+  }
+  return `${sel}
+    <div class="card"><b>➕ Add to your plan</b>
+      <div class="adds"><button class="btn small" id="add-space">🟫 Bed or pots</button>
+        ${Object.entries(FEATURES).map(([k, f]) => `<button class="btn small" data-addfeat="${k}">${f.emoji} ${f.name}</button>`).join("")}</div></div>
+    <div class="card"><b>📐 Your whole garden or field</b>
+      <p class="small muted" style="margin:4px 0 8px">Measure it once and the plan shows its edge, so you can place everything where it really is. Leave blank to fit the plan to what's in it.</p>
+      <div class="size-row"><label class="big-num"><span>Width</span><input id="gw" type="number" step="0.5" min="1" inputmode="decimal" value="${g.w || ""}" placeholder="e.g. 12"><em>m</em></label>
+        <span class="times">×</span><label class="big-num"><span>Length</span><input id="gh" type="number" step="0.5" min="1" inputmode="decimal" value="${g.h || ""}" placeholder="e.g. 8"><em>m</em></label></div>
+      <div class="row" style="margin-top:10px"><button class="btn small primary" id="gsave">Save size</button>${g.w ? `<button class="btn small ghost" id="gclear">No fixed size</button>` : ""}</div></div>`;
+}
+
+function wirePlot() {
   const svg = view.querySelector("svg.plot");
+  const redraw = () => { const y = window.scrollY, wrap = view.querySelector(".plot-wrap"), sx = wrap && wrap.scrollLeft, sy = wrap && wrap.scrollTop;
+    plotPage(); window.scrollTo(0, y); const w2 = view.querySelector(".plot-wrap"); if (w2) { w2.scrollLeft = sx; w2.scrollTop = sy; } };
+  $("#edit").onclick = () => { plotEdit = !plotEdit; placing = null; selected = null; plotPage(); };
+  view.querySelectorAll("[data-zoom]").forEach((b) => (b.onclick = () => {
+    const z = Number(b.dataset.zoom), levels = [0.5, 0.75, 1, 1.5, 2, 3, 4, 6];
+    plotZoom = z === 0 ? 1 : levels[Math.max(0, Math.min(levels.length - 1, levels.indexOf(plotZoom) + z))];
+    redraw();
+  }));
+  const month = $("#month");
+  if (month) month.oninput = (e) => { plotMonth = Number(e.target.value); redraw(); };
+  const nowBtn = $("#now"); if (nowBtn) nowBtn.onclick = () => { plotMonth = 0; redraw(); };
+  const cp = $("#cancel-place"); if (cp) cp.onclick = () => { placing = null; plotPage(); };
+
+  if (plotEdit) wireEdit(svg, redraw);
   view.onclick = async (e) => {
     const gv = e.target.closest("[data-gview]");
-    if (gv) { gardenView = gv.dataset.gview; placing = null; plotMove = false; gardenPage(); return; }
+    if (gv) { gardenView = gv.dataset.gview; placing = null; plotEdit = false; gardenPage(); return; }
+    if (plotEdit) return;
     const pl = e.target.closest("[data-place]");
     if (pl) { placing = placing === Number(pl.dataset.place) ? null : Number(pl.dataset.place); plotPage(); return; }
-    if (plotMove) return;
+    const feat = e.target.closest('[data-item="feature"]');
+    if (feat) { const f = S.g.garden.features.find((x) => x.id === Number(feat.dataset.id)); toast(`${(FEATURES[f.kind] || {}).emoji || ""} ${f.name} - tap ✏️ Edit plan to change it`); return; }
     const sp = e.target.closest("[data-space-id]");
     if (placing && sp) {
       e.stopPropagation();
@@ -747,37 +861,70 @@ function plotPage() {
     }
     if (sp && !e.target.closest("[data-open-crop]")) { e.stopPropagation(); openSpace(Number(sp.dataset.spaceId)); }
   };
-  if (svg && plotMove) wireDrag(svg);
 }
 
-// Drag beds around the plot (in "Move beds" mode); positions are saved in metres
-function wireDrag(svg) {
-  svg.addEventListener("click", (e) => e.stopPropagation(), true);  // dragging shouldn't also open things
-  const pt = (ev) => { const p = svg.createSVGPoint(); p.x = ev.clientX; p.y = ev.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); };
-  svg.querySelectorAll("[data-space-id]").forEach((g) => {
-    g.onpointerdown = (ev) => {
-      ev.preventDefault(); g.setPointerCapture(ev.pointerId);
-      const start = pt(ev), x0 = Number(g.dataset.x), y0 = Number(g.dataset.y);
-      let dx = 0, dy = 0;
-      g.onpointermove = (mv) => { const p = pt(mv); dx = p.x - start.x; dy = p.y - start.y; g.setAttribute("transform", `translate(${dx} ${dy})`); };
-      g.onpointerup = async () => {
-        g.onpointermove = g.onpointerup = null;
-        if (Math.abs(dx) + Math.abs(dy) < 0.05) { g.removeAttribute("transform"); return; }
-        const snap = (v) => Math.max(0, Math.round(v * 10) / 10);
-        // pin every bed where it is now, so only the one you dragged moves
-        const pos = plotPositions();
-        pos[g.dataset.spaceId] = { x: snap(x0 + dx), y: snap(y0 + dy) };
-        const me = space(Number(g.dataset.spaceId)), mine = spaceSize(me), at = pos[me.id];
-        const hit = S.g.spaces.find((o) => {
-          if (o.id === me.id) return false;
-          const os = spaceSize(o), op = pos[o.id];
-          return at.x < op.x + os.w + 0.1 && op.x < at.x + mine.w + 0.1 && at.y < op.y + os.h + 0.1 && op.y < at.y + mine.h + 0.1;
-        });
-        if (hit) { g.removeAttribute("transform"); toast(`That's on top of ${hit.name} - drag it to a clear spot`); return; }
-        await change("POST", "/api/spaces/positions", { positions: Object.entries(pos).map(([id, p]) => ({ id: Number(id), x: p.x, y: p.y })) });
+// Edit mode: drag anything; tap to select; add, change, turn and remove things
+function wireEdit(svg, redraw) {
+  const save = async (moved) => {
+    // pin every bed where it is now, so only what you dragged moves
+    const pos = plotPositions();
+    const list = Object.entries(pos).map(([id, p]) => ({ id: Number(id), x: p.x, y: p.y }));
+    if (moved.type === "space") list.find((e) => e.id === moved.id).x = moved.x, list.find((e) => e.id === moved.id).y = moved.y;
+    else list.push({ feature: moved.id, x: moved.x, y: moved.y });
+    await change("POST", "/api/spaces/positions", { positions: list });
+  };
+  if (svg) {
+    svg.addEventListener("click", (e) => e.stopPropagation(), true);  // in edit mode, taps select rather than open
+    const pt = (ev) => { const p = svg.createSVGPoint(); p.x = ev.clientX; p.y = ev.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); };
+    svg.querySelectorAll("[data-item]").forEach((g) => {
+      g.onpointerdown = (ev) => {
+        ev.preventDefault(); g.setPointerCapture(ev.pointerId);
+        const start = pt(ev), x0 = Number(g.dataset.x), y0 = Number(g.dataset.y), w = Number(g.dataset.w), h = Number(g.dataset.h);
+        const type = g.dataset.item, id = Number(g.dataset.id);
+        let dx = 0, dy = 0;
+        g.onpointermove = (mv) => { const p = pt(mv); dx = p.x - start.x; dy = p.y - start.y; g.setAttribute("transform", `translate(${dx} ${dy})`); };
+        g.onpointerup = async () => {
+          g.onpointermove = g.onpointerup = null;
+          if (Math.abs(dx) + Math.abs(dy) < 0.08) { g.removeAttribute("transform"); selected = { type, id }; redraw(); return; }
+          const snap = (v) => Math.round(v * 10) / 10, gw = S.g.garden.w, gh = S.g.garden.h;
+          let x = Math.max(0, snap(x0 + dx)), y = Math.max(0, snap(y0 + dy));
+          if (gw && gh) { x = Math.min(x, Math.max(0, gw - w)); y = Math.min(y, Math.max(0, gh - h)); }
+          if (type === "space") {
+            const hit = planItems().find((o) => o.type === "space" && o.id !== id
+              && x < o.x + o.w + 0.1 && o.x < x + w + 0.1 && y < o.y + o.h + 0.1 && o.y < y + h + 0.1);
+            if (hit) { g.removeAttribute("transform"); toast(`That's on top of ${hit.s.name} - drag it to a clear spot`); return; }
+          }
+          selected = { type, id };
+          await save({ type, id, x, y });
+        };
       };
-    };
-  });
+    });
+  }
+  const desel = $("#desel"); if (desel) desel.onclick = () => { selected = null; redraw(); };
+  const turn = $("#turn-space"); if (turn) turn.onclick = () => change("POST", `/api/spaces/${selected.id}/turn`, null, "Turned ↻");
+  const f = selected && selected.type === "feature" && S.g.garden.features.find((x) => x.id === selected.id);
+  if (f) {
+    $("#fsave").onclick = () => change("PATCH", `/api/features/${f.id}`, { name: $("#fname").value, w: Number($("#fw").value), h: Number($("#fh").value) }, "Saved ✅");
+    $("#fturn").onclick = () => change("PATCH", `/api/features/${f.id}`, { w: f.h, h: f.w }, "Turned ↻");
+    $("#fdel").onclick = async () => { if (confirm(`Remove the ${f.name.toLowerCase()} from your plan?`)) { selected = null; await change("DELETE", `/api/features/${f.id}`, null, "Removed"); } };
+  }
+  $("#add-space").onclick = addSpaceSheet;
+  view.querySelectorAll("[data-addfeat]").forEach((b) => (b.onclick = async () => {
+    const k = FEATURES[b.dataset.addfeat], items = planItems(), bnd = planBounds(items);
+    // drop it in a clear spot: below everything else, inside the garden if it has a size
+    const y = Math.max(0.5, ...items.map((i) => i.y + i.h + 0.8)), gh = S.g.garden.h;
+    const at = { x: 0.5, y: gh ? Math.min(y, Math.max(0, gh - k.h)) : y };
+    if (await change("POST", "/api/features", { kind: b.dataset.addfeat, name: k.name, x: at.x, y: at.y, w: k.w, h: k.h }, `${k.emoji} ${k.name} added - drag it into place`)) {
+      const last = S.g.garden.features[S.g.garden.features.length - 1];
+      selected = { type: "feature", id: last.id }; redraw();
+    }
+  }));
+  $("#gsave").onclick = () => {
+    const w = Number($("#gw").value), h = Number($("#gh").value);
+    if (!w || !h) { toast("Put in both measurements, in metres"); return; }
+    change("POST", "/api/garden/size", { w, h }, `Garden set to ${w} × ${h} m 📐`);
+  };
+  const gc = $("#gclear"); if (gc) gc.onclick = () => change("POST", "/api/garden/size", {}, "The plan now fits to what's in it");
 }
 
 function gardenList() {

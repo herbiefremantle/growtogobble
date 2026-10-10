@@ -238,7 +238,7 @@ def reset_garden(body: DeleteAccount, user=Depends(auth.current_user)):
     if not auth.check_password(body.password, user["pw_hash"]):
         raise HTTPException(400, "That password isn't right.")
     with db.connect() as conn:
-        for table in ("crops", "spaces", "done", "badges", "sent"):
+        for table in ("crops", "spaces", "done", "badges", "sent", "features"):
             conn.execute("DELETE FROM %s WHERE user_id = ?" % table, (user["id"],))
         return garden.payload(conn, user)
 
@@ -459,15 +459,93 @@ class Positions(BaseModel):
     positions: list
 
 
+def _metres(v, lo=0.0, hi=500.0):
+    return round(max(lo, min(float(v), hi)), 2)
+
+
 @app.post("/api/spaces/positions")
 def move_spaces(body: Positions, user=Depends(auth.current_user)):
-    """Save where every bed sits at once, so moving one doesn't shuffle the rest."""
+    """Save where things sit on the plan at once (beds, pots and features), so moving one doesn't shuffle the rest.
+    Each entry: {id, x, y} for a bed/pot, or {feature: id, x, y} for a tree, shed..."""
     with db.connect() as conn:
-        for raw in body.positions[:100]:
-            sid, x, y = int(raw["id"]), float(raw["x"]), float(raw["y"])
-            _own(conn, "spaces", sid, user)
-            conn.execute("UPDATE spaces SET pos_x = ?, pos_y = ? WHERE id = ?",
-                         (round(max(0.0, min(x, 500.0)), 2), round(max(0.0, min(y, 500.0)), 2), sid))
+        for raw in body.positions[:200]:
+            x, y = _metres(raw["x"]), _metres(raw["y"])
+            if raw.get("feature"):
+                fid = int(raw["feature"])
+                _own(conn, "features", fid, user)
+                conn.execute("UPDATE features SET x = ?, y = ? WHERE id = ?", (x, y, fid))
+            else:
+                sid = int(raw["id"])
+                _own(conn, "spaces", sid, user)
+                conn.execute("UPDATE spaces SET pos_x = ?, pos_y = ? WHERE id = ?", (x, y, sid))
+        return garden.payload(conn, user)
+
+
+@app.post("/api/spaces/{space_id}/turn")
+def turn_space(space_id: int, user=Depends(auth.current_user)):
+    """Turn a bed round 90 degrees on the plan (swap its width and length)."""
+    with db.connect() as conn:
+        s = _own(conn, "spaces", space_id, user)
+        default = (5.0, 25.0) if s["kind"] == "allotment" else (1.2, 2.4)
+        w, l = s["width_m"] or default[0], s["length_m"] or default[1]
+        conn.execute("UPDATE spaces SET width_m = ?, length_m = ? WHERE id = ?", (l, w, space_id))
+        return garden.payload(conn, user)
+
+
+class GardenSize(BaseModel):
+    w: Optional[float] = None
+    h: Optional[float] = None
+
+
+@app.post("/api/garden/size")
+def garden_size(body: GardenSize, user=Depends(auth.current_user)):
+    """The whole garden or field, in metres - or blank to fit the plan to what's in it."""
+    with db.connect() as conn:
+        conn.execute("UPDATE users SET garden_w = ?, garden_h = ? WHERE id = ?",
+                     (_metres(body.w, 1) if body.w else None, _metres(body.h, 1) if body.h else None, user["id"]))
+        user = dict(conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone())
+        return garden.payload(conn, user)
+
+
+FEATURE_KINDS = {"tree", "bush", "hedge", "shed", "greenhouse", "compost", "water", "path", "patio", "pond", "house"}
+
+
+class FeatureIn(BaseModel):
+    kind: Optional[str] = None
+    name: Optional[str] = None
+    x: Optional[float] = None
+    y: Optional[float] = None
+    w: Optional[float] = None
+    h: Optional[float] = None
+
+
+@app.post("/api/features")
+def add_feature(body: FeatureIn, user=Depends(auth.current_user)):
+    if body.kind not in FEATURE_KINDS:
+        raise HTTPException(400, "Unknown kind of feature")
+    with db.connect() as conn:
+        conn.execute("INSERT INTO features (user_id, kind, name, x, y, w, h, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                     (user["id"], body.kind, (body.name or body.kind.title()).strip()[:40], _metres(body.x or 0.5),
+                      _metres(body.y or 0.5), _metres(body.w or 1, 0.2, 100), _metres(body.h or 1, 0.2, 100), clock.now().isoformat()))
+        return garden.payload(conn, user)
+
+
+@app.patch("/api/features/{feature_id}")
+def edit_feature(feature_id: int, body: FeatureIn, user=Depends(auth.current_user)):
+    with db.connect() as conn:
+        f = _own(conn, "features", feature_id, user)
+        conn.execute("UPDATE features SET name = ?, x = ?, y = ?, w = ?, h = ? WHERE id = ?", (
+            (body.name or f["name"]).strip()[:40] or f["name"],
+            _metres(body.x) if body.x is not None else f["x"], _metres(body.y) if body.y is not None else f["y"],
+            _metres(body.w, 0.2, 100) if body.w else f["w"], _metres(body.h, 0.2, 100) if body.h else f["h"], feature_id))
+        return garden.payload(conn, user)
+
+
+@app.delete("/api/features/{feature_id}")
+def delete_feature(feature_id: int, user=Depends(auth.current_user)):
+    with db.connect() as conn:
+        _own(conn, "features", feature_id, user)
+        conn.execute("DELETE FROM features WHERE id = ?", (feature_id,))
         return garden.payload(conn, user)
 
 

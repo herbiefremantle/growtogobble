@@ -446,3 +446,25 @@ svg.plot .gridline { fill: none; stroke: rgba(46, 90, 40, .18); stroke-width: 0.
 svg.plot .scalebar path { stroke: #1f2a1c; stroke-width: 0.04; fill: none; }
 svg.plot .scalebar text { fill: #1f2a1c; font-weight: 600; }
 .zoom { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin: -2px 0 6px; }
+
+/* garden planner */
+.plan-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.plan-bar .zoom { margin: 0; display: flex; gap: 4px; }
+.plot-wrap { overflow: auto; max-height: 72vh; background: var(--bg-2); }
+.plot-wrap svg.plot { display: block; width: auto !important; height: auto; max-width: none; margin: 0 auto; }
+svg.plot .outside { fill: #e9e1cd; }
+@media (prefers-color-scheme: dark) { svg.plot .outside { fill: #1a1f18; } }
+svg.plot .fence { fill: none; stroke: #8a6a45; stroke-width: 0.08; stroke-dasharray: 0.3 0.12; }
+svg.plot .label.dim { fill: #6a6f5d; font-weight: 600; }
+svg.plot .feat { stroke: rgba(0,0,0,.18); stroke-width: 0.03; }
+svg.plot .feat.tree, svg.plot .feat.bush { opacity: .85; }
+svg.plot .feat.greenhouse { stroke: #7fb4c4; stroke-width: 0.05; }
+svg.plot .feat.path, svg.plot .feat.patio { stroke-dasharray: 0.1 0.08; }
+svg.plot .item { cursor: pointer; }
+.moving svg.plot .item { cursor: grab; }
+.moving svg.plot .item .hit { fill: rgba(255,255,255,.18); stroke: #3a7ca5; stroke-width: .04; stroke-dasharray: .15 .1; }
+svg.plot .item.sel > :first-child, svg.plot .item.sel .hit { stroke: #e4572e !important; stroke-width: .08 !important; stroke-dasharray: none !important; }
+.adds { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.sel-card { border: 2px solid var(--terra); }
+.mini { display: flex; flex-direction: column; font-size: 12px; font-weight: 800; color: var(--muted); gap: 2px; flex: 1; }
+.mini input { padding: 8px; font-size: 16px; }
