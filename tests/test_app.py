@@ -517,3 +517,8 @@ def test_fill_a_bed_and_what_to_buy():
     assert planner.buy_estimate(onions, 115, "sow_out")["text"] == "Buy about 2 bags of onion sets (250g each)"
     assert planner.buy_estimate(carrots, 288, "sow_out")["seeds"] == 576  # sow double: some don't come up, some get thinned
     assert planner.buy_estimate(carrots, 288, "plants")["text"] == "Buy 288 plants"
+
+
+def test_page_asks_for_the_newest_script(client):
+    page = client.get("/").text
+    assert "/static/app.js?v=" in page and "/static/style.css?v=" in page

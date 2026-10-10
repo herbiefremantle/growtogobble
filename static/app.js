@@ -620,7 +620,7 @@ const inBedRow = (c) => cropRow(c, { unplace: true });
 
 // ---- the Garden tab: a bird's-eye plot (default) or a plain list -----------------------------------------
 
-let gardenView = "plot", plotMonth = 0, plotMove = false, placing = null;
+let gardenView = "plot", plotMonth = 0, plotMove = false, placing = null, plotZoom = 1;
 const FAMILY_COLOUR = { cabbage: "#7fb06b", onion: "#d8c48a", bean: "#a6d98f", potato: "#e0ad74", squash: "#f2c45a", carrot: "#f2a564",
   beet: "#c07a9c", leaf: "#93d07f", corn: "#f5d76e", fruit: "#e88a8a", herb: "#7cc4a0", flower: "#f4a3b8", sweetpotato: "#dc9466" };
 
@@ -640,18 +640,15 @@ function spaceSize(s) {
   return { w: s.width_m || def.w, h: s.length_m || def.h };
 }
 
-// Beds without a saved spot are laid out left to right in rows, below any that have been dragged into place
+// Beds without a saved spot sit side by side, left to right in the order they were added (beds first,
+// then pots), to the right of any that have been dragged into place
 function plotPositions() {
-  const pos = {}, ROW = 4.6, GAP = 0.8;
+  const pos = {}, GAP = 0.6;
   const placed = S.g.spaces.filter((s) => s.pos_x != null);
   placed.forEach((s) => (pos[s.id] = { x: s.pos_x, y: s.pos_y }));
-  let x = 0.4, y = placed.length ? Math.max(...placed.map((s) => s.pos_y + spaceSize(s).h)) + GAP : 0.6, rowH = 0;
-  S.g.spaces.filter((s) => s.pos_x == null).forEach((s) => {
-    const sz = spaceSize(s);
-    if (x > 0.4 && x + sz.w > ROW) { x = 0.4; y += rowH + GAP; rowH = 0; }
-    pos[s.id] = { x, y };
-    x += sz.w + GAP; rowH = Math.max(rowH, sz.h);
-  });
+  let x = placed.length ? Math.max(...placed.map((s) => s.pos_x + spaceSize(s).w)) + GAP : 0.5;
+  const auto = S.g.spaces.filter((s) => s.pos_x == null).sort((a, b) => (a.kind === "pot") - (b.kind === "pot") || a.id - b.id);
+  auto.forEach((s) => { pos[s.id] = { x, y: 0.6 }; x += spaceSize(s).w + GAP; });
   return pos;
 }
 
@@ -694,8 +691,13 @@ function plotSvg() {
       <rect x="${x - 0.12}" y="${y - 0.12}" width="${w + 0.24}" height="${h + 0.24}" rx="0.14" class="hit"/>
       ${inner}<text x="${x}" y="${y - 0.2}" font-size="0.2" class="label">${esc(label)}</text></g>`;
   }).join("");
-  return `<svg class="plot" viewBox="0 0 ${maxX} ${maxY + 0.2}" role="img" aria-label="Bird's-eye view of your garden">
-    <rect x="0" y="0" width="${maxX}" height="${maxY + 0.2}" class="grass"/>${beds}</svg>`;
+  if (plotMove) { maxX += 2.5; maxY += 2; }  // spare grass to drag beds into
+  const W = Math.ceil(maxX), H = Math.ceil(maxY + 0.6), step = plotMove ? 0.5 : 1;
+  return `<svg class="plot" viewBox="0 0 ${W} ${H}" style="width:${plotZoom * 100}%" role="img" aria-label="Bird's-eye view of your garden">
+    <defs><pattern id="grid" width="${step}" height="${step}" patternUnits="userSpaceOnUse"><path d="M ${step} 0 L 0 0 0 ${step}" class="gridline"/></pattern></defs>
+    <rect x="0" y="0" width="${W}" height="${H}" class="grass"/><rect x="0" y="0" width="${W}" height="${H}" fill="url(#grid)"/>
+    ${beds}
+    <g class="scalebar"><path d="M 0.3 ${H - 0.25} h 1"/><text x="0.8" y="${H - 0.33}" font-size="0.18" text-anchor="middle">1 m</text></g></svg>`;
 }
 
 function plotPage() {
@@ -704,11 +706,13 @@ function plotPage() {
   const label = plotMonth === 0 ? "Today" : `${MONTHS_LONG[T.getMonth()]}${T.getFullYear() !== today().getFullYear() ? " " + T.getFullYear() : ""}`;
   view.innerHTML = `<h1>🪴 My garden</h1>${gardenTabs()}
     ${placing ? `<div class="card tint-sun row placing" style="justify-content:space-between"><b>👆 Tap a bed to put ${plant(crop(placing).plant_id).emoji} ${esc(plant(crop(placing).plant_id).name)} in it</b><button class="btn small ghost" id="cancel-place">Cancel</button></div>` : ""}
-    ${plotMove ? `<div class="card tint-sky"><b>✋ Drag your beds</b> to match your real garden, then tap Done.</div>` : ""}
-    <div class="plot-wrap">${S.g.spaces.length ? plotSvg() : `<div class="empty"><div class="big">🟫</div>No beds yet.</div>`}</div>
+    ${plotMove ? `<div class="card tint-sky"><b>✋ Drag your beds</b> to where they really are - each small square is 50cm. Tap Done when they match your garden.</div>` : ""}
+    <div class="plot-wrap ${plotMove ? "moving" : ""}">${S.g.spaces.length ? plotSvg() : `<div class="empty"><div class="big">🟫</div>No beds yet.</div>`}</div>
+    ${S.g.spaces.length ? `<div class="zoom"><button class="btn small" data-zoom="-1" aria-label="Zoom out">➖</button><span class="small muted">${Math.round(plotZoom * 100)}%</span>
+      <button class="btn small" data-zoom="1" aria-label="Zoom in">➕</button>${plotZoom !== 1 ? `<button class="btn small ghost" data-zoom="0">Fit</button>` : ""}</div>` : ""}
     <div class="month-row"><b>📅 ${esc(label)}</b><input type="range" id="month" min="0" max="11" value="${plotMonth}" aria-label="Show the garden in a later month">
       ${plotMonth ? `<button class="btn small ghost" id="now">Today</button>` : ""}</div>
-    <p class="small muted" style="margin:0 0 12px">Each coloured strip is a crop, sized by the room it needs. Tap a crop or a bed to open it. Slide to see your garden later in the year.</p>
+    <p class="small muted" style="margin:0 0 12px">Each coloured strip is a crop, sized by the room it needs. Tap a crop or a bed to open it. Slide to see your garden later in the year. Each grid square is 1 m.</p>
     ${unplaced.length ? `<div class="card"><b>📍 Not in a bed yet</b> <span class="small muted">- tap one, then tap a bed</span>
       <div class="suggest">${unplaced.map((c) => `<button data-place="${c.id}" class="${placing === c.id ? "on" : ""}">${plant(c.plant_id).emoji} ${esc(plant(c.plant_id).name)}${rowLabel(c) ? " · " + rowLabel(c) : ""}</button>`).join("")}</div></div>` : ""}
     <div class="row"><button class="btn small ${plotMove ? "primary" : ""}" id="move">${plotMove ? "✅ Done" : "✋ Move beds"}</button>
@@ -717,6 +721,12 @@ function plotPage() {
   $("#month").oninput = (e) => { plotMonth = Number(e.target.value); const y = window.scrollY; plotPage(); window.scrollTo(0, y); };
   const nowBtn = $("#now"); if (nowBtn) nowBtn.onclick = () => { plotMonth = 0; plotPage(); };
   $("#move").onclick = () => { plotMove = !plotMove; placing = null; plotPage(); };
+  view.querySelectorAll("[data-zoom]").forEach((b) => (b.onclick = () => {
+    const z = Number(b.dataset.zoom), levels = [1, 1.5, 2, 3, 4];
+    const i = levels.indexOf(plotZoom);
+    plotZoom = z === 0 ? 1 : levels[Math.max(0, Math.min(levels.length - 1, i + z))];
+    const y = window.scrollY; plotPage(); window.scrollTo(0, y);
+  }));
   $("#add-space").onclick = addSpaceSheet;
   const cp = $("#cancel-place"); if (cp) cp.onclick = () => { placing = null; plotPage(); };
   const svg = view.querySelector("svg.plot");

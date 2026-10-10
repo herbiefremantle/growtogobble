@@ -437,3 +437,12 @@ svg.plot .space.nope { opacity: .45; }
 .month-row input[type=range] { flex: 1; accent-color: var(--forest-2); }
 .suggest button.on { background: var(--forest-2); color: #fff; }
 .fillrow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+
+.plot-wrap { overflow: auto; -webkit-overflow-scrolling: touch; max-height: 75vh; }
+.plot-wrap.moving { touch-action: none; }
+.plot-wrap svg.plot { max-width: none; }
+svg.plot .gridline { fill: none; stroke: rgba(46, 90, 40, .18); stroke-width: 0.012; }
+@media (prefers-color-scheme: dark) { svg.plot .gridline { stroke: rgba(200, 230, 190, .12); } }
+svg.plot .scalebar path { stroke: #1f2a1c; stroke-width: 0.04; fill: none; }
+svg.plot .scalebar text { fill: #1f2a1c; font-weight: 600; }
+.zoom { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin: -2px 0 6px; }

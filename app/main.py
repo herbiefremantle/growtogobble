@@ -12,7 +12,7 @@ from datetime import date
 from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -63,7 +63,14 @@ app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 @app.get("/")
 def index():
-    return FileResponse(os.path.join(STATIC, "index.html"), headers={"Cache-Control": "no-cache"})
+    """The app page, with ?v=<file date> on its script and styles - so phones always fetch the newest version
+    after a deploy instead of running an old copy from their cache."""
+    with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as f:
+        page = f.read()
+    for name in ("app.js", "style.css"):
+        version = int(os.path.getmtime(os.path.join(STATIC, name)))
+        page = page.replace("/static/%s\"" % name, "/static/%s?v=%d\"" % (name, version))
+    return HTMLResponse(page, headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/sw.js")
