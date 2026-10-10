@@ -596,3 +596,16 @@ def test_group_and_ungroup(client):
     assert grp and all(s["grp"] == grp for s in g["spaces"]) and g["garden"]["features"][0]["grp"] == grp
     g = client.post("/api/plan/ungroup", json={"grp": grp}).json()
     assert all(s["grp"] is None for s in g["spaces"]) and g["garden"]["features"][0]["grp"] is None
+
+
+def test_fruit_trees_and_bushes(client):
+    _join(client)
+    fruit = client.get("/api/plants").json()["fruit"]
+    apple = next(f for f in fruit if f["id"] == "apple_eating")
+    assert apple["kind"] == "tree" and 9 in apple["pick"] and "Gala" in apple["examples"]
+    g = client.post("/api/features", json={"kind": "tree", "name": "Eating apple", "variety": "apple_eating", "w": 3, "h": 3}).json()
+    tree = g["garden"]["features"][0]
+    assert tree["variety"] == "apple_eating"
+    assert client.post("/api/features", json={"kind": "bush", "variety": "apple_eating"}).status_code == 400  # no apple bushes
+    g = client.patch("/api/features/%d" % tree["id"], json={"variety": "pear", "name": "Pear"}).json()
+    assert g["garden"]["features"][0]["variety"] == "pear" and g["garden"]["features"][0]["name"] == "Pear"

@@ -638,6 +638,34 @@ const FEATURES = {
   pond: { emoji: "🦆", name: "Pond", w: 1.6, h: 1.6, round: true, fill: "#72b6da" },
   house: { emoji: "🏠", name: "House", w: 6, h: 3, fill: "#bfae95" },
 };
+// Trees and bushes can be a fruit (app/plants.py FRUIT): what it is, when to pick, what it needs
+const fruitOf = (f) => (f && f.variety && S.cat.fruit ? S.cat.fruit.find((x) => x.id === f.variety) : null);
+const pickMonths = (fr) => (fr.pick.length ? (fr.pick.length === 1 ? MONTHS[fr.pick[0] - 1] : `${MONTHS[fr.pick[0] - 1]}-${MONTHS[fr.pick[fr.pick.length - 1] - 1]}`) : "");
+function fruitInfo(fr) {
+  if (fr.plain) return `<ul class="steps">${fr.care.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>`;
+  const now = fr.pick.includes(new Date().getMonth() + 1);
+  return `${now ? `<p class="fruit-now">🧺 It's picking time now!</p>` : ""}
+    ${fr.examples ? `<p class="small muted" style="margin:0 0 8px">Kinds: ${esc(fr.examples)}</p>` : ""}
+    <p style="margin:0 0 8px"><b>🧺 When to pick:</b> ${esc(fr.pick_text)}</p>
+    <p style="margin:0 0 8px"><b>👀 Is it ripe?</b> ${esc(fr.ripe)}</p>
+    <p style="margin:0 0 8px"><b>🫙 Keeping it:</b> ${esc(fr.keep)}</p>
+    <b>✂️ Looking after it</b><ul class="steps">${fr.care.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
+    ${fr.pests ? `<p style="margin:8px 0 0"><b>🐛 Watch out:</b> ${esc(fr.pests)}</p>` : ""}`;
+}
+function fruitSheet(f) {
+  const fr = fruitOf(f);
+  if (!fr) return;
+  openSheet(`<h2>${fr.emoji} ${esc(f.name)}</h2>${f.name !== fr.name ? `<p class="small muted" style="margin-top:-6px">${esc(fr.name)}</p>` : ""}${fruitInfo(fr)}`);
+}
+// "What kind of tree is it?" - calls back with the chosen fruit (or a plain one)
+function fruitPicker(kind, onPick) {
+  const list = (S.cat.fruit || []).filter((x) => x.kind === kind);
+  openSheet(`<h2>${kind === "tree" ? "🌳 What kind of tree?" : "🌿 What kind of bush?"}</h2>
+    <p class="small muted" style="margin-top:-6px">Pick a fruit and we'll tell you when to pick it and how to look after it.</p>
+    <div class="fruit-list">${list.map((x) => `<button class="fruit-opt" data-fruit="${x.id}"><span class="fe">${x.emoji}</span>
+      <span><b>${esc(x.name)}</b><span class="small muted">${x.plain ? "Just there - no fruit to pick" : `${esc(x.examples)} · pick ${pickMonths(x)}`}</span></span></button>`).join("")}</div>`);
+  $("#sheet-card").querySelectorAll("[data-fruit]").forEach((b) => (b.onclick = () => { closeSheet(); onPick(list.find((x) => x.id === b.dataset.fruit)); }));
+}
 
 function gardenTabs() {
   return `<div class="seg" role="tablist"><button data-gview="plot" class="${gardenView === "plot" ? "on" : ""}">🗺️ My plan</button>
@@ -888,14 +916,14 @@ function plotSvg() {
   const isSel = inSelection;
 
   const features = items.filter((i) => i.type === "feature").map((i) => {
-    const k = FEATURES[i.f.kind] || FEATURES.bush, lab = fitLabel(i.f.name, i.w + 0.2, ppm, 12, 8);
+    const k = FEATURES[i.f.kind] || FEATURES.bush, lab = fitLabel(i.f.name, i.w + 0.2, ppm, 12, 8), fr = fruitOf(i.f);
     const shape = k.round ? `<ellipse cx="${i.x + i.w / 2}" cy="${i.y + i.h / 2}" rx="${i.w / 2}" ry="${i.h / 2}" fill="${k.fill}" class="feat ${i.f.kind}"/>`
       : `<rect x="${i.x}" y="${i.y}" width="${i.w}" height="${i.h}" rx="${Math.min(0.15, i.w / 6)}" fill="${k.fill}" class="feat ${i.f.kind}"/>`;
     const es = Math.min(Math.min(i.w, i.h) * 0.55, px(30));
     const bb = box(i);
     return `<g class="item feature ${isSel(i) ? "sel" : ""}" data-item="feature" data-id="${i.id}" data-x="${i.x}" data-y="${i.y}" data-w="${i.w}" data-h="${i.h}" data-a="${i.a}">
       <title>${esc(i.f.name)}</title><g class="turn" transform="rotate(${i.a} ${i.x + i.w / 2} ${i.y + i.h / 2})">${shape}${k.round ? "" : sizeMarks(i, ppm)}</g>
-      <text x="${i.x + i.w / 2}" y="${i.y + i.h / 2 + es * 0.35}" font-size="${es}" text-anchor="middle">${k.emoji}</text>
+      <text x="${i.x + i.w / 2}" y="${i.y + i.h / 2 + es * 0.35}" font-size="${es}" text-anchor="middle">${fr && !fr.plain ? fr.emoji : k.emoji}</text>
       <text x="${i.x + i.w / 2}" y="${bb.y1 + lab.size * 1.1}" font-size="${lab.size}" text-anchor="middle" class="label">${esc(lab.text)}</text></g>`;
   }).join("");
 
@@ -1024,7 +1052,10 @@ function groupToolbar() {
     ${n >= 2 ? `<button class="btn small primary" id="g-make">🔗 Group them</button>` : `<span class="small">Tap things to pick them</span>`}
     ${n ? `<button class="btn small ghost" id="g-clear">Clear</button>` : ""}</div>`;
   return `<div class="seltools grouptools" style="${at}"><b>🔗 Group of ${n}</b> <span class="small">drag to move them all</span>
-    <button class="btn small" id="g-un">Ungroup</button><button class="btn small ghost" id="g-close" aria-label="Close">✕</button></div>`;
+    <button class="btn small" id="g-un">Ungroup</button><button class="btn small ghost" id="g-close" aria-label="Close">✕</button>
+    <div class="copyrow"><span>Turn them all:</span><button class="btn small" data-grot="-15" aria-label="Turn the group 15 degrees left">↺15°</button>
+      <button class="btn small" data-grot="-5" aria-label="Turn the group 5 degrees left">↺5°</button><button class="btn small" data-grot="5" aria-label="Turn the group 5 degrees right">↻5°</button>
+      <button class="btn small" data-grot="15" aria-label="Turn the group 15 degrees right">↻15°</button><button class="btn small" data-grot="90" aria-label="Turn the group 90 degrees">↻90°</button></div></div>`;
 }
 
 // Turn buttons right next to whatever's selected, so you don't have to scroll down to them
@@ -1038,18 +1069,21 @@ function selToolbar() {
   const cs = getComputedStyle(view), visW = view.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
   const tw = Math.min(330, visW - 8), lo = Math.max(4, plotScroll.l + 4), hi = Math.min(W - tw - 4, plotScroll.l + visW - tw - 4);
   const left = Math.max(lo, Math.min(hi, ((bb.x0 + bb.x1) / 2 - b.x0) * ppm - tw / 2));
-  const th = it.type === "space" ? 140 : 100, above = (bb.y0 - b.y0) * ppm - th, top = above > 4 ? above : (bb.y1 - b.y0) * ppm + 10;
+  const tb = it.type === "feature" && ["tree", "bush"].includes(it.f.kind), fr = tb && fruitOf(it.f);
+  const th = it.type === "space" || tb ? 140 : 100, above = (bb.y0 - b.y0) * ppm - th, top = above > 4 ? above : (bb.y1 - b.y0) * ppm + 10;
   return `<div class="seltools" style="left:${left}px;top:${top}px;width:${tw}px">
     <button class="btn small" data-rot="-15" aria-label="Turn 15 degrees left">↺15°</button>
     <input type="range" id="ang" min="-180" max="180" step="1" value="${Math.round(it.a)}" aria-label="Angle">
     <button class="btn small" data-rot="15" aria-label="Turn 15 degrees right">↻15°</button>
     <b id="angv">${Math.round(it.a)}°</b>
     <button class="btn small" data-rot="90" aria-label="Turn 90 degrees">↻90°</button>${it.a ? `<button class="btn small ghost" data-rot="0" aria-label="Straighten">⟲0</button>` : ""}
-    <button class="btn small ghost" id="seldetails" aria-label="More options">⋯</button><button class="btn small danger" id="seldel" aria-label="Delete">🗑️</button>
+    <button class="btn small ghost" id="seldetails" aria-label="More options">⋯</button><button class="btn small danger" id="seldel" aria-label="Delete">🗑️</button><button class="btn small ghost" id="selclose" aria-label="Close - or tap an empty spot">✕</button>
     <div class="sizerow"><span>📏</span><input id="sz-w" type="number" step="0.1" min="0.2" max="100" inputmode="decimal" value="${it.w}" aria-label="Width in metres">
       <span>×</span><input id="sz-h" type="number" step="0.1" min="0.2" max="100" inputmode="decimal" value="${it.h}" aria-label="Length in metres"><span>m</span><span class="small muted" id="sz-state"></span></div>
     ${it.type === "space" ? `<div class="copyrow"><span>⧉ Copy to:</span><button class="btn small" data-copy-bed="left" aria-label="Copy to the left">◀</button><button class="btn small" data-copy-bed="right" aria-label="Copy to the right">▶</button>
-      <button class="btn small" data-copy-bed="up" aria-label="Copy above">▲</button><button class="btn small" data-copy-bed="down" aria-label="Copy below">▼</button></div>` : ""}</div>`;
+      <button class="btn small" data-copy-bed="up" aria-label="Copy above">▲</button><button class="btn small" data-copy-bed="down" aria-label="Copy below">▼</button></div>` : ""}
+    ${tb ? `<div class="copyrow">${fr && !fr.plain ? `<span>${fr.emoji} ${esc(fr.name)} · pick ${pickMonths(fr)}</span><button class="btn small" data-fruitinfo>ℹ️ Info</button>`
+      : `<span>${fr ? esc(fr.name) : "What kind is it?"}</span>`}<button class="btn small" data-fruitpick>${fr ? "Change" : "🍎 Choose"}</button></div>` : ""}</div>`;
 }
 
 // The edit tools: add things, set the garden's size, and change whatever is selected
@@ -1071,25 +1105,28 @@ function editPanel() {
         <div class="row" style="margin-top:8px"><button class="btn small" data-open-space="${it.id}">✏️ Name, size & soil</button><button class="btn small ghost" id="desel">Done</button></div></div>`;
     } else {
       const k = FEATURES[it.f.kind] || FEATURES.bush;
-      sel = `<div class="card sel-card"><b>${k.emoji} ${esc(it.f.name)}</b>
+      const fr = fruitOf(it.f), tb = ["tree", "bush"].includes(it.f.kind);
+      sel = `<div class="card sel-card"><b>${fr && !fr.plain ? fr.emoji : k.emoji} ${esc(it.f.name)}</b>
+        ${tb ? `<div class="row" style="margin-top:6px"><span class="small muted">${fr ? esc(fr.name) : `Which ${it.f.kind} is it? Choose one to get picking times and care tips.`}</span>
+          <button class="btn small" data-fruitpick>${fr ? "🔄 Change kind" : "🍎 Choose kind"}</button></div>` : ""}
+        ${fr ? `<details class="fruit-card" ${fr.plain ? "" : "open"}><summary><b>${fr.plain ? "Tips" : "🧺 Picking & care"}</b></summary>${fruitInfo(fr)}</details>` : ""}
         <div class="row" style="margin-top:8px;flex-wrap:nowrap"><input id="fname" type="text" maxlength="40" value="${esc(it.f.name)}" aria-label="Name"></div>
-        <div class="row" style="margin-top:8px;flex-wrap:nowrap"><label class="mini">Width<input id="fw" type="number" step="0.1" min="0.2" value="${it.w}"></label><span>×</span>
-          <label class="mini">${k.round ? "Height" : "Length"}<input id="fh" type="number" step="0.1" min="0.2" value="${it.h}"></label><span class="small muted">m</span></div>
 
         <div class="row" style="margin-top:8px"><button class="btn small primary" id="fsave">Save name</button>
           <button class="btn small danger" id="fdel">🗑️ Remove</button><button class="btn small ghost" id="desel">Done</button></div></div>`;
     }
   }
-  return `${sel}
+  return `
+    <div class="card"><b>➕ Add to your plan</b>
+      <div class="adds"><button class="btn small" id="add-space">🟫 Bed or pots</button>
+        ${Object.entries(FEATURES).map(([k, f]) => `<button class="btn small" data-addfeat="${k}">${f.emoji} ${f.name}</button>`).join("")}</div></div>
+    ${sel}
     <div class="card"><b>🧲 Lining beds up</b>
       <label class="check" style="margin-top:6px"><input type="checkbox" id="snap" ${snapOn ? "checked" : ""}> <span>Snap a bed alongside the one you drop it next to - same angle, ends level</span></label>
       <label class="field" for="pathw" style="margin-top:8px">Path between beds</label>
       <select id="pathw">${[[0, "No path - right up against each other"], [0.3, "30cm"], [0.4, "40cm"], [0.5, "50cm"], [0.6, "60cm"], [0.75, "75cm"], [1, "1m"]]
         .map(([v, l]) => `<option value="${v}" ${Math.abs(v - g.path_w) < 0.001 ? "selected" : ""}>${l}</option>`).join("")}</select>
       <p class="small muted" style="margin:6px 0 0">Paths are drawn for you between beds that sit side by side.</p></div>
-    <div class="card"><b>➕ Add to your plan</b>
-      <div class="adds"><button class="btn small" id="add-space">🟫 Bed or pots</button>
-        ${Object.entries(FEATURES).map(([k, f]) => `<button class="btn small" data-addfeat="${k}">${f.emoji} ${f.name}</button>`).join("")}</div></div>
     <div class="card"><b>📐 Your whole garden or field</b>
       <p class="small muted" style="margin:4px 0 8px">Trace it on a satellite map, or type its size. The plan then shows its edge, so you can place everything where it really is.</p>
       <div class="row"><button class="btn small primary" id="trace">🗺️ ${g.shape ? "Trace it again" : "Trace it on a satellite map"}</button>
@@ -1143,7 +1180,7 @@ function wirePlot() {
     const pl = e.target.closest("[data-place]");
     if (pl) { placing = placing === Number(pl.dataset.place) ? null : Number(pl.dataset.place); plotPage(); return; }
     const feat = e.target.closest('[data-item="feature"]');
-    if (feat) { const f = S.g.garden.features.find((x) => x.id === Number(feat.dataset.id)); toast(`${(FEATURES[f.kind] || {}).emoji || ""} ${f.name} - tap ✏️ Edit plan to change it`); return; }
+    if (feat) { const f = S.g.garden.features.find((x) => x.id === Number(feat.dataset.id)); if (fruitOf(f)) { fruitSheet(f); return; } toast(`${(FEATURES[f.kind] || {}).emoji || ""} ${f.name} - tap ✏️ Edit plan to change it`); return; }
     const sp = e.target.closest("[data-space-id]");
     if (placing && sp) {
       e.stopPropagation();
@@ -1212,6 +1249,15 @@ function wireItemDrag(svg) {
   if (!svg || !planWire) return;
   const { redraw, saveMany } = planWire;
     svg.addEventListener("click", (e) => e.stopPropagation(), true);  // in edit mode, taps select rather than open
+    // tapping an empty bit of the plan lets go of whatever's selected (and its box goes away)
+    let bgDown = null;
+    svg.onpointerdown = (ev) => { bgDown = ev.target.closest("[data-item]") ? null : { x: ev.clientX, y: ev.clientY }; };
+    svg.onpointerup = (ev) => {
+      if (!bgDown || ev.target.closest("[data-item]")) return;
+      const tap = Math.abs(ev.clientX - bgDown.x) + Math.abs(ev.clientY - bgDown.y) < 10;
+      bgDown = null;
+      if (tap && !multi && selected) { selected = null; redraw(); }
+    };
     const pt = (ev) => { const p = svg.createSVGPoint(); p.x = ev.clientX; p.y = ev.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); };
     svg.querySelectorAll("[data-item]").forEach((g) => {
       g.onpointerdown = (ev) => {
@@ -1338,7 +1384,6 @@ function wireEdit(svg, redraw) {
       setAngle(r === "0" ? 0 : r === "90" ? it.a + 90 : it.a + Number(r));
     }));
     wireSize($("#sz-w"), $("#sz-h"), it);
-    wireSize($("#fw"), $("#fh"), it);
     const del = $("#seldel");
     if (del) del.onclick = async () => {
       if (it.type === "space") {
@@ -1389,6 +1434,32 @@ function wireEdit(svg, redraw) {
   const grpClear = $("#g-clear"); if (grpClear) grpClear.onclick = () => { picked.clear(); redraw(); };
   const grpUn = $("#g-un"); if (grpUn) grpUn.onclick = async () => { const g = selected.grp; selected = null; await change("POST", "/api/plan/ungroup", { grp: g }, "Ungrouped"); };
   const grpClose = $("#g-close"); if (grpClose) grpClose.onclick = () => { selected = null; redraw(); };
+  const selClose = $("#selclose"); if (selClose) selClose.onclick = () => { selected = null; redraw(); };
+  // turn a whole group round its middle: every bed swings round together and turns by the same amount
+  view.querySelectorAll("[data-grot]").forEach((b) => (b.onclick = () => {
+    const d = Number(b.dataset.grot), items = planItems(), group = items.filter((i) => i.grp === selected.grp);
+    const bbs = group.map(box), gx = (Math.min(...bbs.map((q) => q.x0)) + Math.max(...bbs.map((q) => q.x1))) / 2, gy = (Math.min(...bbs.map((q) => q.y0)) + Math.max(...bbs.map((q) => q.y1))) / 2;
+    const c = Math.cos(rad(d)), sn = Math.sin(rad(d)), r2 = (v) => Math.round(v * 100) / 100;
+    let moved = group.map((i) => {
+      const dx = i.x + i.w / 2 - gx, dy = i.y + i.h / 2 - gy, cx = gx + dx * c - dy * sn, cy = gy + dx * sn + dy * c;
+      return { ...i, x: cx - i.w / 2, y: cy - i.h / 2, a: Math.round(((((i.a + d + 180) % 360) + 360) % 360) - 180) };
+    });
+    const minX = Math.min(...moved.map((i) => box(i).x0)), minY = Math.min(...moved.map((i) => box(i).y0));  // keep it on the plan
+    moved = moved.map((i) => ({ ...i, x: r2(i.x - Math.min(0, minX)), y: r2(i.y - Math.min(0, minY)) }));
+    const inGroup = new Set(group.map(itemKey));
+    const hit = moved.filter((i) => i.type === "space").map((i) => items.find((o) => o.type === "space" && !inGroup.has(itemKey(o)) && overlaps(i, o))).find(Boolean);
+    if (hit) { toast(`Turning them would hit ${hit.s.name} - move the group first`); return; }
+    saveMany(moved);
+  }));
+  const fsel = selected && selected.type === "feature" && S.g.garden.features.find((x) => x.id === selected.id);
+  if (fsel) {
+    view.querySelectorAll("[data-fruitinfo]").forEach((b) => (b.onclick = () => fruitSheet(fsel)));
+    view.querySelectorAll("[data-fruitpick]").forEach((b) => (b.onclick = () => fruitPicker(fsel.kind, (fr) => {
+      // rename it too, unless they've given it their own name
+      const old = fruitOf(fsel), own = fsel.name !== FEATURES[fsel.kind].name && !(old && fsel.name === old.name);
+      change("PATCH", `/api/features/${fsel.id}`, { variety: fr.id, ...(own ? {} : { name: fr.name }) }, `${fr.emoji} Now a ${fr.name.toLowerCase()}`);
+    })));
+  }
 
   const f = selected && selected.type === "feature" && S.g.garden.features.find((x) => x.id === selected.id);
   if (f) {
@@ -1397,15 +1468,19 @@ function wireEdit(svg, redraw) {
     $("#fdel").onclick = async () => { if (confirm(`Remove the ${f.name.toLowerCase()} from your plan?`)) { selected = null; await change("DELETE", `/api/features/${f.id}`, null, "Removed"); } };
   }
   $("#add-space").onclick = addSpaceSheet;
-  view.querySelectorAll("[data-addfeat]").forEach((b) => (b.onclick = async () => {
-    const k = FEATURES[b.dataset.addfeat], items = planItems(), bnd = planBounds(items);
+  const addFeature = async (kind, fr) => {
+    const k = { ...FEATURES[kind], ...(fr ? { name: fr.name, w: fr.w, h: fr.h, emoji: fr.plain ? FEATURES[kind].emoji : fr.emoji } : {}) }, items = planItems();
     // drop it in a clear spot: below everything else, inside the garden if it has a size
     const y = Math.max(0.5, ...items.map((i) => i.y + i.h + 0.8)), gh = S.g.garden.h;
     const at = { x: 0.5, y: gh ? Math.min(y, Math.max(0, gh - k.h)) : y };
-    if (await change("POST", "/api/features", { kind: b.dataset.addfeat, name: k.name, x: at.x, y: at.y, w: k.w, h: k.h }, `${k.emoji} ${k.name} added - drag it into place`)) {
+    if (await change("POST", "/api/features", { kind, name: k.name, x: at.x, y: at.y, w: k.w, h: k.h, variety: fr ? fr.id : null }, `${k.emoji} ${k.name} added - drag it into place`)) {
       const last = S.g.garden.features[S.g.garden.features.length - 1];
       selected = { type: "feature", id: last.id }; redraw();
     }
+  };
+  view.querySelectorAll("[data-addfeat]").forEach((b) => (b.onclick = () => {
+    const kind = b.dataset.addfeat;
+    if (["tree", "bush"].includes(kind)) fruitPicker(kind, (fr) => addFeature(kind, fr)); else addFeature(kind);
   }));
   {
     let gTimer;

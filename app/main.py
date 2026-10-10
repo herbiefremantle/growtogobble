@@ -603,6 +603,16 @@ def garden_shape(body: GardenShape, user=Depends(auth.current_user)):
         return garden.payload(conn, user)
 
 
+def _variety(v, kind):
+    """A fruit for a tree or bush - must exist and match (no apple bushes)."""
+    if not v:
+        return None
+    f = catalogue.FRUIT_BY_ID.get(v)
+    if not f or f["kind"] != kind:
+        raise HTTPException(400, "That kind doesn't fit a %s" % kind)
+    return v
+
+
 FEATURE_KINDS = {"tree", "bush", "hedge", "shed", "greenhouse", "compost", "water", "path", "patio", "pond", "house"}
 
 
@@ -614,6 +624,7 @@ class FeatureIn(BaseModel):
     w: Optional[float] = None
     h: Optional[float] = None
     angle: Optional[float] = None
+    variety: Optional[str] = None     # trees & bushes: which fruit (or "tree_plain"/"bush_plain")
 
 
 @app.post("/api/features")
@@ -621,9 +632,10 @@ def add_feature(body: FeatureIn, user=Depends(auth.current_user)):
     if body.kind not in FEATURE_KINDS:
         raise HTTPException(400, "Unknown kind of feature")
     with db.connect() as conn:
-        conn.execute("INSERT INTO features (user_id, kind, name, x, y, w, h, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        conn.execute("INSERT INTO features (user_id, kind, name, x, y, w, h, variety, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                      (user["id"], body.kind, (body.name or body.kind.title()).strip()[:40], _metres(body.x or 0.5),
-                      _metres(body.y or 0.5), _metres(body.w or 1, 0.2, 100), _metres(body.h or 1, 0.2, 100), clock.now().isoformat()))
+                      _metres(body.y or 0.5), _metres(body.w or 1, 0.2, 100), _metres(body.h or 1, 0.2, 100),
+                      _variety(body.variety, body.kind), clock.now().isoformat()))
         return garden.payload(conn, user)
 
 
@@ -631,6 +643,8 @@ def add_feature(body: FeatureIn, user=Depends(auth.current_user)):
 def edit_feature(feature_id: int, body: FeatureIn, user=Depends(auth.current_user)):
     with db.connect() as conn:
         f = _own(conn, "features", feature_id, user)
+        if body.variety is not None:
+            conn.execute("UPDATE features SET variety = ? WHERE id = ?", (_variety(body.variety, f["kind"]), feature_id))
         conn.execute("UPDATE features SET name = ?, x = ?, y = ?, w = ?, h = ?, angle = ? WHERE id = ?", (
             (body.name or f["name"]).strip()[:40] or f["name"],
             _metres(body.x) if body.x is not None else f["x"], _metres(body.y) if body.y is not None else f["y"],

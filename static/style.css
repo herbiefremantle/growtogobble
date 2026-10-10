@@ -518,3 +518,14 @@ svg.plot.withsat .gridline { stroke: rgba(255,255,255,.18); }
 .btn.groupbtn.on { background: var(--sky); color: #fff; }
 @media (prefers-color-scheme: dark) { .btn.groupbtn.on { color: #0f2014; } }
 .plan-bar { flex-wrap: wrap; }
+
+/* fruit trees and bushes */
+.fruit-list { display: grid; gap: 8px; }
+.fruit-opt { display: flex; align-items: center; gap: 12px; text-align: left; padding: 10px 12px; border: 1.5px solid var(--line);
+  border-radius: 14px; background: var(--card); color: inherit; font: inherit; cursor: pointer; }
+.fruit-opt:hover, .fruit-opt:focus-visible { border-color: var(--terra); }
+.fruit-opt .fe { font-size: 28px; }
+.fruit-opt > span:last-child { display: flex; flex-direction: column; gap: 2px; }
+.fruit-now { background: #fff1c9; color: #6b4a00; border-radius: 10px; padding: 6px 10px; font-weight: 800; margin: 0 0 8px; }
+.fruit-card { margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 8px; }
+.fruit-card summary { cursor: pointer; }
