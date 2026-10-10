@@ -474,3 +474,17 @@ svg.plot .pathstrip { fill: #e3d8bf; stroke: #c9b996; stroke-width: 0.02; }
 @media (prefers-color-scheme: dark) { svg.plot .pathstrip { fill: #4a4335; stroke: #5d543f; } }
 .angle { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 .angle input[type=range] { flex: 1; accent-color: var(--forest-2); }
+
+.plot-inner { position: relative; display: inline-block; min-width: 100%; }
+.plan-bar .toggles { display: flex; gap: 4px; margin-left: auto; }
+.seltools { position: absolute; z-index: 3; display: flex; align-items: center; gap: 4px; padding: 6px; width: 300px;
+  background: var(--card); border: 1.5px solid var(--terra); border-radius: 14px; box-shadow: var(--shadow-lift); }
+.seltools .btn.small { min-height: 34px; padding: 6px 8px; font-size: 13px; }
+.seltools input[type=range] { flex: 1; min-width: 50px; accent-color: var(--forest-2); }
+.seltools b { font-size: 13px; min-width: 34px; text-align: center; }
+svg.plot .dims text { fill: #3d4a37; font-weight: 700; paint-order: stroke; stroke: rgba(255,255,255,.8); stroke-width: 0.03; }
+svg.plot .dims.edge text { fill: #6e4a2e; }
+@media (prefers-color-scheme: dark) { svg.plot .dims text { fill: #eef2e4; stroke: rgba(0,0,0,.6); } }
+.plot-wrap { text-align: center; }
+.plot-inner { min-width: 0; text-align: left; vertical-align: top; }
+.plot-inner svg.plot { margin: 0; }

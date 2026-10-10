@@ -702,8 +702,14 @@ function localOf(A, px, py) {
   const t = rad(A.a || 0), cx = A.x + A.w / 2, cy = A.y + A.h / 2, dx = px - cx, dy = py - cy;
   return { lx: dx * Math.cos(t) + dy * Math.sin(t), ly: -dx * Math.sin(t) + dy * Math.cos(t) };
 }
-let snapOn = true;
-try { snapOn = localStorage.getItem("gtg-snap") !== "0"; } catch (e) { /* private mode */ }
+let snapOn = true, showPaths = true, showSizes = false, plotScroll = { l: 0, t: 0 }, lastPlan = null;
+try {
+  snapOn = localStorage.getItem("gtg-snap") !== "0";
+  showPaths = localStorage.getItem("gtg-paths") !== "0";
+  showSizes = localStorage.getItem("gtg-sizes") === "1";
+} catch (e) { /* private mode */ }
+const remember = (k, v) => { try { localStorage.setItem(k, v ? "1" : "0"); } catch (e) { /* private mode */ } };
+const m = (v) => (v >= 10 ? v.toFixed(1) : v.toFixed(2)).replace(/\.?0+$/, "") + " m";
 
 // Dropped near another bed? Line it up alongside: same angle, a path's width apart, ends level
 // (unless it was dropped well along the other bed's length, then it keeps that slide)
@@ -724,6 +730,31 @@ function snapNextTo(M, items) {
     best = { dist, x: Math.round((cx - M.w / 2) * 100) / 100, y: Math.round((cy - M.h / 2) * 100) / 100, a: N.a || 0, to: N };
   }
   return best;
+}
+
+// Width along the bottom edge, length up the right-hand side
+function sizeMarks(i, ppm) {
+  if (!showSizes) return "";
+  const fs = 10 / ppm, gap = 4 / ppm;
+  return `<g class="dims"><text x="${i.x + i.w / 2}" y="${i.y + i.h + fs + gap}" font-size="${fs}" text-anchor="middle">${m(i.w)}</text>
+    <text x="${i.x + i.w + gap}" y="${i.y + i.h / 2}" font-size="${fs}" text-anchor="middle" transform="rotate(90 ${i.x + i.w + gap} ${i.y + i.h / 2})">${m(i.h)}</text></g>`;
+}
+// Each edge of the garden's boundary, measured
+function edgeMarks(ppm) {
+  const g = S.g.garden;
+  if (!showSizes || !g.w) return "";
+  const pts = g.shape || [[0, 0], [g.w, 0], [g.w, g.h], [0, g.h]];
+  const fs = 11 / ppm, cx = pts.reduce((a, p) => a + p[0], 0) / pts.length, cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
+  return `<g class="dims edge">${pts.map(([x1, y1], k) => {
+    const [x2, y2] = pts[(k + 1) % pts.length], len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 0.5) return "";
+    let mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    const nx = -(y2 - y1) / len, ny = (x2 - x1) / len, out = (mx - cx) * nx + (my - cy) * ny > 0 ? 1 : -1;  // push the label outside
+    mx += nx * out * fs * 1.1; my += ny * out * fs * 1.1;
+    let ang = (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI;
+    if (ang > 90) ang -= 180; if (ang < -90) ang += 180;
+    return `<text x="${mx}" y="${my + fs * 0.35}" font-size="${fs}" text-anchor="middle" transform="rotate(${ang} ${mx} ${my})">${m(len)}</text>`;
+  }).join("")}</g>`;
 }
 
 // Paths: wherever two beds sit side by side at the same angle with a gap, draw the path between them
@@ -783,7 +814,7 @@ function plotSvg() {
     const es = Math.min(Math.min(i.w, i.h) * 0.55, px(30));
     const bb = box(i);
     return `<g class="item feature ${isSel(i) ? "sel" : ""}" data-item="feature" data-id="${i.id}" data-x="${i.x}" data-y="${i.y}" data-w="${i.w}" data-h="${i.h}" data-a="${i.a}">
-      <title>${esc(i.f.name)}</title><g class="turn" transform="rotate(${i.a} ${i.x + i.w / 2} ${i.y + i.h / 2})">${shape}</g>
+      <title>${esc(i.f.name)}</title><g class="turn" transform="rotate(${i.a} ${i.x + i.w / 2} ${i.y + i.h / 2})">${shape}${k.round ? "" : sizeMarks(i, ppm)}</g>
       <text x="${i.x + i.w / 2}" y="${i.y + i.h / 2 + es * 0.35}" font-size="${es}" text-anchor="middle">${k.emoji}</text>
       <text x="${i.x + i.w / 2}" y="${bb.y1 + lab.size * 1.1}" font-size="${lab.size}" text-anchor="middle" class="label">${esc(lab.text)}</text></g>`;
   }).join("");
@@ -822,10 +853,11 @@ function plotSvg() {
     const lab = fitLabel(s.name + (later ? `  +${later}` : ""), w + 0.1, ppm), bb = box(i);
     return `<g class="item space ${isSel(i) ? "sel" : ""} ${placing ? (target ? "target" : "nope") : ""}" data-item="space" data-id="${s.id}" data-space-id="${s.id}" data-x="${x}" data-y="${y}" data-w="${w}" data-h="${h}" data-a="${i.a}">
       <title>${esc(s.name)}</title><g class="turn" transform="rotate(${i.a} ${x + w / 2} ${y + h / 2})"><rect x="${x - 0.1}" y="${y - 0.1}" width="${w + 0.2}" height="${h + 0.2}" rx="0.12" class="hit"/>
-      ${inner}</g><text x="${i.a ? (bb.x0 + bb.x1) / 2 : x}" y="${bb.y0 - lab.size * 0.45}" font-size="${lab.size}" ${i.a ? 'text-anchor="middle"' : ""} class="label">${esc(lab.text)}</text></g>`;
+      ${inner}${s.kind === "pot" ? "" : sizeMarks(i, ppm)}</g><text x="${i.a ? (bb.x0 + bb.x1) / 2 : x}" y="${bb.y0 - lab.size * 0.45}" font-size="${lab.size}" ${i.a ? 'text-anchor="middle"' : ""} class="label">${esc(lab.text)}</text></g>`;
   }).join("");
 
   // grid squares that stay readable whatever the zoom: 50cm up close, 1m, 5m or 10m across a field
+  lastPlan = { ppm, b };
   const step = ppm >= 40 && plotEdit ? 0.5 : ppm >= 9 ? 1 : ppm >= 2 ? 5 : 10;
   const bar = Math.max(1, step);
   const shape = S.g.garden.shape && S.g.garden.shape.map((p) => p.join(",")).join(" ");
@@ -836,7 +868,7 @@ function plotSvg() {
     <rect x="${b.x0}" y="${b.y0}" width="${b.W}" height="${b.H}" class="${b.fenced ? "outside" : "grass"}"/>
     ${b.fenced ? (shape ? `<polygon points="${shape}" class="grass"/>` : `<rect x="0" y="0" width="${S.g.garden.w}" height="${S.g.garden.h}" class="grass"/>`) : ""}
     <rect x="${b.x0}" y="${b.y0}" width="${b.W}" height="${b.H}" fill="url(#grid)"/>
-    ${fence}${pathsBetween(items, ppm)}${features}${beds}
+    ${fence}${showPaths ? pathsBetween(items, ppm) : ""}${features}${beds}${edgeMarks(ppm)}
     <g class="scalebar" style="stroke-width:${px(2)}"><path d="M ${b.x0 + px(12)} ${b.y0 + b.H - px(12)} h ${bar}"/><text x="${b.x0 + px(12) + bar / 2}" y="${b.y0 + b.H - px(17)}" font-size="${px(11)}" text-anchor="middle">${bar} m</text></g></svg>`;
 }
 
@@ -847,9 +879,10 @@ function plotPage() {
   view.innerHTML = `<h1>🪴 My garden</h1>${gardenTabs()}
     ${placing ? `<div class="card tint-sun row placing" style="justify-content:space-between"><b>👆 Tap a bed to put ${plant(crop(placing).plant_id).emoji} ${esc(plant(crop(placing).plant_id).name)} in it</b><button class="btn small ghost" id="cancel-place">Cancel</button></div>` : ""}
     <div class="plan-bar"><button class="btn small ${plotEdit ? "primary" : ""}" id="edit">${plotEdit ? "✅ Done editing" : "✏️ Edit plan"}</button>
+      <span class="toggles"><button class="btn small ${showSizes ? "primary" : ""}" id="t-sizes" aria-pressed="${showSizes}">📏</button><button class="btn small ${showPaths ? "primary" : ""}" id="t-paths" aria-pressed="${showPaths}" title="Paths between beds">🚶</button></span>
       <span class="zoom"><button class="btn small" data-zoom="-1" aria-label="Zoom out">➖</button><button class="btn small ghost" data-zoom="0" aria-label="Fit the whole garden">${Math.round(plotZoom * 100)}%</button><button class="btn small" data-zoom="1" aria-label="Zoom in">➕</button></span></div>
     ${plotEdit ? `<div class="card tint-sky small" style="margin-bottom:10px"><b>✏️ Editing:</b> drag anything to move it - zoom in for a finer grid (down to 50cm squares). Tap something to change, turn or remove it.</div>` : ""}
-    <div class="plot-wrap ${plotEdit ? "moving" : ""}">${plotSvg()}</div>
+    <div class="plot-wrap ${plotEdit ? "moving" : ""}"><div class="plot-inner">${plotSvg()}${plotEdit ? selToolbar() : ""}</div></div>
     ${plotEdit ? editPanel() : `
     <div class="month-row"><b>📅 ${esc(label)}</b><input type="range" id="month" min="0" max="11" value="${plotMonth}" aria-label="Show the garden in a later month">
       ${plotMonth ? `<button class="btn small ghost" id="now">Today</button>` : ""}</div>
@@ -858,6 +891,26 @@ function plotPage() {
       <div class="suggest">${unplaced.map((c) => `<button data-place="${c.id}" class="${placing === c.id ? "on" : ""}">${plant(c.plant_id).emoji} ${esc(plant(c.plant_id).name)}${rowLabel(c) ? " · " + rowLabel(c) : ""}</button>`).join("")}</div></div>` : ""}
     ${activeCrops().length ? `<div class="row"><button class="btn small" data-layout="all">🧩 Suggest a layout</button></div>` : ""}`}`;
   wirePlot();
+}
+
+// Turn buttons right next to whatever's selected, so you don't have to scroll down to them
+function selToolbar() {
+  if (!selected || !lastPlan) return "";
+  const it = planItems().find((i) => i.type === selected.type && i.id === selected.id);
+  if (!it || (it.type === "space" && it.s.kind === "pot")) return "";
+  const { ppm, b } = lastPlan, bb = box(it), W = b.W * ppm;
+  // keep it on screen: within the plan, and within the part you're scrolled to
+  const cs = getComputedStyle(view), visW = view.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const tw = Math.min(300, visW - 8), lo = Math.max(4, plotScroll.l + 4), hi = Math.min(W - tw - 4, plotScroll.l + visW - tw - 4);
+  const left = Math.max(lo, Math.min(hi, ((bb.x0 + bb.x1) / 2 - b.x0) * ppm - tw / 2));
+  const above = (bb.y0 - b.y0) * ppm - 58, top = above > 4 ? above : (bb.y1 - b.y0) * ppm + 10;
+  return `<div class="seltools" style="left:${left}px;top:${top}px;width:${tw}px">
+    <button class="btn small" data-rot="-15" aria-label="Turn 15 degrees left">↺15°</button>
+    <input type="range" id="ang" min="-180" max="180" step="1" value="${Math.round(it.a)}" aria-label="Angle">
+    <button class="btn small" data-rot="15" aria-label="Turn 15 degrees right">↻15°</button>
+    <b id="angv">${Math.round(it.a)}°</b>
+    <button class="btn small" data-rot="90" aria-label="Turn 90 degrees">↻90°</button>${it.a ? `<button class="btn small ghost" data-rot="0" aria-label="Straighten">⟲0</button>` : ""}
+    <button class="btn small ghost" id="seldetails" aria-label="More options">⋯</button></div>`;
 }
 
 // The edit tools: add things, set the garden's size, and change whatever is selected
@@ -875,9 +928,7 @@ function editPanel() {
       });
       sel = `<div class="card sel-card"><b>${SPACE_KINDS[it.s.kind].emoji} ${esc(it.s.name)}</b> <span class="small muted">${it.s.kind === "pot" ? "pots" : `${it.w} × ${it.h} m`}</span>
         ${shade ? `<p class="small" style="margin:6px 0 0">🌥️ It's close to the ${esc(shade.f.name.toLowerCase())} - it may get shade. Most veg want 6+ hours of sun a day.</p>` : ""}
-        ${it.s.kind !== "pot" ? `<div class="angle"><button class="btn small" data-rot="-15" aria-label="Turn 15 degrees left">↺ 15°</button>
-          <input type="range" id="ang" min="-180" max="180" step="1" value="${Math.round(it.a)}" aria-label="Angle"><button class="btn small" data-rot="15" aria-label="Turn 15 degrees right">↻ 15°</button></div>
-        <div class="row" style="margin-top:6px"><span class="small">Angle <b id="angv">${Math.round(it.a)}°</b></span><button class="btn small" data-rot="90">↻ 90°</button>${it.a ? `<button class="btn small ghost" data-rot="0">Straighten</button>` : ""}</div>` : ""}
+        
         <div class="row" style="margin-top:8px"><button class="btn small" data-open-space="${it.id}">✏️ Name, size & soil</button><button class="btn small ghost" id="desel">Done</button></div></div>`;
     } else {
       const k = FEATURES[it.f.kind] || FEATURES.bush;
@@ -885,9 +936,7 @@ function editPanel() {
         <div class="row" style="margin-top:8px;flex-wrap:nowrap"><input id="fname" type="text" maxlength="40" value="${esc(it.f.name)}" aria-label="Name"></div>
         <div class="row" style="margin-top:8px;flex-wrap:nowrap"><label class="mini">Width<input id="fw" type="number" step="0.1" min="0.2" value="${it.w}"></label><span>×</span>
           <label class="mini">${k.round ? "Height" : "Length"}<input id="fh" type="number" step="0.1" min="0.2" value="${it.h}"></label><span class="small muted">m</span></div>
-        <div class="angle"><button class="btn small" data-rot="-15" aria-label="Turn 15 degrees left">↺ 15°</button>
-          <input type="range" id="ang" min="-180" max="180" step="1" value="${Math.round(it.a)}" aria-label="Angle"><button class="btn small" data-rot="15" aria-label="Turn 15 degrees right">↻ 15°</button></div>
-        <div class="row" style="margin-top:6px"><span class="small">Angle <b id="angv">${Math.round(it.a)}°</b></span><button class="btn small" data-rot="90">↻ 90°</button>${it.a ? `<button class="btn small ghost" data-rot="0">Straighten</button>` : ""}</div>
+
         <div class="row" style="margin-top:8px"><button class="btn small primary" id="fsave">Save</button>
           <button class="btn small danger" id="fdel">🗑️ Remove</button><button class="btn small ghost" id="desel">Done</button></div></div>`;
     }
@@ -914,12 +963,27 @@ function editPanel() {
 
 function wirePlot() {
   const svg = view.querySelector("svg.plot");
-  const redraw = () => { const y = window.scrollY, wrap = view.querySelector(".plot-wrap"), sx = wrap && wrap.scrollLeft, sy = wrap && wrap.scrollTop;
-    plotPage(); window.scrollTo(0, y); const w2 = view.querySelector(".plot-wrap"); if (w2) { w2.scrollLeft = sx; w2.scrollTop = sy; } };
+  const redraw = () => { const y = window.scrollY; plotPage(); window.scrollTo(0, y); };
+  // stay looking at the same part of the garden: remember the scroll, and put it back after every redraw
+  const wrap = view.querySelector(".plot-wrap");
+  if (wrap) {
+    wrap.scrollLeft = plotScroll.l; wrap.scrollTop = plotScroll.t;
+    wrap.onscroll = () => { plotScroll = { l: wrap.scrollLeft, t: wrap.scrollTop }; };
+  }
   $("#edit").onclick = () => { plotEdit = !plotEdit; placing = null; selected = null; plotPage(); };
+  $("#t-sizes").onclick = () => { showSizes = !showSizes; remember("gtg-sizes", showSizes); redraw(); toast(showSizes ? "📏 Measurements on" : "Measurements off"); };
+  $("#t-paths").onclick = () => { showPaths = !showPaths; remember("gtg-paths", showPaths); redraw(); toast(showPaths ? "🚶 Paths shown" : "Paths hidden"); };
+  const more = $("#seldetails"); if (more) more.onclick = () => { const c = view.querySelector(".sel-card"); if (c) c.scrollIntoView({ behavior: "smooth", block: "center" }); };
   view.querySelectorAll("[data-zoom]").forEach((b) => (b.onclick = () => {
     const z = Number(b.dataset.zoom), levels = [0.5, 0.75, 1, 1.5, 2, 3, 4, 6];
+    // zoom round the middle of what you're looking at, not the corner
+    const before = lastPlan, cxm = wrap && before ? (wrap.scrollLeft + wrap.clientWidth / 2) / before.ppm : 0, cym = wrap && before ? (wrap.scrollTop + wrap.clientHeight / 2) / before.ppm : 0;
     plotZoom = z === 0 ? 1 : levels[Math.max(0, Math.min(levels.length - 1, levels.indexOf(plotZoom) + z))];
+    if (wrap && before) {
+      plotPage();  // draw once at the new zoom to learn its scale, then scroll so the same spot is in the middle
+      const w2 = view.querySelector(".plot-wrap");
+      plotScroll = z === 0 ? { l: 0, t: 0 } : { l: Math.max(0, cxm * lastPlan.ppm - w2.clientWidth / 2), t: Math.max(0, cym * lastPlan.ppm - w2.clientHeight / 2) };
+    }
     redraw();
   }));
   const month = $("#month");
