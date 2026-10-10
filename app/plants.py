@@ -1104,6 +1104,8 @@ for _p in PLANTS:
     _p["seedling"] = _extras.SEEDLINGS.get(_p["id"])
     _p["mixes"] = [m["id"] for m in MIXES if any(x["plant_id"] == _p["id"] for x in m["plants"])]
     _p.setdefault("height_cm", _extras.HEIGHTS.get(_p["id"], 40))
+    _kind = _extras.SEED_SAVE.get(_p["id"], "none")
+    _p["save"] = dict(_extras.SAVE_KINDS[_kind], kind=_kind)
     # flowers and herbs that also help the veg show up with the companion plants
     _p["helps"] = _p["group"] == "companion" or _p["id"] in _extras.MORE_HELPS
 ALL_ROUNDERS = _extras.ALL_ROUNDERS

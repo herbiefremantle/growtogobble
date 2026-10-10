@@ -200,7 +200,7 @@ def catalogue_payload(user=None):
     return {
         "plants": out, "levels": catalogue.LEVELS, "methods": planner.METHODS,
         "nodig_steps": catalogue.NODIG_STEPS, "pot_steps": catalogue.POT_STEPS,
-        "all_rounders": catalogue.ALL_ROUNDERS,
+        "all_rounders": catalogue.ALL_ROUNDERS, "seed_store": catalogue._extras.SEED_STORE,
         "nodig_planting": catalogue.NODIG_PLANTING, "soil_types": catalogue.SOIL_TYPES, "fruit": catalogue.FRUIT, "mixes": catalogue.MIXES, "weed_tips": catalogue.WEED_TIPS,
         "combos": catalogue.COMBOS, "sun_spots": catalogue.SUN_SPOTS,
         "affiliate": shops.is_affiliate(),

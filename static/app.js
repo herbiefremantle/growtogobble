@@ -2210,6 +2210,16 @@ function storeCard(p) {
     <p style="margin:0"><b>❄️ Freezing:</b> ${esc(st.freeze)}</p></div>`;
 }
 
+// Saving seeds (or bulbs, cuttings, runners...) for next year
+function saveCard(p) {
+  const x = p.save, badge = { easy: "🟢 Easy", tricky: "🟠 A bit tricky", no: "Not really" }[x.ease];
+  const title = x.how === "seeds" || !x.how ? "🌰 Save seeds for next year" : `🌰 Free plants for next year - from ${x.how}`;
+  return `<div class="card tint-soil"><h3>${title} <span class="chip grey" style="vertical-align:middle">${badge}</span></h3>
+    ${x.when ? `<p style="margin:0 0 6px"><b>When:</b> ${esc(x.when)}</p>` : ""}
+    <ol class="steps">${x.steps.map((t) => `<li>${esc(t)}</li>`).join("")}</ol>
+    ${x.how === "seeds" ? `<details><summary class="small"><b>Keeping seeds safe until next year</b></summary><ul class="small" style="margin:6px 0 0;padding-left:18px">${S.cat.seed_store.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></details>` : ""}</div>`;
+}
+
 function roomCard(p) {
   return `<div class="card tint-sky"><h3>📏 How much room?</h3>
     <p style="margin:0 0 4px">Each one needs <b>${p.sp_cm}cm</b> to its neighbour, with <b>${p.row_cm}cm</b> between rows. That's about <b>${Math.max(1, Math.floor(1 / p.area_each))} per square metre</b>.</p>
@@ -2305,6 +2315,7 @@ function openPlant(id, spaceId, startMethod, after) {
     <div class="card tint-leaf"><h3>${isFlower(p) ? "🌸 Flowers" : "🧺 Picking"}</h3><p style="margin:0">${esc(p.harvest_tip)}</p></div>
     ${p.eat ? `<div class="card tint-tomato"><h3>😋 Eat it!</h3><p style="margin:0">${esc(p.eat)}</p></div>` : ""}
     ${p.store ? storeCard(p) : ""}
+    ${saveCard(p)}
     ${after || !p.then ? "" : thenCard(dict(p.then, { family: p.family_name }), "After picking, grow next", spaceId)}
     </div>`);
   wirePanes();

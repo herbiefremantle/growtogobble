@@ -202,6 +202,12 @@ def crop_jobs(crop, shift, done_keys, today):
             add("store", "store", "🫙", "Got extra %s? Keep or freeze them" % name.lower(), harvested, max(h_end, harvested + 2 * WEEK),
                 steps=store["how"] + ["❄️ " + store["freeze"], "⏳ Keeps for " + store["keeps"]])
 
+    # saving seeds for next year, from the ones where it's easy - near the end of picking
+    if plant["save"]["kind"] in ("pod", "tomato", "pepper", "bolt", "flower"):
+        s_start = max(h_start, h_end - 4 * WEEK)
+        add("seeds", "seeds", "🌰", "Save seeds from your %s for next year" % name.lower(), s_start, h_end + 3 * WEEK,
+            steps=plant["save"]["steps"] + catalogue._extras.SEED_STORE, waiting=not in_ground)
+
     # 4. another batch, for a steady supply
     if plant.get("succession") and method != "plants" and sown:
         start = sown + plant["succession"] * WEEK

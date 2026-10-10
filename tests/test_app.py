@@ -714,3 +714,14 @@ def test_every_plant_and_fruit_has_a_photo_with_credit(client):
         ph = item["photo"]
         assert ph and ph["page"].startswith("https://commons.wikimedia.org/"), item["id"]
         assert os.path.getsize(os.path.join(root, ph["src"].lstrip("/"))) > 2000, item["id"]
+
+
+def test_seed_saving(client):
+    _join(client)
+    plants = {p["id"]: p for p in client.get("/api/plants").json()["plants"]}
+    assert plants["peas"]["save"]["ease"] == "easy" and plants["carrots"]["save"]["kind"] == "biennial"
+    assert plants["potatoes"]["save"]["ease"] == "no" and plants["strawberries"]["save"]["how"] == "new plants"
+    g = client.post("/api/crops", json={"plant_id": "peas"}).json()
+    assert any(j["kind"] == "seeds" for j in g["crops"][0]["jobs"])
+    g = client.post("/api/crops", json={"plant_id": "carrots"}).json()
+    assert not any(j["kind"] == "seeds" for j in next(c for c in g["crops"] if c["plant_id"] == "carrots")["jobs"])

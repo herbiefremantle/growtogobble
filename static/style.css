@@ -582,3 +582,4 @@ svg.plot.withsat .gridline { stroke: rgba(255,255,255,.18); }
 .hero-pic figcaption { position: absolute; right: 8px; bottom: 8px; max-width: 80%; }
 .hero-pic figcaption a { font-size: 11px; color: #fff; background: rgba(0,0,0,.55); padding: 2px 8px; border-radius: 999px; text-decoration: none;
   display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.sheet-close { position: relative; z-index: 5; }  /* stay on top of a photo at the top of the pop-up */
