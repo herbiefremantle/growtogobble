@@ -514,3 +514,7 @@ svg.plot.withsat .gridline { stroke: rgba(255,255,255,.18); }
 .grouptools b { white-space: nowrap; }
 .seltools .sizerow { display: flex; align-items: center; gap: 4px; width: 100%; border-top: 1px dashed var(--line); padding-top: 6px; margin-top: 2px; font-size: 13px; font-weight: 800; }
 .seltools .sizerow input { width: 64px; padding: 6px; font-size: 15px; text-align: center; }
+.btn.groupbtn { background: var(--sky-soft); color: var(--sky); border: 1.5px solid var(--sky); }
+.btn.groupbtn.on { background: var(--sky); color: #fff; }
+@media (prefers-color-scheme: dark) { .btn.groupbtn.on { color: #0f2014; } }
+.plan-bar { flex-wrap: wrap; }

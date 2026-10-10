@@ -959,9 +959,9 @@ function plotPage() {
   const label = plotMonth === 0 ? "Today" : `${MONTHS_LONG[T.getMonth()]}${T.getFullYear() !== today().getFullYear() ? " " + T.getFullYear() : ""}`;
   view.innerHTML = `<h1>🪴 My garden</h1>${gardenTabs()}
     ${placing ? `<div class="card tint-sun row placing" style="justify-content:space-between"><b>👆 Tap a bed to put ${plant(crop(placing).plant_id).emoji} ${esc(plant(crop(placing).plant_id).name)} in it</b><button class="btn small ghost" id="cancel-place">Cancel</button></div>` : ""}
-    ${plotEdit && !boundaryEdit ? `<div class="card tint-sky small" style="margin-bottom:10px"><b>✏️ Editing:</b> drag anything to move it - zoom in for a finer grid (down to 50cm squares). Tap something to change, turn or remove it. Use ☑️ to pick several and group them.</div>` : ""}
+    ${plotEdit && !boundaryEdit ? `<div class="card tint-sky small" style="margin-bottom:10px"><b>✏️ Editing:</b> drag anything to move it - zoom in for a finer grid (down to 50cm squares). Tap something to change, turn or remove it. To move several beds together, tap <b>🔗 Group beds</b>.</div>` : ""}
     <div class="plan-bar"><button class="btn small ${plotEdit ? "primary" : ""}" id="edit">${plotEdit ? "✅ Done editing" : "✏️ Edit plan"}</button>
-      ${plotEdit && !boundaryEdit ? `<button class="btn small ${multi ? "primary" : ""}" id="t-multi" aria-pressed="${multi}" title="Select several">☑️</button>` : ""}
+      ${plotEdit && !boundaryEdit ? `<button class="btn small groupbtn ${multi ? "on" : ""}" id="t-multi" aria-pressed="${multi}">${multi ? "☑️ Picking… tap to stop" : "🔗 Group beds"}</button>` : ""}
       <span class="toggles">${satAnchor() ? `<button class="btn small ${showSat ? "primary" : ""}" id="t-sat" aria-pressed="${showSat}" title="Satellite view">🛰️</button>` : ""}<button class="btn small ${showSizes ? "primary" : ""}" id="t-sizes" aria-pressed="${showSizes}">📏</button><button class="btn small ${showPaths ? "primary" : ""}" id="t-paths" aria-pressed="${showPaths}" title="Paths between beds">🚶</button></span>
       <span class="zoom"><button class="btn small" data-zoom="-1" aria-label="Zoom out">➖</button><button class="btn small ghost" data-zoom="0" aria-label="Fit the whole garden">${Math.round(plotZoom * 100)}%</button><button class="btn small" data-zoom="1" aria-label="Zoom in">➕</button></span></div>
     ${boundaryEdit ? `<div class="card tint-sun small row" style="justify-content:space-between;margin-bottom:10px"><span><b>📐 Editing the boundary:</b> drag a corner · tap ＋ to add a corner · tap a corner to remove it · tap a side to type its real length</span><button class="btn small primary" id="b-done">✅ Done</button></div>` : ""}
@@ -1112,7 +1112,7 @@ function wirePlot() {
   }
   $("#edit").onclick = () => { plotEdit = !plotEdit; placing = null; selected = null; boundaryEdit = false; bSel = null; multi = false; picked.clear(); plotPage(); };
   const tm = $("#t-multi");
-  if (tm) tm.onclick = () => { multi = !multi; picked.clear(); selected = null; redraw(); if (multi) toast("☑️ Tap the beds and things you want to pick"); };
+  if (tm) tm.onclick = () => { multi = !multi; picked.clear(); selected = null; redraw(); if (multi) toast("☑️ Now tap each bed you want in the group, then tap 🔗 Group them"); };
   const ts = $("#t-sat");
   if (ts) ts.onclick = () => { showSat = !showSat; remember("gtg-satview", showSat); redraw(); toast(showSat ? "🛰️ Satellite view on" : "Satellite view off"); };
   $("#t-sizes").onclick = () => { showSizes = !showSizes; remember("gtg-sizes", showSizes); redraw(); toast(showSizes ? "📏 Measurements on" : "Measurements off"); };
