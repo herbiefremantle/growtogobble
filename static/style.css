@@ -512,3 +512,5 @@ svg.plot.withsat .label { fill: #fff; paint-order: stroke; stroke: rgba(0,0,0,.6
 svg.plot.withsat .gridline { stroke: rgba(255,255,255,.18); }
 .grouptools { width: auto !important; max-width: calc(100% - 16px); gap: 6px; border-color: #3a7ca5; }
 .grouptools b { white-space: nowrap; }
+.seltools .sizerow { display: flex; align-items: center; gap: 4px; width: 100%; border-top: 1px dashed var(--line); padding-top: 6px; margin-top: 2px; font-size: 13px; font-weight: 800; }
+.seltools .sizerow input { width: 64px; padding: 6px; font-size: 15px; text-align: center; }

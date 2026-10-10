@@ -1036,9 +1036,9 @@ function selToolbar() {
   const { ppm, b } = lastPlan, bb = box(it), W = b.W * ppm;
   // keep it on screen: within the plan, and within the part you're scrolled to
   const cs = getComputedStyle(view), visW = view.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-  const tw = Math.min(300, visW - 8), lo = Math.max(4, plotScroll.l + 4), hi = Math.min(W - tw - 4, plotScroll.l + visW - tw - 4);
+  const tw = Math.min(330, visW - 8), lo = Math.max(4, plotScroll.l + 4), hi = Math.min(W - tw - 4, plotScroll.l + visW - tw - 4);
   const left = Math.max(lo, Math.min(hi, ((bb.x0 + bb.x1) / 2 - b.x0) * ppm - tw / 2));
-  const th = it.type === "space" ? 100 : 58, above = (bb.y0 - b.y0) * ppm - th, top = above > 4 ? above : (bb.y1 - b.y0) * ppm + 10;
+  const th = it.type === "space" ? 140 : 100, above = (bb.y0 - b.y0) * ppm - th, top = above > 4 ? above : (bb.y1 - b.y0) * ppm + 10;
   return `<div class="seltools" style="left:${left}px;top:${top}px;width:${tw}px">
     <button class="btn small" data-rot="-15" aria-label="Turn 15 degrees left">↺15°</button>
     <input type="range" id="ang" min="-180" max="180" step="1" value="${Math.round(it.a)}" aria-label="Angle">
@@ -1046,6 +1046,8 @@ function selToolbar() {
     <b id="angv">${Math.round(it.a)}°</b>
     <button class="btn small" data-rot="90" aria-label="Turn 90 degrees">↻90°</button>${it.a ? `<button class="btn small ghost" data-rot="0" aria-label="Straighten">⟲0</button>` : ""}
     <button class="btn small ghost" id="seldetails" aria-label="More options">⋯</button><button class="btn small danger" id="seldel" aria-label="Delete">🗑️</button>
+    <div class="sizerow"><span>📏</span><input id="sz-w" type="number" step="0.1" min="0.2" max="100" inputmode="decimal" value="${it.w}" aria-label="Width in metres">
+      <span>×</span><input id="sz-h" type="number" step="0.1" min="0.2" max="100" inputmode="decimal" value="${it.h}" aria-label="Length in metres"><span>m</span><span class="small muted" id="sz-state"></span></div>
     ${it.type === "space" ? `<div class="copyrow"><span>⧉ Copy to:</span><button class="btn small" data-copy-bed="left" aria-label="Copy to the left">◀</button><button class="btn small" data-copy-bed="right" aria-label="Copy to the right">▶</button>
       <button class="btn small" data-copy-bed="up" aria-label="Copy above">▲</button><button class="btn small" data-copy-bed="down" aria-label="Copy below">▼</button></div>` : ""}</div>`;
 }
@@ -1074,7 +1076,7 @@ function editPanel() {
         <div class="row" style="margin-top:8px;flex-wrap:nowrap"><label class="mini">Width<input id="fw" type="number" step="0.1" min="0.2" value="${it.w}"></label><span>×</span>
           <label class="mini">${k.round ? "Height" : "Length"}<input id="fh" type="number" step="0.1" min="0.2" value="${it.h}"></label><span class="small muted">m</span></div>
 
-        <div class="row" style="margin-top:8px"><button class="btn small primary" id="fsave">Save</button>
+        <div class="row" style="margin-top:8px"><button class="btn small primary" id="fsave">Save name</button>
           <button class="btn small danger" id="fdel">🗑️ Remove</button><button class="btn small ghost" id="desel">Done</button></div></div>`;
     }
   }
@@ -1096,7 +1098,7 @@ function editPanel() {
       <p class="small muted" style="margin:12px 0 6px">Or type its size:</p>
       <div class="size-row"><label class="big-num"><span>Width</span><input id="gw" type="number" step="0.5" min="1" inputmode="decimal" value="${g.w || ""}" placeholder="e.g. 12"><em>m</em></label>
         <span class="times">×</span><label class="big-num"><span>Length</span><input id="gh" type="number" step="0.5" min="1" inputmode="decimal" value="${g.h || ""}" placeholder="e.g. 8"><em>m</em></label></div>
-      <div class="row" style="margin-top:10px"><button class="btn small primary" id="gsave">Save size</button>${g.w ? `<button class="btn small ghost" id="gclear">No fixed size</button>` : ""}</div></div>`;
+      <div class="row" style="margin-top:10px"><span class="small muted" id="g-state">Changes as you type - saved automatically</span>${g.w ? `<button class="btn small ghost" id="gclear">No fixed size</button>` : ""}</div></div>`;
 }
 
 function wirePlot() {
@@ -1203,75 +1205,12 @@ function wireBoundary(svg, redraw) {
   });
 }
 
-function wireEdit(svg, redraw) {
-  const bs = $("#b-start");
-  if (bs) bs.onclick = () => { boundaryEdit = true; selected = null; bSel = null; window.scrollTo(0, 0); redraw(); };
-  if (boundaryEdit) {
-    if (svg) svg.addEventListener("click", (e) => e.stopPropagation(), true);  // editing the outline: don't open beds or crops
-    wireBoundary(svg, redraw); return;
-  }
-  // save where things are: pin every bed where it is now, so only what you dragged (or turned) moves
-  const saveMany = async (movedList, message) => {
-    const pos = plotPositions();
-    const list = Object.entries(pos).map(([id, p]) => ({ id: Number(id), x: p.x, y: p.y }));
-    movedList.forEach((mv) => {
-      if (mv.type === "space") Object.assign(list.find((e) => e.id === mv.id), { x: mv.x, y: mv.y, angle: mv.a });
-      else list.push({ feature: mv.id, x: mv.x, y: mv.y, angle: mv.a });
-    });
-    await change("POST", "/api/spaces/positions", { positions: list }, message);
-  };
-  const save = (mv, message) => saveMany([mv], message);
-  // turning the selected thing
-  const it = selected && planItems().find((i) => i.type === selected.type && i.id === selected.id);
-  const setAngle = (a) => {
-    const norm = Math.round(((((a + 180) % 360) + 360) % 360) - 180);
-    const items = planItems(), me = { ...it, a: norm };
-    if (it.type === "space" && items.some((o) => o.type === "space" && o.id !== it.id && overlaps(me, o))) { toast("Turning it would hit another bed - move it first"); redraw(); return; }
-    save({ type: it.type, id: it.id, x: it.x, y: it.y, a: norm });
-  };
-  if (it) {
-    view.querySelectorAll("[data-rot]").forEach((b) => (b.onclick = () => {
-      const r = b.dataset.rot;
-      setAngle(r === "0" ? 0 : r === "90" ? it.a + 90 : it.a + Number(r));
-    }));
-    const del = $("#seldel");
-    if (del) del.onclick = async () => {
-      if (it.type === "space") {
-        const n = activeCrops().filter((c) => c.space_id === it.id).length;
-        if (!confirm(`Delete ${it.s.name}?${n ? ` The ${n} plant${n === 1 ? "" : "s"} in it go back to "Not placed yet".` : ""}`)) return;
-        selected = null; await change("DELETE", `/api/spaces/${it.id}`, null, `🗑️ ${it.s.name} deleted`);
-      } else {
-        if (!confirm(`Remove the ${it.f.name.toLowerCase()} from your plan?`)) return;
-        selected = null; await change("DELETE", `/api/features/${it.id}`, null, "Removed");
-      }
-    };
-    view.querySelectorAll("[data-copy-bed]").forEach((b) => (b.onclick = async () => {
-      const spot = copySpot(it, b.dataset.copyBed), items = planItems(), twin = { ...it, ...spot, id: -1 };
-      const hit = items.find((o) => o.type === "space" && overlaps(twin, o));
-      if (hit) { toast(`There's no room - it would land on ${hit.s.name}`); return; }
-      const gw = S.g.garden.w, gh = S.g.garden.h, bb = box(twin);
-      if (bb.x0 < -0.05 || bb.y0 < -0.05 || (gw && gh && (bb.x1 > gw + 0.05 || bb.y1 > gh + 0.05))) { toast("That would go off the edge of your garden"); return; }
-      const nums = S.g.spaces.map((sp) => (/^Bed (\d+)$/.exec(sp.name) || [])[1]).filter(Boolean).map(Number);
-      const name = it.s.kind === "allotment" ? `${it.s.name} copy` : `Bed ${Math.max(S.g.spaces.filter((sp) => sp.kind !== "pot").length, ...nums) + 1}`;
-      // pin the others first, so the auto-arranged ones don't shuffle round the new bed
-      const pos = plotPositions();
-      await api("POST", "/api/spaces/positions", { positions: Object.entries(pos).map(([id, p]) => ({ id: Number(id), x: p.x, y: p.y })) });
-      if (await change("POST", "/api/spaces", { name, kind: it.s.kind, width_m: it.w, length_m: it.h, soil: it.s.soil, built: it.s.built == null ? null : !!it.s.built,
-        pos_x: spot.x, pos_y: spot.y, angle: it.a }, `⧉ ${name} added next door${S.g.garden.path_w ? ` with a ${Math.round(S.g.garden.path_w * 100)}cm path` : ""}`)) {
-        const made = S.g.spaces.find((sp) => sp.name === name);
-        if (made) { selected = { type: "space", id: made.id }; plotPage(); }
-      }
-    }));
-    const ang = $("#ang");
-    if (ang) {
-      const g = svg && svg.querySelector(`[data-item="${it.type}"][data-id="${it.id}"] .turn`);
-      ang.oninput = () => { $("#angv").textContent = ang.value + "°"; if (g) g.setAttribute("transform", `rotate(${ang.value} ${it.x + it.w / 2} ${it.y + it.h / 2})`); };
-      ang.onchange = () => setAngle(Number(ang.value));
-    }
-  }
-  $("#snap").onchange = (e) => { snapOn = e.target.checked; try { localStorage.setItem("gtg-snap", snapOn ? "1" : "0"); } catch (err) { /* ignore */ } };
-  $("#pathw").onchange = (e) => change("POST", "/api/garden/paths", { w: Number(e.target.value) }, "Path width saved");
-  if (svg) {
+// Dragging things on the plan (and tapping to pick them). Kept separate so the picture alone can be
+// redrawn - e.g. while a size is being typed - without losing the box you're typing in.
+let planWire = null;
+function wireItemDrag(svg) {
+  if (!svg || !planWire) return;
+  const { redraw, saveMany } = planWire;
     svg.addEventListener("click", (e) => e.stopPropagation(), true);  // in edit mode, taps select rather than open
     const pt = (ev) => { const p = svg.createSVGPoint(); p.x = ev.clientX; p.y = ev.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); };
     svg.querySelectorAll("[data-item]").forEach((g) => {
@@ -1320,6 +1259,125 @@ function wireEdit(svg, redraw) {
       };
     });
   }
+
+// Width/length boxes: the plan changes as you type, and saves itself a moment after you stop
+function wireSize(wEl, hEl, it) {
+  if (!wEl || !hEl || !it) return;
+  let timer;
+  const state = (t) => { const el = $("#sz-state"); if (el) el.textContent = t; };
+  const values = () => [Number(wEl.value), Number(hEl.value)];
+  const ok = ([w, h]) => w >= 0.2 && h >= 0.2 && w <= 100 && h <= 100;
+  const save = async () => {
+    const [w, h] = values();
+    if (!ok([w, h])) return;
+    state("saving…");
+    try {
+      if (it.type === "space") {
+        const sp = space(it.id);
+        S.g = await api("PATCH", `/api/spaces/${it.id}`, { name: sp.name, kind: sp.kind, soil: sp.soil, width_m: w, length_m: h });
+      } else S.g = await api("PATCH", `/api/features/${it.id}`, { w, h });
+      redrawPlanPicture();
+      const me = planItems().find((i) => i.type === it.type && i.id === it.id);
+      const hit = me && it.type === "space" && planItems().find((o) => o.type === "space" && o.id !== it.id && overlaps(me, o));
+      state(hit ? `✓ saved - now overlaps ${hit.s.name}` : "✓ saved");
+    } catch (e) { state(""); toast(e.message); }
+  };
+  const live = () => {
+    const [w, h] = values();
+    if (!ok([w, h])) return;
+    if (it.type === "space") { const sp = space(it.id); sp.width_m = w; sp.length_m = h; }
+    else { const f = S.g.garden.features.find((x) => x.id === it.id); f.w = w; f.h = h; }
+    redrawPlanPicture();
+    state("");
+    clearTimeout(timer); timer = setTimeout(save, 700);
+  };
+  wEl.oninput = hEl.oninput = live;
+  wEl.onchange = hEl.onchange = () => { clearTimeout(timer); save(); };
+}
+
+// Redraw just the plan picture (not the boxes round it) and keep it draggable
+function redrawPlanPicture() {
+  const old = view.querySelector("svg.plot");
+  if (!old) return;
+  const tmp = document.createElement("div");
+  tmp.innerHTML = plotSvg();
+  const fresh = tmp.firstElementChild;
+  old.replaceWith(fresh);
+  if (plotEdit && !boundaryEdit) wireItemDrag(fresh);
+}
+
+function wireEdit(svg, redraw) {
+  const bs = $("#b-start");
+  if (bs) bs.onclick = () => { boundaryEdit = true; selected = null; bSel = null; window.scrollTo(0, 0); redraw(); };
+  if (boundaryEdit) {
+    if (svg) svg.addEventListener("click", (e) => e.stopPropagation(), true);  // editing the outline: don't open beds or crops
+    wireBoundary(svg, redraw); return;
+  }
+  // save where things are: pin every bed where it is now, so only what you dragged (or turned) moves
+  const saveMany = async (movedList, message) => {
+    const pos = plotPositions();
+    const list = Object.entries(pos).map(([id, p]) => ({ id: Number(id), x: p.x, y: p.y }));
+    movedList.forEach((mv) => {
+      if (mv.type === "space") Object.assign(list.find((e) => e.id === mv.id), { x: mv.x, y: mv.y, angle: mv.a });
+      else list.push({ feature: mv.id, x: mv.x, y: mv.y, angle: mv.a });
+    });
+    await change("POST", "/api/spaces/positions", { positions: list }, message);
+  };
+  const save = (mv, message) => saveMany([mv], message);
+  // turning the selected thing
+  const it = selected && planItems().find((i) => i.type === selected.type && i.id === selected.id);
+  const setAngle = (a) => {
+    const norm = Math.round(((((a + 180) % 360) + 360) % 360) - 180);
+    const items = planItems(), me = { ...it, a: norm };
+    if (it.type === "space" && items.some((o) => o.type === "space" && o.id !== it.id && overlaps(me, o))) { toast("Turning it would hit another bed - move it first"); redraw(); return; }
+    save({ type: it.type, id: it.id, x: it.x, y: it.y, a: norm });
+  };
+  if (it) {
+    view.querySelectorAll("[data-rot]").forEach((b) => (b.onclick = () => {
+      const r = b.dataset.rot;
+      setAngle(r === "0" ? 0 : r === "90" ? it.a + 90 : it.a + Number(r));
+    }));
+    wireSize($("#sz-w"), $("#sz-h"), it);
+    wireSize($("#fw"), $("#fh"), it);
+    const del = $("#seldel");
+    if (del) del.onclick = async () => {
+      if (it.type === "space") {
+        const n = activeCrops().filter((c) => c.space_id === it.id).length;
+        if (!confirm(`Delete ${it.s.name}?${n ? ` The ${n} plant${n === 1 ? "" : "s"} in it go back to "Not placed yet".` : ""}`)) return;
+        selected = null; await change("DELETE", `/api/spaces/${it.id}`, null, `🗑️ ${it.s.name} deleted`);
+      } else {
+        if (!confirm(`Remove the ${it.f.name.toLowerCase()} from your plan?`)) return;
+        selected = null; await change("DELETE", `/api/features/${it.id}`, null, "Removed");
+      }
+    };
+    view.querySelectorAll("[data-copy-bed]").forEach((b) => (b.onclick = async () => {
+      const spot = copySpot(it, b.dataset.copyBed), items = planItems(), twin = { ...it, ...spot, id: -1 };
+      const hit = items.find((o) => o.type === "space" && overlaps(twin, o));
+      if (hit) { toast(`There's no room - it would land on ${hit.s.name}`); return; }
+      const gw = S.g.garden.w, gh = S.g.garden.h, bb = box(twin);
+      if (bb.x0 < -0.05 || bb.y0 < -0.05 || (gw && gh && (bb.x1 > gw + 0.05 || bb.y1 > gh + 0.05))) { toast("That would go off the edge of your garden"); return; }
+      const nums = S.g.spaces.map((sp) => (/^Bed (\d+)$/.exec(sp.name) || [])[1]).filter(Boolean).map(Number);
+      const name = it.s.kind === "allotment" ? `${it.s.name} copy` : `Bed ${Math.max(S.g.spaces.filter((sp) => sp.kind !== "pot").length, ...nums) + 1}`;
+      // pin the others first, so the auto-arranged ones don't shuffle round the new bed
+      const pos = plotPositions();
+      await api("POST", "/api/spaces/positions", { positions: Object.entries(pos).map(([id, p]) => ({ id: Number(id), x: p.x, y: p.y })) });
+      if (await change("POST", "/api/spaces", { name, kind: it.s.kind, width_m: it.w, length_m: it.h, soil: it.s.soil, built: it.s.built == null ? null : !!it.s.built,
+        pos_x: spot.x, pos_y: spot.y, angle: it.a }, `⧉ ${name} added next door${S.g.garden.path_w ? ` with a ${Math.round(S.g.garden.path_w * 100)}cm path` : ""}`)) {
+        const made = S.g.spaces.find((sp) => sp.name === name);
+        if (made) { selected = { type: "space", id: made.id }; plotPage(); }
+      }
+    }));
+    const ang = $("#ang");
+    if (ang) {
+      const g = svg && svg.querySelector(`[data-item="${it.type}"][data-id="${it.id}"] .turn`);
+      ang.oninput = () => { $("#angv").textContent = ang.value + "°"; if (g) g.setAttribute("transform", `rotate(${ang.value} ${it.x + it.w / 2} ${it.y + it.h / 2})`); };
+      ang.onchange = () => setAngle(Number(ang.value));
+    }
+  }
+  $("#snap").onchange = (e) => { snapOn = e.target.checked; try { localStorage.setItem("gtg-snap", snapOn ? "1" : "0"); } catch (err) { /* ignore */ } };
+  $("#pathw").onchange = (e) => change("POST", "/api/garden/paths", { w: Number(e.target.value) }, "Path width saved");
+  planWire = { redraw, saveMany };
+  wireItemDrag(svg);
   const desel = $("#desel"); if (desel) desel.onclick = () => { selected = null; redraw(); };
   const grpMake = $("#g-make");
   if (grpMake) grpMake.onclick = async () => {
@@ -1334,7 +1392,7 @@ function wireEdit(svg, redraw) {
 
   const f = selected && selected.type === "feature" && S.g.garden.features.find((x) => x.id === selected.id);
   if (f) {
-    $("#fsave").onclick = () => change("PATCH", `/api/features/${f.id}`, { name: $("#fname").value, w: Number($("#fw").value), h: Number($("#fh").value) }, "Saved ✅");
+    $("#fsave").onclick = () => change("PATCH", `/api/features/${f.id}`, { name: $("#fname").value }, "Saved ✅");
 
     $("#fdel").onclick = async () => { if (confirm(`Remove the ${f.name.toLowerCase()} from your plan?`)) { selected = null; await change("DELETE", `/api/features/${f.id}`, null, "Removed"); } };
   }
@@ -1349,11 +1407,23 @@ function wireEdit(svg, redraw) {
       selected = { type: "feature", id: last.id }; redraw();
     }
   }));
-  $("#gsave").onclick = () => {
-    const w = Number($("#gw").value), h = Number($("#gh").value);
-    if (!w || !h) { toast("Put in both measurements, in metres"); return; }
-    change("POST", "/api/garden/size", { w, h }, `Garden set to ${w} × ${h} m 📐`);
-  };
+  {
+    let gTimer;
+    const gwEl = $("#gw"), ghEl = $("#gh");
+    const gLive = () => {
+      const w = Number(gwEl.value), h = Number(ghEl.value);
+      if (!(w >= 1 && h >= 1)) return;
+      S.g.garden.w = w; S.g.garden.h = h; S.g.garden.shape = null;  // typing a size replaces a traced outline
+      redrawPlanPicture();
+      $("#g-state").textContent = "";
+      clearTimeout(gTimer);
+      gTimer = setTimeout(async () => {
+        try { S.g = await api("POST", "/api/garden/size", { w, h }); redrawPlanPicture(); $("#g-state").textContent = `✓ saved: ${w} × ${h} m`; }
+        catch (e) { toast(e.message); }
+      }, 800);
+    };
+    gwEl.oninput = ghEl.oninput = gLive;
+  }
   const gc = $("#gclear"); if (gc) gc.onclick = () => change("POST", "/api/garden/size", {}, "The plan now fits to what's in it");
   const gc2 = $("#gclear2"); if (gc2) gc2.onclick = () => change("POST", "/api/garden/size", {}, "Outline removed");
   $("#trace").onclick = openMapTrace;
