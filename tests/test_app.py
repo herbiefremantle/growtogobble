@@ -506,3 +506,14 @@ def test_moving_one_bed_pins_the_others(client):
     b = client.post("/api/spaces", json={"name": "B", "kind": "bed"}).json()["spaces"][-1]["id"]
     g = client.post("/api/spaces/positions", json={"positions": [{"id": a, "x": 0.4, "y": 0.6}, {"id": b, "x": 3, "y": 0.6}]}).json()
     assert {(s["pos_x"], s["pos_y"]) for s in g["spaces"]} == {(0.4, 0.6), (3.0, 0.6)}
+
+
+def test_fill_a_bed_and_what_to_buy():
+    garlic, carrots, onions = (catalogue.BY_ID[x] for x in ("garlic", "carrots", "onions"))
+    whole = planner.fill_quantity(garlic, 2.88, 1.0)          # a standard 1.2 x 2.4m bed
+    assert whole == 64 and planner.fill_quantity(garlic, 2.88, 0.5) == 32
+    assert planner.buy_estimate(garlic, whole, "sow_out")["text"] == "Buy about 7 bulbs"
+    assert planner.buy_estimate(garlic, 8, "sow_out")["text"] == "Buy about 1 bulb"
+    assert planner.buy_estimate(onions, 115, "sow_out")["text"] == "Buy about 2 bags of onion sets (250g each)"
+    assert planner.buy_estimate(carrots, 288, "sow_out")["seeds"] == 576  # sow double: some don't come up, some get thinned
+    assert planner.buy_estimate(carrots, 288, "plants")["text"] == "Buy 288 plants"

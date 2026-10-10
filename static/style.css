@@ -436,3 +436,4 @@ svg.plot .space.nope { opacity: .45; }
 .month-row b { white-space: nowrap; min-width: 92px; }
 .month-row input[type=range] { flex: 1; accent-color: var(--forest-2); }
 .suggest button.on { background: var(--forest-2); color: #fff; }
+.fillrow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }

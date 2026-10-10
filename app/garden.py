@@ -96,6 +96,7 @@ def payload(conn, user):
             crop, jobs=jobs, stage=planner.crop_stage(crop, jobs, today), space_name=space_names.get(crop["space_id"]),
             starts=starts.isoformat() if starts else None, finishes=finishes.isoformat() if finishes else None,
             qty=qty, area=round(qty * planner.area_each(plant), 2), harvest=planner.harvest_estimate(plant, qty),
+            buy=planner.buy_estimate(plant, qty, crop["method"]),
             then=None if crop.get("finished_on") else mark_duplicates(planner.next_in_space(
                 crop, jobs, kinds.get(crop["space_id"], "bed"), state["liked"], state["shift"], today), state, space_names),
             second=None if crop.get("finished_on") else second_season(state, crop)))

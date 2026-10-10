@@ -605,6 +605,7 @@ def space_check(plant_id: str, space_id: Optional[int] = None, method: Optional[
              "bed_free_on": free.isoformat() if free else None, "anchor": start.isoformat(), "anchor_end": end.isoformat()}
     jobs = planner.crop_jobs(trial, shift, set(), today)
     out = {"quantity": qty, "area": round(qty * planner.area_each(plant), 2), "harvest": planner.harvest_estimate(plant, qty),
+           "buy": planner.buy_estimate(plant, qty, method),
            "plan": [{"kind": j["kind"], "title": j["title"], "start": j["start"], "end": j["end"]}
                     for j in jobs if j["kind"] in ("sow_in", "sow_out", "plant_out", "harvest")],
            "in_ground": [d.isoformat() if d else None for d in (planner.crop_starts(trial, jobs), planner.crop_finishes(trial, jobs))]}

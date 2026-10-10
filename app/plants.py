@@ -1027,3 +1027,51 @@ SOIL_TYPES = {
     "unknown": {"name": "Not sure yet", "emoji": "❓", "test": "Try the squeeze test: grab a damp handful and squeeze.",
                 "tips": "Sticky shiny ball = clay. Falls apart = sandy. Holds then crumbles = loam."},
 }
+
+
+# ---- what to buy -----------------------------------------------------------------------------------
+# id: (what you buy, how many plants one of those gives, spare factor, note)
+# Seed counts per packet are typical UK packets - they vary, so the app says "about" and "check the packet".
+# Spare factor: sow a few extra, because not every seed comes up and some get thinned out.
+PACKS = {
+    "radish": ("packets of seeds", 300, 2.0, "about 300 seeds a packet"),
+    "salad": ("packets of seeds", 500, 1.5, "about 500 seeds a packet"),
+    "peas": ("packets of seeds", 150, 1.2, "about 150 seeds a packet"),
+    "broad_beans": ("packets of seeds", 40, 1.2, "about 40 seeds a packet"),
+    "garlic": ("bulbs", 10, 1.0, "a bulb splits into about 8-12 cloves"),
+    "onions": ("bags of onion sets (250g each)", 85, 1.0, "a 250g bag has about 75-100 sets"),
+    "spring_onions": ("packets of seeds", 300, 2.0, "about 300 seeds a packet"),
+    "potatoes": ("bags of seed potatoes (2kg each)", 22, 1.0, "a 2kg bag has about 20-25 seed potatoes"),
+    "courgette": ("packets of seeds", 10, 1.5, "about 10 seeds a packet"),
+    "summer_squash": ("packets of seeds", 10, 1.5, "about 10 seeds a packet"),
+    "strawberries": ("plants", 1, 1.0, "often sold in packs of 6 or 12"),
+    "nasturtium": ("packets of seeds", 25, 1.5, "about 25 seeds a packet"),
+    "chives": ("packets of seeds", 300, 1.5, "about 300 seeds a packet"),
+    "mint": ("plants", 1, 1.0, "one plant is plenty"),
+    "chard": ("packets of seeds", 100, 2.0, "about 100 seeds a packet"),
+    "beetroot": ("packets of seeds", 100, 1.5, "about 100 seed clusters a packet"),
+    "runner_beans": ("packets of seeds", 30, 1.2, "about 30 seeds a packet"),
+    "french_beans": ("packets of seeds", 60, 1.2, "about 60 seeds a packet"),
+    "rhubarb": ("crowns", 1, 1.0, "bought one at a time"),
+    "carrots": ("packets of seeds", 1000, 2.0, "about 1,000 seeds a packet"),
+    "tomatoes": ("packets of seeds", 20, 1.5, "about 20 seeds a packet"),
+    "tomatoes_big": ("packets of seeds", 20, 1.5, "about 20 seeds a packet"),
+    "cucumber": ("packets of seeds", 8, 1.5, "about 8 seeds a packet"),
+    "pumpkin": ("packets of seeds", 10, 1.5, "about 10 seeds a packet"),
+    "squash": ("packets of seeds", 10, 1.5, "about 10 seeds a packet"),
+    "sweetcorn": ("packets of seeds", 25, 1.3, "about 25 seeds a packet"),
+    "kale": ("packets of seeds", 200, 1.5, "about 200 seeds a packet"),
+    "leeks": ("packets of seeds", 250, 1.5, "about 250 seeds a packet"),
+    "parsnips": ("packets of seeds", 300, 2.0, "about 300 seeds a packet - always buy fresh"),
+    "basil": ("packets of seeds", 300, 1.5, "about 300 seeds a packet"),
+    "raspberries": ("canes", 1, 1.0, "often sold in bundles of 5 or 10"),
+    "blueberries": ("plants", 1, 1.0, "grow 2 different kinds for a bigger crop"),
+    "chillies": ("packets of seeds", 15, 1.5, "about 15 seeds a packet"),
+    "peppers": ("packets of seeds", 15, 1.5, "about 15 seeds a packet"),
+    "aubergine": ("packets of seeds", 15, 1.5, "about 15 seeds a packet"),
+    "broccoli": ("packets of seeds", 100, 1.5, "about 100 seeds a packet"),
+    "cauliflower": ("packets of seeds", 100, 1.5, "about 100 seeds a packet"),
+    "sprouts": ("packets of seeds", 100, 1.5, "about 100 seeds a packet"),
+    "melon": ("packets of seeds", 8, 1.5, "about 8 seeds a packet"),
+    "sweet_potatoes": ("slips", 1, 1.0, "usually sold in packs of 5"),
+}

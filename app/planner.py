@@ -293,6 +293,26 @@ def harvest_estimate(plant, qty):
     return "about %s %s" % (lo, unit) if lo == hi else "about %s-%s %s" % (lo, hi, unit)
 
 
+def buy_estimate(plant, qty, method):
+    """What to buy for `qty` plants: '2 bulbs', '1 packet of seeds'... with a few spare where seeds don't all come up."""
+    import math
+    if method == "plants":
+        return {"count": qty, "what": "plants", "note": "", "text": "Buy %d plant%s" % (qty, "" if qty == 1 else "s")}
+    what, per, spare, note = catalogue.PACKS[plant["id"]]
+    need = math.ceil(qty * spare)
+    count = max(1, math.ceil(need / per))
+    first, _, rest = what.partition(" ")
+    unit = what if count != 1 else (first[:-1] + (" " + rest if rest else ""))  # "packets of seeds" -> "packet of seeds"
+    text = ("Buy %d %s" if per == 1 else "Buy about %d %s") % (count, unit)
+    return {"count": count, "what": what, "note": note, "text": text,
+            "seeds": need if "seed" in what and per > 1 else None}
+
+
+def fill_quantity(plant, area, fraction):
+    """How many plants fill `fraction` of a bed of `area` square metres."""
+    return max(1, int(area * fraction / area_each(plant)))
+
+
 def pot_advice(plant):
     """How many fit in an ordinary 30cm pot (about 0.07 m2), or how big a pot one plant needs."""
     per_pot = int(0.07 / area_each(plant))

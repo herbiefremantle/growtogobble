@@ -943,7 +943,8 @@ function drawCrop(id) {
   const c = crop(id), p = plant(c.plant_id);
   const started = c.sown_on || c.planted_on;
   const fits = S.g.spaces.filter((s) => p.where.includes(s.kind === "pot" ? "pot" : "bed"));
-  const timeline = c.jobs.filter((j) => j.kind !== "buy" || j.status !== "done");
+  const todo = c.jobs.filter((j) => j.status !== "done");
+  const doneJobs = c.jobs.filter((j) => j.status === "done" && j.kind !== "buy");
   const near = new Set(activeCrops().filter((x) => x.space_id && x.space_id === c.space_id && x.id !== c.id).map((x) => x.plant_id));
   const row = rowLabel(c);
   openSheet(`<div class="plant-head"><span class="blob l${p.level}">${p.emoji}</span><div><h2 style="margin:0">${esc(p.name)}${row ? ` <span class="chip grey" style="vertical-align:middle">${row}</span>` : ""}</h2>
@@ -951,7 +952,8 @@ function drawCrop(id) {
     <div class="seg sticky-tabs" role="tablist">
       <button role="tab" data-pane="jobs" class="on">📋 Jobs</button><button role="tab" data-pane="details">⚙️ Details</button><button role="tab" data-pane="next">🔁 What next</button></div>
     <div data-panel="jobs">
-      <div class="card">${timeline.map((j) => jobCard(j)).join("")}</div>
+      <div class="card">${todo.map((j) => jobCard(j)).join("") || `<div class="empty"><div class="big">🎉</div>Nothing left to do for this one!</div>`}</div>
+      ${doneJobs.length ? `<details class="card" data-key="done-${c.id}"><summary><b>✅ Done (${doneJobs.length})</b> <span class="small muted">tap to see or undo</span></summary>${doneJobs.map((j) => jobCard(j)).join("")}</details>` : ""}
       <button class="btn wide" data-open-plant="${p.id}">📖 All about ${esc(p.name.toLowerCase())}</button>
     </div>
     <div data-panel="details" hidden>
@@ -959,7 +961,7 @@ function drawCrop(id) {
       <select id="cs" aria-label="Where it grows"><option value="" ${c.space_id ? "" : "selected"}>📍 Not in a bed (decide later)</option>${fits.map((s) => `<option value="${s.id}" ${s.id === c.space_id ? "selected" : ""}>${SPACE_KINDS[s.kind].emoji} ${esc(s.name)}</option>`).join("")}</select>
       ${!started && p.methods.length > 1 ? `<label class="field">How to start it</label><div class="chips" style="margin-bottom:12px">${p.methods.map((m) => `<button class="btn small ${m === c.method ? "primary" : ""}" data-crop-method="${m}">${S.cat.methods[m].emoji} ${esc(S.cat.methods[m].label)}</button>`).join("")}</div>` : ""}
       <div class="card tint-sky" style="margin-top:12px"><div class="row" style="justify-content:space-between">
-        <div><b>How many ${esc(p.unit)}?</b><div class="small">🧺 ${esc(c.harvest || "")}</div>${c.space_id && S.g.spaces.find((s) => s.id === c.space_id).kind !== "pot" ? `<div class="small muted">📏 Uses about ${c.area} m²</div>` : ""}</div>
+        <div><b>How many ${esc(p.unit)}?</b><div class="small">🧺 ${esc(c.harvest || "")}</div><div class="small">🛒 ${esc(c.buy.text)}${c.buy.note ? ` <span class="muted">(${esc(c.buy.note)})</span>` : ""}</div>${c.space_id && S.g.spaces.find((s) => s.id === c.space_id).kind !== "pot" ? `<div class="small muted">📏 Uses about ${c.area} m²</div>` : ""}</div>
         <div class="counter qty"><button class="btn small" data-cq="-1" aria-label="Fewer">−</button><input id="cq" type="number" inputmode="numeric" min="1" value="${c.qty}"><button class="btn small" data-cq="1" aria-label="More">+</button></div></div></div>
       ${datesCard(c)}
       <div class="row" style="margin-top:10px">
@@ -1164,7 +1166,7 @@ function openPlant(id, spaceId, startMethod, after) {
       <label class="field" for="qty">How many ${esc(p.unit)}?</label>
       <div class="counter qty"><button class="btn small" data-q="-1" aria-label="Fewer">−</button><input id="qty" type="number" inputmode="numeric" min="1" max="5000" value="${qty}"><button class="btn small" data-q="1" aria-label="More">+</button></div>
       <div id="rows">${rowsHtml()}</div>
-      ${fits.length ? `<label class="field" for="sp">Where?</label><select id="sp"><option value="">📍 Decide later</option>${fits.map((s) => `<option value="${s.id}" ${s.id === spaceId ? "selected" : ""}>${SPACE_KINDS[s.kind].emoji} ${esc(s.name)}</option>`).join("")}</select>`
+      ${fits.length ? `<label class="field" for="sp">Where?</label><select id="sp"><option value="">📍 Decide later</option>${fits.map((s) => `<option value="${s.id}" ${s.id === spaceId ? "selected" : ""}>${SPACE_KINDS[s.kind].emoji} ${esc(s.name)}</option>`).join("")}</select><div id="fill"></div>`
         : `<p class="small muted">${p.where.includes("pot") ? "" : "This one needs a bed - it's too big for pots. "}Add a ${p.where.includes("pot") ? "bed or pot" : "bed"} in My garden to place it.</p>`}
       <div id="check" class="check-box" aria-live="polite"></div>
       <button class="btn primary wide" style="margin-top:14px" id="add">Add ${esc(p.name.toLowerCase())} 🌱</button></div>
@@ -1214,7 +1216,22 @@ function openPlant(id, spaceId, startMethod, after) {
     const step = qty >= 50 ? 10 : qty >= 20 ? 5 : 1;
     qty = Math.max(1, qty + Number(b.dataset.q) * step); $("#qty").value = qty; runCheck();
   }));
-  if ($("#sp")) $("#sp").onchange = runCheck;
+  // "Fill the bed": pick a share of the chosen bed and we work out how many
+  const drawFill = () => {
+    const sp = $("#sp"), bed = sp && sp.value ? space(Number(sp.value)) : null;
+    const area = bed && bed.usage && bed.usage.area;
+    $("#fill").innerHTML = area ? `<div class="fillrow"><span class="small muted">Fill ${esc(bed.name)}:</span>${[[0.25, "¼"], [0.5, "½"], [0.75, "¾"], [1, "Whole bed"]]
+      .map(([f, l]) => `<button class="btn small" data-fill="${f}">${l}</button>`).join("")}</div>` : "";
+    $("#fill").onclick = (e) => {
+      const b = e.target.closest("[data-fill]");
+      if (!b) return;
+      qty = Math.max(1, Math.floor((area * Number(b.dataset.fill)) / p.area_each));
+      $("#qty").value = qty; runCheck();
+      toast(`${b.textContent === "Whole bed" ? "The whole bed" : b.textContent + " of the bed"} = ${qty} ${p.unit}`);
+    };
+  };
+  if ($("#sp")) $("#sp").onchange = () => { drawFill(); runCheck(); };
+  drawFill();
   runCheck();
   $("#add").onclick = async () => {
     const sp = $("#sp");
@@ -1244,7 +1261,8 @@ function checkHtml(p, r) {
   const icon = { sow_in: "🏠", sow_out: "🌱", plant_out: "🌿", harvest: "🧺" };
   const word = { sow_in: "Sow indoors", sow_out: "Sow", plant_out: "Plant out", harvest: "Pick" };
   const plan = (r.plan || []).map((j) => `${icon[j.kind]} ${word[j.kind]} ${fmt(j.start)}`).join(" → ");
-  const lines = [plan ? `<span class="plan">${plan}</span>` : "", `🧺 You'll get <b>${esc(r.harvest || "a good crop")}</b>`].filter(Boolean);
+  const lines = [plan ? `<span class="plan">${plan}</span>` : "", `🧺 You'll get <b>${esc(r.harvest || "a good crop")}</b>`,
+    r.buy ? `🛒 <b>${esc(r.buy.text)}</b>${r.buy.seeds ? ` - enough to sow ${r.buy.seeds}` : ""}${r.buy.note ? ` <span class="muted">(${esc(r.buy.note)})</span>` : ""}` : ""].filter(Boolean);
   let cls = "ok";
   if (r.space && r.space.area) {
     const u = r.space;
@@ -1334,7 +1352,7 @@ function calendarPage() {
   };
   calMonth = calMonth == null ? 0 : calMonth;
   const m = months[calMonth], mEnd = new Date(m.getFullYear(), m.getMonth() + 1, 0);
-  const monthJobs = crops.flatMap((c) => c.jobs).filter((j) => j.kind !== "eat" && j.kind !== "buy" && d(j.start) <= mEnd && d(j.end) >= m && (j.status !== "missed"))
+  const monthJobs = crops.flatMap((c) => c.jobs).filter((j) => j.kind !== "eat" && j.kind !== "buy" && d(j.start) <= mEnd && d(j.end) >= m && j.status !== "missed" && j.status !== "done")
     .sort((a, b) => a.start.localeCompare(b.start));
   const calUrl = location.origin + S.me.calendar_path;
   view.innerHTML = `<h1>📅 Growing calendar</h1>${calTabs()}
