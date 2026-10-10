@@ -406,3 +406,33 @@ details.card[open] > summary::before { content: "▾ "; }
 .lay-row select { width: auto; max-width: 44%; font-size: 14px; padding: 8px; }
 .unplace { flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--card); color: var(--muted); font-size: 15px; font-weight: 900; cursor: pointer; }
 .unplace:hover { border-color: var(--terra); color: var(--terra); }
+
+.hello.slim .scene { max-height: 90px; object-fit: cover; }
+.hello.slim .hello-text h1 { font-size: 24px; }
+.link-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 14px 16px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); color: var(--ink); text-decoration: none; margin-bottom: 14px; }
+.sticky-tabs { position: sticky; top: -18px; z-index: 2; margin: 8px -4px 12px; }
+.sticky-tabs button { font-size: 14px; padding: 9px 4px; }
+
+/* bird's-eye plot */
+.plot-wrap { border-radius: 22px; overflow: hidden; box-shadow: var(--shadow); border: 1px solid var(--line); margin-bottom: 10px; touch-action: pan-y; }
+svg.plot { display: block; width: 100%; height: auto; font-family: var(--display); user-select: none; -webkit-user-select: none; }
+svg.plot .grass { fill: #cfe3b4; }
+@media (prefers-color-scheme: dark) { svg.plot .grass { fill: #24341f; } }
+svg.plot .bed { fill: #7a5230; stroke: #5b3c22; stroke-width: 0.04; }
+svg.plot .bed.unbuilt { fill: #b8956e; stroke-dasharray: 0.12 0.08; }
+svg.plot .bed.over { stroke: #c65a32; stroke-width: 0.07; }
+svg.plot .pot { fill: #c46b3f; stroke: #8f4524; stroke-width: 0.05; }
+svg.plot .hit { fill: transparent; }
+svg.plot .label { fill: #1f2a1c; font-weight: 600; }
+@media (prefers-color-scheme: dark) { svg.plot .label { fill: #eef2e4; } }
+svg.plot .plus { fill: #f6efdf; opacity: .7; }
+svg.plot .crop, svg.plot .space { cursor: pointer; }
+svg.plot .crop:hover rect, svg.plot .crop:hover circle { filter: brightness(1.08); }
+svg.plot .space.movable { cursor: grab; }
+svg.plot .space.movable .hit { fill: rgba(255,255,255,.25); stroke: #3a7ca5; stroke-width: .05; stroke-dasharray: .15 .1; }
+svg.plot .space.target .hit { fill: rgba(255,255,255,.35); stroke: #2e7a4d; stroke-width: .06; }
+svg.plot .space.nope { opacity: .45; }
+.month-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+.month-row b { white-space: nowrap; min-width: 92px; }
+.month-row input[type=range] { flex: 1; accent-color: var(--forest-2); }
+.suggest button.on { background: var(--forest-2); color: #fff; }

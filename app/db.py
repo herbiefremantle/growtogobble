@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS spaces (
     length_m REAL,
     soil TEXT,
     built INTEGER,                    -- a bed: 1 already built, 0 still to build, NULL not asked yet
+    pos_x REAL,                       -- where it sits on the bird's-eye plot (metres); NULL = arranged automatically
+    pos_y REAL,
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS crops (
@@ -113,7 +115,8 @@ def connect():
 MIGRATIONS = [("spaces", "width_m", "REAL"), ("spaces", "length_m", "REAL"), ("crops", "quantity", "INTEGER"),
               ("crops", "bed_free_on", "TEXT"), ("users", "is_admin", "INTEGER NOT NULL DEFAULT 0"),
               ("users", "last_active", "TEXT"), ("spaces", "soil", "TEXT"),
-              ("spaces", "built", "INTEGER"), ("users", "invited_by", "INTEGER"), ("users", "invite_token", "TEXT")]
+              ("spaces", "built", "INTEGER"), ("users", "invited_by", "INTEGER"), ("users", "invite_token", "TEXT"),
+              ("spaces", "pos_x", "REAL"), ("spaces", "pos_y", "REAL")]
 
 
 def init():

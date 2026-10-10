@@ -480,3 +480,29 @@ def test_admin_can_correct_who_invited_someone(client, monkeypatch):
     out = client.post("/api/admin/users/%d/invited_by" % friend["id"], json={"inviter_id": boss["id"]}).json()
     assert next(u for u in out["users"] if u["id"] == friend["id"])["invited_by_name"] == "Sam"
     assert next(u for u in out["users"] if u["id"] == boss["id"])["invites_joined"] == 1
+
+
+def test_reset_my_garden_keeps_the_account(client):
+    _join(client)
+    sid = client.post("/api/spaces", json={"name": "Bed", "kind": "bed"}).json()["spaces"][0]["id"]
+    client.post("/api/crops", json={"plant_id": "peas", "space_id": sid})
+    client.post("/api/spaces/%d/position" % sid, json={"x": 3.2, "y": 1.5})
+    assert client.post("/api/me/reset-garden", json={"password": "wrong-pw"}).status_code == 400
+    g = client.post("/api/me/reset-garden", json={"password": "sunflower1"}).json()
+    assert g["spaces"] == [] and g["crops"] == [] and not any(b["earned_on"] for b in g["badges"])
+    assert client.get("/api/me").status_code == 200  # still logged in, same account
+
+
+def test_bed_position_is_saved(client):
+    _join(client)
+    sid = client.post("/api/spaces", json={"name": "Bed", "kind": "bed"}).json()["spaces"][0]["id"]
+    g = client.post("/api/spaces/%d/position" % sid, json={"x": 3.25, "y": 1.5}).json()
+    assert (g["spaces"][0]["pos_x"], g["spaces"][0]["pos_y"]) == (3.25, 1.5)
+
+
+def test_moving_one_bed_pins_the_others(client):
+    _join(client)
+    a = client.post("/api/spaces", json={"name": "A", "kind": "bed"}).json()["spaces"][0]["id"]
+    b = client.post("/api/spaces", json={"name": "B", "kind": "bed"}).json()["spaces"][-1]["id"]
+    g = client.post("/api/spaces/positions", json={"positions": [{"id": a, "x": 0.4, "y": 0.6}, {"id": b, "x": 3, "y": 0.6}]}).json()
+    assert {(s["pos_x"], s["pos_y"]) for s in g["spaces"]} == {(0.4, 0.6), (3.0, 0.6)}

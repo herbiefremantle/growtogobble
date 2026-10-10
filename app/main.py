@@ -224,6 +224,18 @@ def change_password(body: NewPassword, request: Request, user=Depends(auth.curre
     return {"ok": True}
 
 
+@app.post("/api/me/reset-garden")
+def reset_garden(body: DeleteAccount, user=Depends(auth.current_user)):
+    """Start the garden again from scratch: beds, plants, ticked jobs and garden badges go. The account, its
+    password, reminders on this phone, and invites (both ways) are kept."""
+    if not auth.check_password(body.password, user["pw_hash"]):
+        raise HTTPException(400, "That password isn't right.")
+    with db.connect() as conn:
+        for table in ("crops", "spaces", "done", "badges", "sent"):
+            conn.execute("DELETE FROM %s WHERE user_id = ?" % table, (user["id"],))
+        return garden.payload(conn, user)
+
+
 class Reset(BaseModel):
     token: str
     password: str
@@ -418,6 +430,37 @@ def rename_space(space_id: int, body: SpaceIn, user=Depends(auth.current_user)):
                       _soil(body.soil), space_id))
         if body.built is not None:
             conn.execute("UPDATE spaces SET built = ? WHERE id = ?", (int(body.built), space_id))
+        return garden.payload(conn, user)
+
+
+class Position(BaseModel):
+    x: float
+    y: float
+
+
+@app.post("/api/spaces/{space_id}/position")
+def move_space(space_id: int, body: Position, user=Depends(auth.current_user)):
+    """Where a bed sits on the bird's-eye plot, in metres (dragged into place to match the real garden)."""
+    with db.connect() as conn:
+        _own(conn, "spaces", space_id, user)
+        conn.execute("UPDATE spaces SET pos_x = ?, pos_y = ? WHERE id = ?",
+                     (round(max(0.0, min(body.x, 500.0)), 2), round(max(0.0, min(body.y, 500.0)), 2), space_id))
+        return garden.payload(conn, user)
+
+
+class Positions(BaseModel):
+    positions: list
+
+
+@app.post("/api/spaces/positions")
+def move_spaces(body: Positions, user=Depends(auth.current_user)):
+    """Save where every bed sits at once, so moving one doesn't shuffle the rest."""
+    with db.connect() as conn:
+        for raw in body.positions[:100]:
+            sid, x, y = int(raw["id"]), float(raw["x"]), float(raw["y"])
+            _own(conn, "spaces", sid, user)
+            conn.execute("UPDATE spaces SET pos_x = ?, pos_y = ? WHERE id = ?",
+                         (round(max(0.0, min(x, 500.0)), 2), round(max(0.0, min(y, 500.0)), 2), sid))
         return garden.payload(conn, user)
 
 
