@@ -358,10 +358,12 @@ def overlap(a0, a1, b0, b1):
 
 def already_planned(plant_id, start, crops_with_jobs, skip_id=None):
     """Crops of the same plant that will already be in the ground around `start` (in any space): planted before
-    and still growing then, or going in up to 6 weeks after. Stops the same thing being planned twice by accident."""
+    and still growing then, or going in up to 6 weeks after. Stops the same thing being planned twice by accident.
+    Only plants actually in a bed or pot count - ones taken out ("Not placed yet") don't.
+    """
     out = []
     for crop, jobs in crops_with_jobs:
-        if crop["plant_id"] != plant_id or crop.get("finished_on") or crop.get("id") == skip_id:
+        if crop["plant_id"] != plant_id or crop.get("finished_on") or crop.get("id") == skip_id or crop.get("space_id") is None:
             continue
         s0, s1 = crop_starts(crop, jobs), crop_finishes(crop, jobs)
         if s0 and s1 and s0 <= start + 6 * WEEK and s1 > start:

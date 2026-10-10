@@ -334,6 +334,11 @@ def test_warns_when_the_same_crop_is_already_planned_elsewhere(client):
     # something not planned yet isn't flagged
     chard = next(x for x in garlic["then"]["plants"] if x["plant_id"] == "chard")
     assert chard["already"] == []
+    # take the beetroot out of its bed: it's no longer "already planned" anywhere
+    beet_crop = next(c for c in g["crops"] if c["plant_id"] == "beetroot")
+    client.patch("/api/crops/%d" % beet_crop["id"], json={"plant_id": "beetroot", "clear_space": True})
+    check = client.get("/api/check", params={"plant_id": "beetroot", "space_id": b1, "method": "sow_out", "after": free}).json()
+    assert check["already"] == []
 
 
 # ---- accounts & admin -------------------------------------------------------------------------------
