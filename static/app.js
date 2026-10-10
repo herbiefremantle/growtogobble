@@ -966,7 +966,9 @@ function shapeStats(pts) {
 async function openMapTrace() {
   S.sheet = null;
   openSheet(`<h2>🗺️ Trace your garden</h2>
-    <p class="small" style="margin:0 0 8px">Zoom in on your garden or field, then <b>tap each corner</b> round its edge. 🔒 We only keep the shape and size - <b>never where it is</b>.</p>
+    <p class="small" style="margin:0 0 8px">Find your garden or field, zoom in, then <b>tap each corner</b> round its edge. 🔒 We only keep the shape and size - <b>never where it is</b>, and the postcode isn't saved.</p>
+    <form id="m-find" class="row" style="flex-wrap:nowrap;margin-bottom:8px"><input id="m-pc" type="text" autocomplete="postal-code" placeholder="Full postcode, e.g. LS6 2AB" aria-label="Postcode to find on the map">
+      <button class="btn small primary" type="submit">🔍 Find</button></form>
     <div id="map" class="map"><p class="muted" style="padding:20px">Loading the map…</p></div>
     <p id="mapstats" class="small" style="margin:8px 0"><b>Tap the first corner.</b></p>
     <div class="row"><button class="btn small" id="m-loc">📍 Go to where I am</button><button class="btn small" id="m-undo">↶ Undo</button><button class="btn small ghost" id="m-clear">Start again</button></div>
@@ -992,6 +994,20 @@ async function openMapTrace() {
   map.on("click", (e) => { taps.push(e.latlng); draw(); });
   $("#m-undo").onclick = () => { taps.pop(); draw(); };
   $("#m-clear").onclick = () => { taps.length = 0; draw(); };
+  // jump to a postcode: looked up on the phone (postcodes.io), never sent to the app or saved
+  $("#m-find").onsubmit = async (e) => {
+    e.preventDefault();
+    const pc = $("#m-pc").value.trim().toUpperCase().replace(/\s+/g, " ");
+    if (!/^[A-Z]{1,2}[0-9][A-Z0-9]? ?[0-9][A-Z]{2}$/.test(pc)) { toast("Type a full postcode, like LS6 2AB"); return; }
+    try {
+      const r = await fetch("https://api.postcodes.io/postcodes/" + encodeURIComponent(pc));
+      const data = await r.json();
+      if (!r.ok || !data.result) { toast("Couldn't find that postcode - check it and try again"); return; }
+      map.setView([data.result.latitude, data.result.longitude], 18);
+      $("#m-pc").blur();
+      toast("📍 Found it - your garden should be close by. Zoom out a little if you can't see it.");
+    } catch (err) { toast("Couldn't look that up - check your internet connection"); }
+  };
   $("#m-loc").onclick = () => {
     if (!navigator.geolocation) { toast("This phone can't share its location"); return; }
     navigator.geolocation.getCurrentPosition((p) => map.setView([p.coords.latitude, p.coords.longitude], 19),
