@@ -67,9 +67,9 @@ const SCENE = `<svg class="scene" viewBox="0 0 400 150" preserveAspectRatio="xMi
   <g><path d="M178 126 l6-26 l6 26z" fill="#e8742f"/><path d="M184 100 c-4-10-10-12-14-10 M184 100 c0-12 2-16 6-18 M184 100 c4-9 10-11 14-9" stroke="#3f8f4f" stroke-width="3" fill="none" stroke-linecap="round"/></g>
   <g><circle cx="318" cy="112" r="10" fill="#d9442f"/><circle cx="336" cy="116" r="8" fill="#e05a3a"/><path d="M318 102 v-8 M336 108 v-6" stroke="#2e7a4d" stroke-width="3" stroke-linecap="round"/><path d="M318 104 c-6 0-10-4-10-8 c6 0 10 4 10 8z M336 110 c5 0 8-3 8-6 c-5 0-8 3-8 6z" fill="#3f8f4f"/></g>
 </svg>`;
-const LOGO = `<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="20" fill="#1f5c3b"/>
-  <ellipse cx="20" cy="29" rx="11" ry="4" fill="#eca42b"/><path d="M20 28 V17" stroke="#e3eed8" stroke-width="3" stroke-linecap="round"/>
-  <path d="M20 19 c-2-6-7-8-11-7 c1 5 6 8 11 7z" fill="#9fd88f"/><path d="M20 17 c1-7 6-10 11-9 c-1 6-6 9-11 9z" fill="#cfeec0"/></svg>`;
+const LOGO = `<svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="11" fill="#1e9e5a"/>
+  <path d="M20 31 V18" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M20 20 c-2-6-7-8-11-7 c1 5 6 8 11 7z" fill="#dff3e7"/><path d="M20 18 c1-7 6-10 11-9 c-1 6-6 9-11 9z" fill="#fff"/></svg>`;
 // Pip: a friendly seed who gives the tips
 const PIP = `<svg class="pip-face" viewBox="0 0 46 46" aria-hidden="true">
   <path d="M23 6 c10 0 16 10 16 21 c0 9-7 14-16 14 s-16-5-16-14 C7 16 13 6 23 6z" fill="#b98352"/>
@@ -186,6 +186,7 @@ function render() {
   if (!loggedIn) { (PUBLIC[route] || welcome)(); return; }
   if (route === "reset") { $("#topbar").hidden = $("#tabs").hidden = true; resetPage(); return; }
   if (PUBLIC[route]) { go("#/"); return; }
+  $("#top-me").textContent = (S.me.name || "Me").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
   const tab = route === "shop" ? "" : route;
   document.querySelectorAll(".tabs a").forEach((a) => a.classList.toggle("on", (a.dataset.tab === "home" ? "" : a.dataset.tab) === tab));
   (PAGES[route] || home)();
@@ -519,13 +520,23 @@ function home() {
 
   const list = [...now, ...soon];
   const shown = homeAll ? list : list.slice(0, 3);
+  // the numbers: how far through the season, what needs doing now, and what's still to buy
+  const all = jobs.filter((j) => j.kind !== "buy"), doneN = all.filter((j) => j.status === "done").length;
+  const pct = all.length ? Math.round((100 * doneN) / all.length) : 0, toBuy = S.g.spaces.reduce((n, sp) => n + sp.cost.to_buy, 0);
+  const C = 2 * Math.PI * 14;
   view.innerHTML = `
-    <div class="card hello slim"><div class="hello-text"><h1>${hello}, ${esc(S.me.name)}! 👋</h1>
-      <p>${fmt(S.g.today, true)} · ${esc(S.me.region.short)}</p></div>${SCENE}</div>
+    <div class="today-head"><small>${fmt(S.g.today, true)} · ${esc(S.me.region.short)}</small><h1>${hello}, ${esc(S.me.name)}</h1></div>
+    <div class="stats">
+      <div class="stat"><svg class="ring" viewBox="0 0 34 34" aria-hidden="true"><circle class="bg" cx="17" cy="17" r="14" fill="none" stroke-width="4"/>
+        <circle class="fg" cx="17" cy="17" r="14" fill="none" stroke-width="4" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct / 100)}" transform="rotate(-90 17 17)"/></svg>
+        <b>${pct}%</b><span>of the season's jobs done</span></div>
+      <div class="stat ${now.length ? "warn" : ""}"><b>${now.length}</b><span>job${now.length === 1 ? "" : "s"} to do now</span></div>
+      <a class="stat" href="#/shop"><b>${money(toBuy)}</b><span>seeds & plants still to buy</span></a>
+    </div>
     ${nudge}
-    <div class="section-title"><h2>${now.length ? "🧤 Your next jobs" : "🔜 Coming up"}</h2>${list.length > 3 ? `<button class="btn small ghost" id="more">${homeAll ? "Show fewer" : `See all ${list.length}`}</button>` : ""}</div>
+    <div class="section-title"><h2>${now.length ? "Your next jobs" : "Coming up"}</h2>${list.length > 3 ? `<button class="btn small ghost" id="more">${homeAll ? "Show fewer" : `See all ${list.length}`}</button>` : ""}</div>
     <div class="card">${shown.length ? shown.map((j) => jobCard(j, { showSpace: true })).join("") :
-      `<div class="empty"><div class="big">😌</div><b>Nothing to do right now.</b><br>Enjoy the garden!</div>`}</div>
+      `<div class="empty"><b>Nothing to do right now.</b><br>Enjoy the garden.</div>`}</div>
     ${buyNow.length ? `<a href="#/shop" class="link-row">🛒 <b>${buyNow.length} thing${buyNow.length === 1 ? "" : "s"} to buy soon</b> <span>${buyNow.slice(0, 5).map((x) => plant(x.plant_id).emoji).join(" ")} 👉</span></a>` : ""}`;
   const more = $("#more");
   if (more) more.onclick = () => { homeAll = !homeAll; home(); };
@@ -2845,6 +2856,10 @@ function mePage() {
     <p class="muted">${got} of ${S.g.badges.length} earned. Keep growing!</p>
     <div class="badges">${S.g.badges.map((b) => `<div class="badge ${b.earned_on ? "got" : "locked"}"><span class="e">${b.emoji}</span><b>${esc(b.name)}</b><small>${esc(b.text)}</small></div>`).join("")}</div>
     <div class="section-title"><h2>⚙️ My account</h2></div>
+    <div class="card"><h3>Appearance</h3>
+      <div class="seg" role="radiogroup" aria-label="Light or dark">${[["", "Match my phone"], ["light", "Light"], ["dark", "Dark"]].map(([k, l]) =>
+        `<button role="radio" aria-checked="${(document.documentElement.getAttribute("data-theme") || "") === k}" class="${(document.documentElement.getAttribute("data-theme") || "") === k ? "on" : ""}" data-theme-set="${k}">${l}</button>`).join("")}</div>
+      <label class="check"><input type="checkbox" id="photos-pref" ${showPhotos ? "checked" : ""}> <span>Show photos of plants instead of icons</span></label></div>
     <div class="card tint-leaf" id="invite-card"><h3>💌 Invite a friend</h3>
       <p class="small" style="margin:0 0 10px">Know someone who'd love to grow their own? Send them a link - we'll keep count of who joins from your invites.</p>
       <div id="invite-tally" class="small muted" style="margin-bottom:10px">…</div>
@@ -2884,6 +2899,8 @@ function mePage() {
       : "You haven't invited anyone yet.";
   };
   api("GET", "/api/invites").then(tally, () => { $("#invite-tally").textContent = ""; });
+  view.querySelectorAll("[data-theme-set]").forEach((b) => (b.onclick = () => { setTheme(b.dataset.themeSet); mePage(); }));
+  $("#photos-pref").onchange = (e) => { showPhotos = e.target.checked; remember("gtg-photos", showPhotos); toast(showPhotos ? "Showing photos" : "Showing icons"); };
   $("#invite").onclick = async () => {
     try {
       const t = await api("POST", "/api/invites");
@@ -3008,7 +3025,17 @@ function resetPage() {
 
 // ---- start -----------------------------------------------------------------------------------------
 
-$("#brand").innerHTML = LOGO + "<span>Grow <em>to</em> Gobble</span>";
+$("#brand").innerHTML = LOGO + `<span>Grow to <span class="g">Gobble</span></span>`;
+
+// Light or dark: follows the phone unless you pick one (the toggle in the top bar, or Me > Appearance)
+function themeNow() { const t = document.documentElement.getAttribute("data-theme"); return t || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); }
+function setTheme(mode) {  // "light", "dark" or "" (match the phone)
+  if (mode) document.documentElement.setAttribute("data-theme", mode); else document.documentElement.removeAttribute("data-theme");
+  try { if (mode) localStorage.setItem("gtg-theme", mode); else localStorage.removeItem("gtg-theme"); } catch (e) { /* private mode */ }
+  $("#theme-color").setAttribute("content", themeNow() === "dark" ? "#0d1511" : "#f3f5f2");
+}
+setTheme(document.documentElement.getAttribute("data-theme") || "");
+$("#theme-btn").onclick = () => { setTheme(themeNow() === "dark" ? "light" : "dark"); if (location.hash.startsWith("#/me")) mePage(); };
 
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); S.installPrompt = e; });
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
