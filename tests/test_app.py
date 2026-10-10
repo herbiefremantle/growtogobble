@@ -564,3 +564,11 @@ def test_beds_and_features_can_sit_at_any_angle(client):
     assert client.patch("/api/features/%d" % fid, json={"angle": -30}).json()["garden"]["features"][0]["angle"] == -30
     assert client.get("/api/garden").json()["garden"]["path_w"] == 0.5
     assert client.post("/api/garden/paths", json={"w": 0.6}).json()["garden"]["path_w"] == 0.6
+
+
+def test_new_bed_can_be_placed_and_angled(client):
+    _join(client)
+    g = client.post("/api/spaces", json={"name": "Bed 2", "kind": "bed", "width_m": 1.2, "length_m": 2.4,
+                                         "pos_x": 3.1, "pos_y": 0.6, "angle": 20, "soil": "clay", "built": True}).json()
+    s = g["spaces"][0]
+    assert (s["pos_x"], s["pos_y"], s["angle"], s["soil"], s["built"]) == (3.1, 0.6, 20, "clay", 1)

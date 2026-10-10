@@ -409,6 +409,9 @@ class SpaceIn(BaseModel):
     length_m: Optional[float] = None
     soil: Optional[str] = None
     built: Optional[bool] = None
+    pos_x: Optional[float] = None     # where it goes on the plan (e.g. a copy placed next door)
+    pos_y: Optional[float] = None
+    angle: Optional[float] = None
 
 
 def _soil(v):
@@ -424,9 +427,13 @@ def add_space(body: SpaceIn, user=Depends(auth.current_user)):
     if body.kind not in ("bed", "pot", "allotment"):
         raise HTTPException(400, "Unknown kind of space")
     with db.connect() as conn:
-        conn.execute("INSERT INTO spaces (user_id, name, kind, width_m, length_m, soil, built, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        placed = body.pos_x is not None and body.pos_y is not None
+        conn.execute("INSERT INTO spaces (user_id, name, kind, width_m, length_m, soil, built, pos_x, pos_y, angle, created_at) "
+                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                      (user["id"], body.name.strip()[:40] or "My bed", body.kind, _size(body.width_m), _size(body.length_m),
-                      _soil(body.soil), None if body.built is None else int(body.built), clock.now().isoformat()))
+                      _soil(body.soil), None if body.built is None else int(body.built),
+                      _metres(body.pos_x) if placed else None, _metres(body.pos_y) if placed else None,
+                      _angle(body.angle) if body.angle is not None else None, clock.now().isoformat()))
         return garden.payload(conn, user)
 
 

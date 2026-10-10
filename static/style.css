@@ -488,3 +488,6 @@ svg.plot .dims.edge text { fill: #6e4a2e; }
 .plot-wrap { text-align: center; }
 .plot-inner { min-width: 0; text-align: left; vertical-align: top; }
 .plot-inner svg.plot { margin: 0; }
+.seltools { flex-wrap: wrap; }
+.seltools .copyrow { display: flex; align-items: center; gap: 4px; width: 100%; border-top: 1px dashed var(--line); padding-top: 6px; margin-top: 2px; font-size: 13px; font-weight: 800; color: var(--muted); }
+.seltools .copyrow span { margin-right: auto; }

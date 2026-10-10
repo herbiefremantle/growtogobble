@@ -711,8 +711,9 @@ try {
 const remember = (k, v) => { try { localStorage.setItem(k, v ? "1" : "0"); } catch (e) { /* private mode */ } };
 const m = (v) => (v >= 10 ? v.toFixed(1) : v.toFixed(2)).replace(/\.?0+$/, "") + " m";
 
-// Dropped near another bed? Line it up alongside: same angle, a path's width apart, ends level
-// (unless it was dropped well along the other bed's length, then it keeps that slide)
+// Dropped near another bed? Slide it up alongside, KEEPING ITS OWN ANGLE: its nearest corner ends up a path's
+// width from the other bed's side (so beds at different angles leave a wedge-shaped path), and its end lines up
+// with the other bed's end if it's close. Beds within 5 degrees of each other straighten up to match exactly.
 function snapNextTo(M, items) {
   if (!snapOn || M.type !== "space" || M.s.kind === "pot") return null;
   const gap = S.g.garden.path_w, mx = M.x + M.w / 2, my = M.y + M.h / 2;
@@ -720,16 +721,61 @@ function snapNextTo(M, items) {
   for (const N of items) {
     if (N.type !== "space" || N.id === M.id || N.s.kind === "pot") continue;
     const { lx, ly } = localOf(N, mx, my);
-    if (Math.abs(lx) > N.w / 2 + gap + M.w / 2 + 1 || Math.abs(ly) > N.h / 2 + M.h / 2 + 0.5) continue;
+    if (Math.abs(lx) > N.w / 2 + gap + Math.max(M.w, M.h) / 2 + 1 || Math.abs(ly) > N.h / 2 + Math.max(M.w, M.h) / 2 + 0.5) continue;
     const dist = Math.hypot(lx, ly);
     if (best && dist >= best.dist) continue;
-    const side = lx >= 0 ? 1 : -1, ox = side * (N.w / 2 + gap + M.w / 2), level = -N.h / 2 + M.h / 2;
-    const oy = Math.abs(ly - level) < 0.6 ? level : Math.round(ly * 10) / 10;
-    const t = rad(N.a || 0), ncx = N.x + N.w / 2, ncy = N.y + N.h / 2;
-    const cx = ncx + ox * Math.cos(t) - oy * Math.sin(t), cy = ncy + ox * Math.sin(t) + oy * Math.cos(t);
-    best = { dist, x: Math.round((cx - M.w / 2) * 100) / 100, y: Math.round((cy - M.h / 2) * 100) / 100, a: N.a || 0, to: N };
+    const diff = ((((M.a || 0) - (N.a || 0)) % 360) + 540) % 360 - 180;
+    const a = Math.abs(diff) < 5 ? N.a || 0 : M.a || 0;
+    const T = { ...M, a };
+    const pts = corners(T).map(([x, y]) => localOf(N, x, y)), side = lx >= 0 ? 1 : -1;
+    const nearX = side > 0 ? Math.min(...pts.map((p) => p.lx)) : Math.max(...pts.map((p) => p.lx));
+    const shiftX = side * (N.w / 2 + gap) - nearX;
+    const topY = Math.min(...pts.map((p) => p.ly)), level = -N.h / 2 - topY;
+    const shiftY = Math.abs(level) < 0.6 ? level : 0;
+    const t = rad(N.a || 0);
+    const wx = shiftX * Math.cos(t) - shiftY * Math.sin(t), wy = shiftX * Math.sin(t) + shiftY * Math.cos(t);
+    best = { dist, x: Math.round((M.x + wx) * 100) / 100, y: Math.round((M.y + wy) * 100) / 100, a, to: N };
   }
   return best;
+}
+
+// A copy of a bed right next door: same size and angle, a path's width away, on the side asked for
+function copySpot(it, dir) {
+  const gap = S.g.garden.path_w, t = rad(it.a || 0);
+  const [ox, oy] = { left: [-(it.w + gap), 0], right: [it.w + gap, 0], up: [0, -(it.h + gap)], down: [0, it.h + gap] }[dir];
+  const cx = it.x + it.w / 2 + ox * Math.cos(t) - oy * Math.sin(t), cy = it.y + it.h / 2 + ox * Math.sin(t) + oy * Math.cos(t);
+  return { x: Math.round((cx - it.w / 2) * 100) / 100, y: Math.round((cy - it.h / 2) * 100) / 100 };
+}
+
+// Paths: between two beds whose sides face each other a little apart - a strip if they're parallel,
+// a wedge (wider at one end) if they're at different angles
+function pathsBetween(items) {
+  const beds = items.filter((i) => i.type === "space" && i.s.kind !== "pot"), out = [];
+  const mid = (e) => [(e[0][0] + e[1][0]) / 2, (e[0][1] + e[1][1]) / 2];
+  const d = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]);
+  const edgesOf = (i) => { const c = corners(i); return [[c[0], c[1]], [c[1], c[2]], [c[2], c[3]], [c[3], c[0]]]; };
+  for (const A of beds) for (const B of beds) {
+    if (A.id >= B.id) continue;
+    const ca = [A.x + A.w / 2, A.y + A.h / 2], cb = [B.x + B.w / 2, B.y + B.h / 2];
+    const ea = edgesOf(A).sort((p, q) => d(mid(p), cb) - d(mid(q), cb))[0];
+    const eb = edgesOf(B).sort((p, q) => d(mid(p), ca) - d(mid(q), ca))[0];
+    // the two sides must face each other...
+    const ma = mid(ea), mb = mid(eb);
+    if ((mb[0] - ma[0]) * (ma[0] - ca[0]) + (mb[1] - ma[1]) * (ma[1] - ca[1]) <= 0) continue;
+    if ((ma[0] - mb[0]) * (mb[0] - cb[0]) + (ma[1] - mb[1]) * (mb[1] - cb[1]) <= 0) continue;
+    // ...at a similar angle (up to 45 degrees apart)...
+    const angA = Math.atan2(ea[1][1] - ea[0][1], ea[1][0] - ea[0][0]), angB = Math.atan2(eb[1][1] - eb[0][1], eb[1][0] - eb[0][0]);
+    const turn = Math.abs(((((angA - angB) * 180) / Math.PI) % 180 + 180) % 180);
+    if (Math.min(turn, 180 - turn) > 45) continue;
+    // ...and close: pair each corner with the nearest corner opposite
+    const [a1, a2] = ea, b1 = d(a1, eb[0]) <= d(a1, eb[1]) ? eb[0] : eb[1], b2 = b1 === eb[0] ? eb[1] : eb[0];
+    const g1 = d(a1, b1), g2 = d(a2, b2);
+    if (Math.min(g1, g2) < 0.12 || Math.max(g1, g2) > 1.6) continue;  // wider than that is just open ground, not a path
+    const pts = [a1, a2, b2, b1].map((p) => p.join(",")).join(" ");
+    const wide = Math.round(Math.max(g1, g2) * 100), narrow = Math.round(Math.min(g1, g2) * 100);
+    out.push(`<polygon points="${pts}" class="pathstrip"><title>Path, ${wide - narrow > 5 ? `${narrow}-${wide}cm wide` : `${narrow}cm wide`}</title></polygon>`);
+  }
+  return out.join("");
 }
 
 // Width along the bottom edge, length up the right-hand side
@@ -755,22 +801,6 @@ function edgeMarks(ppm) {
     if (ang > 90) ang -= 180; if (ang < -90) ang += 180;
     return `<text x="${mx}" y="${my + fs * 0.35}" font-size="${fs}" text-anchor="middle" transform="rotate(${ang} ${mx} ${my})">${m(len)}</text>`;
   }).join("")}</g>`;
-}
-
-// Paths: wherever two beds sit side by side at the same angle with a gap, draw the path between them
-function pathsBetween(items, ppm) {
-  const beds = items.filter((i) => i.type === "space" && i.s.kind !== "pot"), out = [];
-  for (const A of beds) for (const B of beds) {
-    if (A.id >= B.id || Math.abs((((A.a || 0) - (B.a || 0)) % 360 + 540) % 360 - 180) > 1) continue;
-    const { lx, ly } = localOf(A, B.x + B.w / 2, B.y + B.h / 2);
-    const gap = Math.abs(lx) - (A.w + B.w) / 2;
-    if (gap < 0.15 || gap > 1.5) continue;
-    const top = Math.max(-A.h / 2, ly - B.h / 2), bot = Math.min(A.h / 2, ly + B.h / 2);
-    if (bot - top < 0.3) continue;
-    const cx = A.x + A.w / 2, cy = A.y + A.h / 2, x0 = lx > 0 ? A.w / 2 : -A.w / 2 - gap;
-    out.push(`<rect x="${cx + x0}" y="${cy + top}" width="${gap}" height="${bot - top}" class="pathstrip" transform="rotate(${A.a || 0} ${cx} ${cy})"><title>Path, ${Math.round(gap * 100)}cm wide</title></rect>`);
-  }
-  return out.join("");
 }
 
 function planBounds(items) {
@@ -868,7 +898,7 @@ function plotSvg() {
     <rect x="${b.x0}" y="${b.y0}" width="${b.W}" height="${b.H}" class="${b.fenced ? "outside" : "grass"}"/>
     ${b.fenced ? (shape ? `<polygon points="${shape}" class="grass"/>` : `<rect x="0" y="0" width="${S.g.garden.w}" height="${S.g.garden.h}" class="grass"/>`) : ""}
     <rect x="${b.x0}" y="${b.y0}" width="${b.W}" height="${b.H}" fill="url(#grid)"/>
-    ${fence}${showPaths ? pathsBetween(items, ppm) : ""}${features}${beds}${edgeMarks(ppm)}
+    ${fence}${showPaths ? pathsBetween(items) : ""}${features}${beds}${edgeMarks(ppm)}
     <g class="scalebar" style="stroke-width:${px(2)}"><path d="M ${b.x0 + px(12)} ${b.y0 + b.H - px(12)} h ${bar}"/><text x="${b.x0 + px(12) + bar / 2}" y="${b.y0 + b.H - px(17)}" font-size="${px(11)}" text-anchor="middle">${bar} m</text></g></svg>`;
 }
 
@@ -903,14 +933,16 @@ function selToolbar() {
   const cs = getComputedStyle(view), visW = view.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
   const tw = Math.min(300, visW - 8), lo = Math.max(4, plotScroll.l + 4), hi = Math.min(W - tw - 4, plotScroll.l + visW - tw - 4);
   const left = Math.max(lo, Math.min(hi, ((bb.x0 + bb.x1) / 2 - b.x0) * ppm - tw / 2));
-  const above = (bb.y0 - b.y0) * ppm - 58, top = above > 4 ? above : (bb.y1 - b.y0) * ppm + 10;
+  const th = it.type === "space" ? 100 : 58, above = (bb.y0 - b.y0) * ppm - th, top = above > 4 ? above : (bb.y1 - b.y0) * ppm + 10;
   return `<div class="seltools" style="left:${left}px;top:${top}px;width:${tw}px">
     <button class="btn small" data-rot="-15" aria-label="Turn 15 degrees left">↺15°</button>
     <input type="range" id="ang" min="-180" max="180" step="1" value="${Math.round(it.a)}" aria-label="Angle">
     <button class="btn small" data-rot="15" aria-label="Turn 15 degrees right">↻15°</button>
     <b id="angv">${Math.round(it.a)}°</b>
     <button class="btn small" data-rot="90" aria-label="Turn 90 degrees">↻90°</button>${it.a ? `<button class="btn small ghost" data-rot="0" aria-label="Straighten">⟲0</button>` : ""}
-    <button class="btn small ghost" id="seldetails" aria-label="More options">⋯</button></div>`;
+    <button class="btn small ghost" id="seldetails" aria-label="More options">⋯</button>
+    ${it.type === "space" ? `<div class="copyrow"><span>⧉ Copy to:</span><button class="btn small" data-copy-bed="left" aria-label="Copy to this side">◀</button><button class="btn small" data-copy-bed="right" aria-label="Copy to that side">▶</button>
+      <button class="btn small" data-copy-bed="up" aria-label="Copy beyond this end">▲</button><button class="btn small" data-copy-bed="down" aria-label="Copy beyond that end">▼</button></div>` : ""}</div>`;
 }
 
 // The edit tools: add things, set the garden's size, and change whatever is selected
@@ -1035,6 +1067,23 @@ function wireEdit(svg, redraw) {
     view.querySelectorAll("[data-rot]").forEach((b) => (b.onclick = () => {
       const r = b.dataset.rot;
       setAngle(r === "0" ? 0 : r === "90" ? it.a + 90 : it.a + Number(r));
+    }));
+    view.querySelectorAll("[data-copy-bed]").forEach((b) => (b.onclick = async () => {
+      const spot = copySpot(it, b.dataset.copyBed), items = planItems(), twin = { ...it, ...spot, id: -1 };
+      const hit = items.find((o) => o.type === "space" && overlaps(twin, o));
+      if (hit) { toast(`There's no room - it would land on ${hit.s.name}`); return; }
+      const gw = S.g.garden.w, gh = S.g.garden.h, bb = box(twin);
+      if (bb.x0 < -0.05 || bb.y0 < -0.05 || (gw && gh && (bb.x1 > gw + 0.05 || bb.y1 > gh + 0.05))) { toast("That would go off the edge of your garden"); return; }
+      const nums = S.g.spaces.map((sp) => (/^Bed (\d+)$/.exec(sp.name) || [])[1]).filter(Boolean).map(Number);
+      const name = it.s.kind === "allotment" ? `${it.s.name} copy` : `Bed ${Math.max(S.g.spaces.filter((sp) => sp.kind !== "pot").length, ...nums) + 1}`;
+      // pin the others first, so the auto-arranged ones don't shuffle round the new bed
+      const pos = plotPositions();
+      await api("POST", "/api/spaces/positions", { positions: Object.entries(pos).map(([id, p]) => ({ id: Number(id), x: p.x, y: p.y })) });
+      if (await change("POST", "/api/spaces", { name, kind: it.s.kind, width_m: it.w, length_m: it.h, soil: it.s.soil, built: it.s.built == null ? null : !!it.s.built,
+        pos_x: spot.x, pos_y: spot.y, angle: it.a }, `⧉ ${name} added next door${S.g.garden.path_w ? ` with a ${Math.round(S.g.garden.path_w * 100)}cm path` : ""}`)) {
+        const made = S.g.spaces.find((sp) => sp.name === name);
+        if (made) { selected = { type: "space", id: made.id }; plotPage(); }
+      }
     }));
     const ang = $("#ang");
     if (ang) {
