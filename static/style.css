@@ -816,3 +816,26 @@ svg.plot .grp-tag { fill: #fff; font-weight: 800; paint-order: stroke; stroke: r
 .samplebar { position: sticky; top: calc(56px + env(safe-area-inset-top)); z-index: 4; display: flex; justify-content: space-between; align-items: center; gap: 10px;
   max-width: 760px; margin: 8px auto 0; padding: 8px 12px; border-radius: 12px; background: var(--marigold-soft); border: 1px solid color-mix(in srgb, var(--marigold) 40%, var(--line));
   font-size: 14px; width: calc(100% - 32px); }
+
+/* moving demos */
+.clip-box { margin: 10px 0 2px; }
+.clip { display: block; width: 100%; height: auto; border-radius: 12px; background: var(--bg-2); }
+.clip .clip-plan { fill: #cfe5b8; } .clip .clip-grid { stroke: rgba(60, 100, 40, .18); stroke-width: 1; }
+.clip .clip-card { fill: var(--card); stroke: var(--line); stroke-width: 1; }
+.clip .clip-btn { fill: var(--sage); } .clip .clip-primary { fill: var(--forest-2); }
+.clip .clip-input { fill: var(--bg); stroke: var(--line); }
+.clip .clip-bed { fill: #7a5230; } .clip .clip-strip { fill: #f2a564; }
+.clip .clip-hi { fill: none; stroke: var(--forest-2); stroke-width: 3; }
+.clip .clip-t { font: 600 10px "Figtree", sans-serif; fill: var(--ink); } .clip .clip-t.b { font-weight: 800; font-size: 11.5px; }
+.clip .clip-t.s { font-size: 9px; } .clip .clip-t.w { fill: var(--on-primary); font-weight: 800; } .clip .clip-t.ok { fill: var(--forest); font-weight: 700; }
+.clip .clip-tap { fill: var(--forest-2); }
+.clip .clip-band { fill: var(--card); } .clip .clip-cap { font: 800 12px "Figtree", sans-serif; fill: var(--ink); }
+.clip .clip-sat { fill: #56703f; } .clip .clip-sat2 { fill: #6c8a4b; } .clip .clip-roof { fill: #a9a39a; } .clip .clip-road { stroke: #c8c2b6; stroke-width: 8; }
+.clip .clip-dot { fill: #f2b01e; stroke: #fff; stroke-width: 2; }
+.clip .clip-outline { fill: #f2b01e; stroke: #f2b01e; stroke-width: 3; }
+.clip .clip-pot { fill: #c0714a; stroke: #8e4f30; stroke-width: 1.5; }
+.clip-pair { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 8px; }
+@media (min-width: 640px) { .clip-pair { grid-template-columns: 1fr 1fr; } }
+.clip-steps { margin: 8px 0 0; }
+#tour .tour-bubble { max-height: calc(100vh - 16px); overflow-y: auto; }
+:root[data-theme="dark"] .clip .clip-plan { fill: #2c4a26; }

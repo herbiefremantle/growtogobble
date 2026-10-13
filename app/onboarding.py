@@ -56,13 +56,14 @@ def path_for(profile):
 
 
 # Each step: where it is (route), what it points at (anchor - skipped if it isn't there), how to get the page ready
-# (prep), and words. why: a plain-English "why this matters", shown to beginners.
+# (prep), and words. why: a plain-English "why this matters", shown to beginners. clip: a short moving demo of
+# doing it (drawn by the app - see CLIPS in static/app.js).
 TOURS = {
     "A": [
-        {"route": "#/garden", "prep": "list", "anchor": "#add-space", "title": "My containers",
+        {"route": "#/garden", "prep": "list", "anchor": "#add-space", "title": "My containers", "clip": "pot_fit",
          "body": "Add each pot, trough or grow bag. Tell us the size and we'll suggest what fits.",
          "why": "Pot size decides what you can grow - a tomato needs about 10 litres of compost, a lettuce much less."},
-        {"route": "#/plants", "prep": "veg", "anchor": '[data-filter="pot"]', "title": "Crop picker",
+        {"route": "#/plants", "prep": "veg", "anchor": '[data-filter="pot"]', "title": "Crop picker", "clip": "add_veg",
          "body": "Tap 'Good in pots' for things that suit containers: herbs, salad leaves, tomatoes, chillies.",
          "why": "Picking plants that like pots means bigger crops and less fuss."},
         {"route": "#/calendar", "anchor": "#view h1", "title": "Your calendar",
@@ -71,15 +72,15 @@ TOURS = {
         {"route": "#/", "anchor": "#push-card, .stats", "title": "Reminders",
          "body": "Pots dry out fast. Turn on alerts and we'll nudge you on hot, dry days - and when there's a frost coming.",
          "why": "A pot can dry out in a single hot day; a reminder saves the plant."},
-        {"route": "#/garden", "prep": "plot", "anchor": "svg.plot", "title": "Got more space one day?",
+        {"route": "#/garden", "prep": "plot", "anchor": "svg.plot", "title": "Got more space one day?", "clip": "add_bed",
          "body": "The plan lets you lay out beds to scale - even trace your garden from a satellite map. Take a peek.",
          "why": "Seeing it all on one page makes it easy to plan what goes where."},
     ],
     "B": [
-        {"route": "#/garden", "prep": "plot", "anchor": "#edit", "title": "Your beds",
+        {"route": "#/garden", "prep": "plot", "anchor": "#edit", "title": "Your beds", "clip": "add_bed",
          "body": "Add your raised beds or borders - rough sizes are fine. Tap Edit plan, then Bed or pots.",
          "why": "Knowing the size of each bed lets us tell you exactly how much fits."},
-        {"route": "#/plants", "prep": "veg", "anchor": "#view .grid", "title": "Planning crops",
+        {"route": "#/plants", "prep": "veg", "anchor": "#view .grid", "title": "Planning crops", "clip": "add_veg",
          "body": "Pick a crop, choose a bed, and we'll show how many fit - and stop you overfilling it.",
          "why": "Plants squashed together grow small and catch diseases."},
         {"route": "#/plants", "prep": "groups", "anchor": '[data-pgroup="groups"]', "title": "Companions and spacing",
@@ -88,18 +89,18 @@ TOURS = {
         {"route": "#/calendar", "anchor": "#view h1", "title": "Calendar and reminders",
          "body": "Every sowing, planting and picking date for your beds, with reminders when it's time.",
          "why": "Little and often is the secret - the calendar breaks it into small jobs."},
-        {"route": "#/garden", "prep": "plot", "anchor": "svg.plot", "title": "Your whole plot to scale",
+        {"route": "#/garden", "prep": "plot", "anchor": "svg.plot", "title": "Your whole plot to scale", "clip": "trace_plot",
          "body": "Drag beds into place, add paths and trees, or trace your garden from a satellite map.",
          "why": "Seeing which beds are next to each other helps keep bad neighbours apart."},
     ],
     "C": [
-        {"route": "#/garden", "prep": "plot", "anchor": "#edit", "title": "Draw your plot",
+        {"route": "#/garden", "prep": "plot", "anchor": "#edit", "title": "Draw your plot", "clip": "trace_plot",
          "body": "Tap Edit plan, then trace your boundary on a satellite map - or just type its size.",
          "why": "With the real shape and size, everything you add is to scale."},
-        {"route": "#/garden", "prep": "plot", "anchor": "svg.plot", "title": "Beds and features",
+        {"route": "#/garden", "prep": "plot", "anchor": "svg.plot", "title": "Beds and features", "clip": "add_bed",
          "body": "Drop in beds, paths, a greenhouse, compost bins. Drag to move; set sizes in the box that pops up.",
          "why": "A map of the plot makes planning and jobs much quicker on a big site."},
-        {"route": "#/garden", "prep": "plot", "anchor": ".month-row", "title": "Plant and space",
+        {"route": "#/garden", "prep": "plot", "anchor": ".month-row", "title": "Plant and space", "clip": "add_veg",
          "body": "Slide through the year to see what's growing where. Each bed shows how full it is.",
          "why": "Beds fill and empty through the year - this shows the gaps you can fill."},
         {"route": "#/garden", "prep": "plot", "anchor": '.tabs a[data-tab="garden"]', "title": "Moving crops around",

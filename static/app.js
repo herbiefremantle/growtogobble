@@ -393,6 +393,8 @@ async function starterPlan() {
       <span class="e ${blobCls(p)}">${pic(p)}</span><span class="t"><b>${esc(p.name)}</b><span class="small muted">${methodLabel(p, x.method).replace(/^\S+\s/, "")} · ${daysBetween(today(), d(x.from)) <= 0 ? "now until " + fmt(x.to) : "from " + fmt(x.from)}</span>${mini(p)}</span></button>`; }).join("")
       || `<p class="muted">Nothing to start just now - have a look round, and we'll suggest things as the seasons change.</p>`}
       <div class="legend small" style="margin-top:8px"><span><i class="sow"></i>Sow or plant</span><span><i class="pick"></i>Pick</span></div></div>
+    <div class="card"><h3>How it works</h3>
+      <div class="clip-pair"><div>${big ? `<div><b class="small">Draw your plot</b>${clipBlock("trace_plot")}</div>` : ""}<div><b class="small">${S.me.onboarding.space === "pots" ? "Your pots" : "Add a bed"}</b>${clipBlock(S.me.onboarding.space === "pots" ? "pot_fit" : "add_bed")}</div><div><b class="small">Add veg to it</b>${clipBlock("add_veg")}</div></div></div>
     <button class="btn primary wide" id="sp-tour">Start the tour</button>
     <button class="btn wide" id="sp-sample" style="margin-top:8px">Explore a sample garden first</button>
     <button class="btn wide" id="sp-first" style="margin-top:8px">${big ? "Draw your plot" : "Add your first crop"}</button>
@@ -416,6 +418,90 @@ document.addEventListener("click", async (e) => {
   rotYear = 1;
   await change("DELETE", "/api/sample", null, "Sample cleared - over to you 🌱");
 });
+
+// ---- moving demos: a finger doing the real thing, on a mini version of the screen ---------------------------
+// Drawn here (no video files): SVG with its own timeline, looping every CLIP_S seconds. Times are fractions of the loop.
+const CLIP_S = 10;
+const anim = (attr, vals, times) => `<animate attributeName="${attr}" values="${vals}" keyTimes="${times}" dur="${CLIP_S}s" repeatCount="indefinite"/>`;
+const during = (a, b) => (b >= 1 ? anim("opacity", "0;0;1;1", `0;${a};${a + 0.01};1`) : anim("opacity", "0;0;1;1;0;0", `0;${a};${a + 0.01};${b};${b + 0.01};1`));
+function moves(points) {  // [[t, x, y], ...]
+  const pts = [...points];
+  if (pts[0][0] > 0) pts.unshift([0, pts[0][1], pts[0][2]]);
+  if (pts[pts.length - 1][0] < 1) pts.push([1, pts[pts.length - 1][1], pts[pts.length - 1][2]]);
+  return `<animateTransform attributeName="transform" type="translate" values="${pts.map((p) => p[1] + " " + p[2]).join(";")}" keyTimes="${pts.map((p) => p[0]).join(";")}" dur="${CLIP_S}s" repeatCount="indefinite"/>`;
+}
+const finger = (points, taps) => `<g>${moves(points)}${taps.map((t) => `<circle r="4" class="clip-tap" opacity="0">${anim("opacity", "0;0;.6;0;0", `0;${t};${t + 0.005};${t + 0.05};1`)}${anim("r", "4;4;4;18;18", `0;${t};${t + 0.005};${t + 0.05};1`)}</circle>`).join("")}
+  <text x="-9" y="21" font-size="22">👆</text></g>`;
+const captions = (list) => `<rect x="0" y="182" width="320" height="28" class="clip-band"/>` + list.map(([a, b, t]) => `<text x="160" y="201" text-anchor="middle" class="clip-cap" opacity="0">${t}${during(a, b)}</text>`).join("");
+const plotBg = (x = 10, y = 40, w = 300, h = 136) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" class="clip-plan"/>`
+  + Array.from({ length: Math.floor(w / 20) - 1 }, (_, i) => `<line x1="${x + 20 * (i + 1)}" x2="${x + 20 * (i + 1)}" y1="${y}" y2="${y + h}" class="clip-grid"/>`).join("")
+  + Array.from({ length: Math.floor(h / 20) - 1 }, (_, i) => `<line y1="${y + 20 * (i + 1)}" y2="${y + 20 * (i + 1)}" x1="${x}" x2="${x + w}" class="clip-grid"/>`).join("");
+const clipSvg = (label, body) => `<svg class="clip" viewBox="0 0 320 210" role="img" aria-label="${label}">${body}</svg>`;
+const CLIP_STEPS = {
+  add_bed: ["Tap Edit plan", "Tap Bed or pots", "Type its size", "Drag it into place"],
+  add_veg: ["Pick a crop", "Choose its bed - we check it fits", "It's planted, with its first job"],
+  trace_plot: ["Find your garden on the map", "Tap each corner", "Your plot appears, to scale", "Add beds inside it"],
+  pot_fit: ["Choose your pot size", "See what fits in it", "Tap one to plant it"],
+};
+const CLIPS = {
+  add_bed: () => clipSvg("How to add a bed", `${plotBg()}
+    <rect x="12" y="10" width="74" height="22" rx="6" class="clip-btn"/><text x="49" y="25" text-anchor="middle" class="clip-t">Edit plan</text>
+    <g opacity="0">${during(0.14, 0.3)}<rect x="10" y="118" width="300" height="58" rx="10" class="clip-card"/><text x="22" y="136" class="clip-t b">Add to your plan</text>
+      <rect x="22" y="144" width="98" height="22" rx="6" class="clip-btn"/><text x="71" y="159" text-anchor="middle" class="clip-t">🟫 Bed or pots</text></g>
+    <g opacity="0">${during(0.3, 0.53)}<rect x="70" y="40" width="180" height="132" rx="12" class="clip-card"/><text x="84" y="60" class="clip-t b">New bed</text>
+      <text x="84" y="85" class="clip-t">Width</text><rect x="140" y="72" width="64" height="18" rx="4" class="clip-input"/><text x="148" y="85" class="clip-t" opacity="0">1.2 m${during(0.36, 0.53)}</text>
+      <text x="84" y="111" class="clip-t">Length</text><rect x="140" y="98" width="64" height="18" rx="4" class="clip-input"/><text x="148" y="111" class="clip-t" opacity="0">2.4 m${during(0.41, 0.53)}</text>
+      <rect x="110" y="134" width="100" height="24" rx="7" class="clip-primary"/><text x="160" y="150" text-anchor="middle" class="clip-t w">Add it</text></g>
+    <g opacity="0">${during(0.53, 1)}<g>${moves([[0.53, 0, 0], [0.6, 0, 0], [0.75, 140, 30]])}<rect x="40" y="56" width="34" height="68" rx="4" class="clip-bed"/>
+      <text x="57" y="51" text-anchor="middle" class="clip-t s">Bed 1</text></g></g>
+    <g opacity="0">${during(0.8, 0.98)}<rect x="206" y="12" width="100" height="22" rx="11" class="clip-primary"/><text x="256" y="27" text-anchor="middle" class="clip-t w">✓ Bed added</text></g>
+    ${finger([[0, 250, 190], [0.08, 49, 21], [0.16, 49, 21], [0.22, 71, 155], [0.3, 71, 155], [0.38, 172, 81], [0.44, 160, 146], [0.53, 160, 146], [0.58, 57, 90], [0.6, 57, 90], [0.75, 197, 120], [0.82, 197, 120], [0.92, 320, 230]], [0.1, 0.24, 0.46, 0.59])}
+    ${captions([[0, 0.14, "1 · Tap Edit plan"], [0.14, 0.3, "2 · Tap Bed or pots"], [0.3, 0.53, "3 · Type its size"], [0.53, 0.8, "4 · Drag it into place"], [0.8, 1, "Done - it's on your plan"]])}`),
+  add_veg: () => clipSvg("How to add veg to a bed", `
+    <g opacity="0">${during(0, 0.3)}<text x="20" y="30" class="clip-t b">What would you like to grow?</text>
+      ${[["🥕", "Carrots"], ["🍅", "Tomatoes"], ["🧅", "Onions"], ["🥬", "Lettuce"]].map(([e, n], i) => `<rect x="${18 + i * 74}" y="46" width="64" height="76" rx="10" class="clip-card"/>
+        <text x="${50 + i * 74}" y="88" font-size="26" text-anchor="middle">${e}</text><text x="${50 + i * 74}" y="112" text-anchor="middle" class="clip-t s">${n}</text>`).join("")}
+      <rect x="18" y="46" width="64" height="76" rx="10" class="clip-hi" opacity="0">${during(0.17, 0.3)}</rect></g>
+    <g opacity="0">${during(0.3, 0.6)}<rect x="20" y="20" width="280" height="154" rx="12" class="clip-card"/><text x="34" y="44" font-size="18">🥕</text><text x="58" y="42" class="clip-t b">Carrots</text>
+      <text x="34" y="68" class="clip-t">Where?</text><rect x="90" y="56" width="120" height="20" rx="5" class="clip-input"/><text x="98" y="70" class="clip-t">🟫 Bed 1  ▾</text>
+      <text x="34" y="100" class="clip-t ok" opacity="0">✅ Room for 60 carrots in Bed 1${during(0.38, 0.6)}</text>
+      <rect x="60" y="138" width="200" height="26" rx="8" class="clip-primary"/><text x="160" y="155" text-anchor="middle" class="clip-t w">Add carrots 🌱</text></g>
+    <g opacity="0">${during(0.6, 1)}${plotBg(10, 14, 300, 162)}<rect x="125" y="34" width="70" height="128" rx="5" class="clip-bed"/><text x="160" y="29" text-anchor="middle" class="clip-t s">Bed 1</text>
+      <rect x="129" y="38" width="62" height="0" rx="4" class="clip-strip">${anim("height", "0;0;44;44", "0;0.64;0.7;1")}</rect>
+      ${[140, 160, 180].map((x, i) => `<text x="${x}" y="66" font-size="13" text-anchor="middle" opacity="0">🥕${during(0.7 + i * 0.02, 1)}</text>`).join("")}
+      <g opacity="0">${during(0.78, 1)}<g>${moves([[0.78, 0, 16], [0.82, 0, 0]])}<rect x="40" y="132" width="240" height="34" rx="10" class="clip-card"/>
+        <text x="54" y="153" class="clip-t">🌱 Sow carrots outside · from 1 April</text></g></g></g>
+    ${finger([[0, 260, 200], [0.12, 50, 86], [0.2, 50, 86], [0.32, 150, 66], [0.4, 150, 66], [0.48, 160, 151], [0.56, 160, 151], [0.66, 320, 230]], [0.18, 0.52])}
+    ${captions([[0, 0.3, "1 · Pick a crop"], [0.3, 0.6, "2 · Choose its bed - we check it fits"], [0.6, 1, "3 · It's planted, with its first job"]])}`),
+  trace_plot: () => {
+    const P = [[70, 52], [250, 46], [262, 160], [58, 164]], per = 620;
+    return clipSvg("How to draw your plot from the map", `<rect x="10" y="10" width="300" height="166" rx="10" class="clip-sat"/>
+      <ellipse cx="90" cy="70" rx="40" ry="24" class="clip-sat2"/><ellipse cx="220" cy="140" rx="50" ry="22" class="clip-sat2"/><rect x="200" y="58" width="44" height="30" class="clip-roof"/>
+      <path d="M10 28 L310 22" class="clip-road"/>
+      ${P.map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="5" class="clip-dot" opacity="0">${during(0.12 + i * 0.08, 0.98)}</circle>`).join("")}
+      <polygon points="${P.map((p) => p.join(",")).join(" ")}" class="clip-outline" stroke-dasharray="${per}" stroke-dashoffset="${per}">${anim("stroke-dashoffset", `${per};${per};0;0`, "0;0.44;0.56;1")}${anim("fill-opacity", "0;0;.28;.28", "0;0.56;0.6;1")}</polygon>
+      <g opacity="0">${during(0.58, 0.98)}<rect x="122" y="96" width="76" height="20" rx="10" class="clip-card"/><text x="160" y="110" text-anchor="middle" class="clip-t b">12 × 8 m</text></g>
+      <rect x="92" y="78" width="24" height="56" rx="3" class="clip-bed" opacity="0">${during(0.74, 0.98)}</rect><rect x="208" y="104" width="24" height="44" rx="3" class="clip-bed" opacity="0">${during(0.8, 0.98)}</rect>
+      ${finger([[0, 290, 200], [0.1, 70, 52], [0.14, 70, 52], [0.2, 250, 46], [0.22, 250, 46], [0.28, 262, 160], [0.3, 262, 160], [0.36, 58, 164], [0.4, 58, 164], [0.48, 320, 230], [0.7, 320, 230], [0.74, 104, 106], [0.78, 104, 106], [0.86, 320, 230]], [0.12, 0.2, 0.28, 0.36, 0.75])}
+      ${captions([[0, 0.12, "1 · Find your garden on the map"], [0.12, 0.44, "2 · Tap each corner"], [0.44, 0.72, "3 · Your plot appears, to scale"], [0.72, 1, "4 · Add beds inside it"]])}`);
+  },
+  pot_fit: () => clipSvg("How to see what fits in a pot", `<text x="20" y="28" class="clip-t b">How big are your pots?</text>
+    ${[[15, "15cm"], [20, "20cm"], [30, "30cm"], [40, "40cm"]].map(([d, l], i) => { const cx = 50 + i * 74, r = d * 0.7;
+      return `<path d="M${cx - r} ${92 - r * 1.2} L${cx + r} ${92 - r * 1.2} L${cx + r * 0.75} 92 L${cx - r * 0.75} 92 Z" class="clip-pot"/><text x="${cx}" y="108" text-anchor="middle" class="clip-t s">${l}</text>`; }).join("")}
+    <rect x="${50 + 2 * 74 - 32}" y="40" width="64" height="76" rx="10" class="clip-hi" opacity="0">${during(0.16, 1)}</rect>
+    <g opacity="0">${during(0.25, 1)}<text x="20" y="132" class="clip-t b">Fits in each 30cm pot:</text>
+      ${[["🍅", "1 tomato"], ["🥬", "8 lettuces"], ["🌿", "2 basil"], ["🍓", "3 strawberries"]].map(([e, t], i) => `<g opacity="0">${during(0.32 + i * 0.08, 1)}<rect x="${18 + i * 74}" y="142" width="68" height="24" rx="12" class="clip-btn"/>
+        <text x="${52 + i * 74}" y="158" text-anchor="middle" class="clip-t s">${e} ${t}</text></g>`).join("")}</g>
+    <rect x="92" y="142" width="68" height="24" rx="12" class="clip-hi" opacity="0">${during(0.8, 1)}</rect>
+    ${finger([[0, 290, 200], [0.12, 198, 80], [0.2, 198, 80], [0.3, 300, 210], [0.7, 300, 210], [0.78, 126, 154], [0.86, 126, 154], [0.95, 320, 230]], [0.16, 0.8])}
+    ${captions([[0, 0.25, "1 · Choose your pot size"], [0.25, 0.76, "2 · See what fits in it"], [0.76, 1, "3 · Tap one to plant it"]])}`),
+};
+// a demo, or (for people who'd rather not have movement) the same steps as a list
+function clipBlock(name) {
+  if (!CLIPS[name]) return "";
+  if (reduceMotion()) return `<ol class="steps clip-steps">${CLIP_STEPS[name].map((t) => `<li>${esc(t)}</li>`).join("")}</ol>`;
+  return `<div class="clip-box">${CLIPS[name]()}</div>`;
+}
 
 // ---- the guided tour: a step at a time, pointing at the real screen ------------------------------------------
 const TOUR = { steps: null, i: 0, path: null };
@@ -455,7 +541,7 @@ function drawTour(el, st, i) {
   box.innerHTML = `<div class="tour-block"></div><div class="tour-ring"></div>
     <div class="tour-bubble" role="dialog" aria-modal="true" aria-labelledby="tour-t" aria-describedby="tour-b">
       <div class="small muted">Step ${i + 1} of ${TOUR.steps.length}</div>
-      <h3 id="tour-t">${esc(st.title)}</h3><p id="tour-b">${esc(st.body)}</p>
+      <h3 id="tour-t">${esc(st.title)}</h3><p id="tour-b">${esc(st.body)}</p>${st.clip ? clipBlock(st.clip) : ""}
       ${st.why ? `<details class="tour-why"><summary>Why this matters</summary><p class="small">${esc(st.why)}</p></details>` : ""}
       <div class="row" style="justify-content:space-between;margin-top:10px"><button class="btn small ghost" id="tour-skip">Skip tour</button>
         <span class="row" style="gap:6px">${i ? `<button class="btn small" id="tour-back">Back</button>` : ""}<button class="btn small primary" id="tour-next">${last ? "Done" : st.optional ? "Show me" : "Next"}</button></span></div></div>`;
@@ -463,7 +549,8 @@ function drawTour(el, st, i) {
     const r = el.getBoundingClientRect(), pad = 6, ring = box.querySelector(".tour-ring"), b = box.querySelector(".tour-bubble");
     Object.assign(ring.style, { left: r.left - pad + "px", top: r.top - pad + "px", width: r.width + pad * 2 + "px", height: r.height + pad * 2 + "px" });
     const below = r.bottom + 12, bh = b.offsetHeight, vh = innerHeight;
-    b.style.top = (below + bh < vh - 8 ? below : Math.max(8, r.top - bh - 12)) + "px";
+    // below the thing if it fits, else above it, else along the bottom of the screen
+    b.style.top = (below + bh < vh - 8 ? below : r.top - bh - 12 > 8 ? r.top - bh - 12 : Math.max(8, vh - bh - 8)) + "px";
   };
   el.scrollIntoView({ block: "center", behavior: reduceMotion() ? "auto" : "smooth" });
   setTimeout(place, reduceMotion() ? 0 : 350);

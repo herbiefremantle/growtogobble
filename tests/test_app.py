@@ -1034,3 +1034,9 @@ def test_samples_are_left_out_of_alerts_and_the_calendar_feed(client):
     me = client.get("/api/me").json()
     feed = client.get(me["calendar_path"]).text
     assert "tomatoes" not in feed.lower() and "chillies" not in feed.lower()
+
+
+def test_tour_steps_show_how_with_moving_demos():
+    from app import onboarding as ob
+    for space, clips in (("small", {"add_bed", "add_veg", "trace_plot"}), ("pots", {"pot_fit", "add_veg", "add_bed"}), ("large", {"trace_plot", "add_bed", "add_veg"})):
+        assert {s.get("clip") for s in ob.tour({"space": space})["steps"]} >= clips
