@@ -855,3 +855,4 @@ svg.plot .grp-tag { fill: #fff; font-weight: 800; paint-order: stroke; stroke: r
 .reel-play { position: absolute; left: 50%; bottom: 34px; transform: translateX(-50%); border: 0; border-radius: 999px; padding: 10px 18px;
   font: 800 14px "Figtree", sans-serif; background: #fff; color: var(--forest); box-shadow: 0 6px 18px -6px rgba(0, 0, 0, .35); cursor: pointer; }
 .reel.still { padding: 14px 18px; }
+.clip .clip-attr { font: 600 7px "Figtree", sans-serif; fill: #fff; opacity: .85; }
