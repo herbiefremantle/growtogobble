@@ -464,7 +464,12 @@ document.addEventListener("click", async (e) => {
   const drop = e.target.closest("[data-dropcrop]");
   if (drop) {
     e.stopPropagation();
-    const c = crop(Number(drop.dataset.dropcrop)), p = plant(c.plant_id), row = rowLabel(c);
+    const c = crop(Number(drop.dataset.dropcrop)), p = plant(c.plant_id), row = rowLabel(c), m = mixOf(c);
+    if (m) {
+      if (!confirm(`Remove the whole ${m.name.split(":")[0].toLowerCase()} planting${c.space_name ? " in " + c.space_name : ""} (${groupOf(c).length} plants)? Their jobs go too.`)) return;
+      await change("DELETE", `/api/crops/${c.id}?whole_group=true`, null, `${m.name.split(":")[0]} removed from your plan`);
+      return;
+    }
     if (!confirm(`Remove ${p.name.toLowerCase()}${row ? " (" + row + ")" : ""}${c.space_name ? " in " + c.space_name : ""} from your plan? Its jobs go too.`)) return;
     await change("DELETE", `/api/crops/${c.id}`, null, `${p.name} removed from your plan`);
     return;
@@ -503,7 +508,7 @@ document.addEventListener("click", async (e) => {
   const bp = e.target.closest("[data-bedplan]");
   if (bp) { openBedPlan(Number(bp.dataset.bedplan)); return; }
   const mx = e.target.closest("[data-open-mix]");
-  if (mx) { openMix(mx.dataset.openMix); return; }
+  if (mx) { openMix(mx.dataset.openMix, mx.dataset.space ? Number(mx.dataset.space) : null); return; }
   const sz = e.target.closest("[data-setpot]");
   if (sz) { const sp = space(Number(sz.dataset.space)); await patchSpace(sp, { pot_size: sz.dataset.setpot, pot_count: sp.pot_count || 1 }, `🪴 ${potName(potSize(sz.dataset.setpot))} - here's what fits`); return; }
   const fp = e.target.closest("[data-flowers]");
@@ -1102,7 +1107,14 @@ function plotSvg() {
   const beds = items.filter((i) => i.type === "space").map((i) => {
     const s = i.s, { x, y, w, h } = i;
     const here = crops.filter((c) => c.space_id === s.id);
-    const now = here.filter((c) => inGround(c, T)), later = here.length - now.length;
+    const growing = here.filter((c) => inGround(c, T)), later = here.length - growing.length;
+    // sown together = one strip, as big as its biggest plant's room, with all of them in it
+    const now = [];
+    growing.forEach((c) => {
+      const u = c.mixgrp && now.find((x) => x.mixgrp === c.mixgrp);
+      if (!u) now.push({ ...c, emojis: [plant(c.plant_id).emoji] });
+      else { u.area = Math.max(u.area, c.area); u.qty += c.qty; u.emojis.push(plant(c.plant_id).emoji); }
+    });
     const target = placing && plant(crop(placing).plant_id).where.includes(s.kind === "pot" ? "pot" : "bed");
     let inner = "";
     if (s.kind === "pot") {
@@ -1127,8 +1139,8 @@ function plotSvg() {
         const rw = across ? w - 0.08 : depth - 0.04, rh = across ? depth - 0.04 : h - 0.08;
         const n = Math.max(1, Math.min(Math.floor(short / 0.3), c.qty, 8)), fs = Math.min(0.26, depth * 0.75, px(26));
         const emojis = Array.from({ length: n }, (_, k) => across
-          ? `<text x="${x + (w / n) * (k + 0.5)}" y="${ry + rh / 2 + fs * 0.35}" font-size="${fs}" text-anchor="middle">${p.emoji}</text>`
-          : `<text x="${rx + rw / 2}" y="${y + (h / n) * (k + 0.5) + fs * 0.35}" font-size="${fs}" text-anchor="middle">${p.emoji}</text>`).join("");
+          ? `<text x="${x + (w / n) * (k + 0.5)}" y="${ry + rh / 2 + fs * 0.35}" font-size="${fs}" text-anchor="middle">${c.emojis[k % c.emojis.length]}</text>`
+          : `<text x="${rx + rw / 2}" y="${y + (h / n) * (k + 0.5) + fs * 0.35}" font-size="${fs}" text-anchor="middle">${c.emojis[k % c.emojis.length]}</text>`).join("");
         return `<g class="crop" data-open-crop="${c.id}"><rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" rx="0.06" fill="${FAMILY_COLOUR[p.family] || "#9fd88f"}"/>${emojis}</g>`;
       }).join("") + (clipped ? "</g>" : "") + (need < long * 0.9 && !plotEdit ? `<text x="${across ? x + w / 2 : x + at + (w - at) / 2}" y="${across ? y + at + (h - at) / 2 + 0.1 : y + h / 2 + 0.1}" font-size="${Math.min(0.3, px(22))}" text-anchor="middle" class="plus">＋</text>` : "");
     }
@@ -2018,7 +2030,8 @@ function drawSpace(id) {
   const steps = pot ? S.cat.pot_steps : S.cat.nodig_steps;
   const done = new Set(s.nodig_done);
   const here = activeCrops().filter((c) => c.space_id === s.id);
-  const inGroup = (g) => here.filter((c) => plant(c.plant_id).group === g);
+  const plantings = [...new Set(here.filter((c) => c.mixgrp).map((c) => c.mixgrp))].map((g) => here.filter((c) => c.mixgrp === g));
+  const inGroup = (g) => here.filter((c) => !c.mixgrp && plant(c.plant_id).group === g);
   const veg = inGroup("veg"), herbs = inGroup("herb"), comps = inGroup("companion"), flowers = inGroup("flower");
   // companions that would help the veg in this bed, and aren't here yet
   const helpers = {};
@@ -2046,12 +2059,16 @@ function drawSpace(id) {
     <div data-panel="plants">
     ${here.length ? `<button class="card row costcard" data-bedplan="${s.id}" style="justify-content:space-between;width:100%">
       <span><b>About ${money(s.cost.total)} to plant</b><span class="small muted" style="display:block">${s.cost.to_buy < s.cost.total ? `${money(s.cost.to_buy)} still to buy · ` : ""}where each plant goes</span></span><span class="small" style="color:var(--forest-2);font-weight:700">Plan ›</span></button>` : ""}
-    <div class="card"><h3>Growing here</h3>${veg.map(inBedRow).join("") || (here.length ? "" : `<p class="small muted" style="margin:0">Nothing yet.</p>`)}
+    <div class="card"><h3>Growing here</h3>
+      ${plantings.map((g) => { const m = mixOf(g[0]); return `<div class="mixbox"><div class="mixhead"><b>${m ? m.emoji + " " + esc(m.name) : "Sown together"}</b><span class="small muted">one planting</span></div>${g.map(inBedRow).join("")}</div>`; }).join("")}
+      ${veg.map(inBedRow).join("") || (here.length ? "" : `<p class="small muted" style="margin:0 0 10px">Nothing growing here yet.</p>`)}
       ${herbs.length ? `<h3 style="margin-top:14px">🌿 Herbs</h3>${herbs.map(inBedRow).join("")}` : ""}
       ${comps.length ? `<h3 style="margin-top:14px">🐞 Companion plants</h3>${comps.map(inBedRow).join("")}` : ""}
       ${flowers.length ? `<h3 style="margin-top:14px">🌸 Flowers</h3>${flowers.map(inBedRow).join("")}` : ""}
       <div class="row" style="margin-top:10px"><a class="btn small" href="#/plants" data-close>Add plants</a>
       ${here.length ? `<button class="btn small ghost" data-empty="${s.id}">Take everything out</button>` : ""}</div></div>
+    ${!here.length && !pot ? `<div class="card"><h3>Grow together</h3><p class="small muted" style="margin:0 0 8px">Fill the bed with plants that share the space - added as one planting.</p>
+      <div class="nbs">${S.cat.mixes.map((m) => mixButton(m.id, s.id)).join("")}</div></div>` : ""}
     ${pot ? "" : build}
     </div>
     <div data-panel="ideas" hidden>
@@ -2063,6 +2080,7 @@ function drawSpace(id) {
     ${allRound.length ? `<div class="card"><h3>Keep pests off</h3><p class="small" style="margin:0 0 8px">Good all-rounders to dot round any ${s.kind === "allotment" ? "allotment" : "bed"} - they bring in bees and the bugs that eat greenfly, or lure pests away:</p>
       <div class="nbs">${allRound.map((id2) => { const q = plant(id2); return `<div class="nb comp"><span class="e">${q.emoji}</span><span style="flex:1"><b>${esc(q.name)}</b>
         <small>${esc(q.blurb)}</small></span><button class="btn small" data-addcomp="${id2}" data-space="${s.id}">➕ Add</button></div>`; }).join("")}</div></div>` : ""}
+    ${here.length && !pot ? `<div class="card"><h3>Grow together</h3><div class="nbs">${S.cat.mixes.slice(0, 3).map((m) => mixButton(m.id, s.id)).join("")}</div></div>` : ""}
     <button class="card row costcard" data-flowers="${s.id}" style="justify-content:space-between;width:100%"><span><b>Flower ideas</b><span class="small muted" style="display:block">Flowers that go together, laid out for this ${pot ? "pot" : "bed"}</span></span><span class="small" style="color:var(--forest-2);font-weight:700">Show ›</span></button>
     </div>
     <div data-panel="about" hidden>
@@ -2132,6 +2150,8 @@ function drawCrop(id) {
   const row = rowLabel(c);
   openSheet(`<div class="plant-head"><span class="blob l${p.level} ${blobCls(p)}">${pic(p)}</span><div><h2 style="margin:0">${esc(p.name)}${c.variety ? ` <span class="vname">'${esc(c.variety)}'</span>` : ""}${row ? ` <span class="chip grey" style="vertical-align:middle">${row}</span>` : ""}</h2>
       <div class="stage" style="font-size:20px;margin-top:4px">${stagesFor(plant(c.plant_id)).map((e, i) => `<span class="${i <= c.stage ? "on" : ""}">${e}</span>`).join("")}</div></div></div>
+    ${c.mixgrp ? `<div class="mixbox mixnote"><div class="mixhead"><b>${mixOf(c) ? mixOf(c).emoji + " " + esc(mixOf(c).name) : "Sown together"}</b><button class="btn small ghost" id="ungroup">Split them up</button></div>
+      <p class="small" style="margin:4px 0 0">Planted together with ${groupOf(c).filter((x) => x.id !== c.id).map((x) => esc(plant(x.plant_id).name.toLowerCase())).join(" and ")}. Moving or removing it moves or removes the whole planting.</p></div>` : ""}
     <div class="seg sticky-tabs" role="tablist">
       <button role="tab" data-pane="jobs" class="on">📋 Jobs</button><button role="tab" data-pane="details">⚙️ Details</button><button role="tab" data-pane="next">🔁 What next</button></div>
     <div data-panel="jobs">
@@ -2183,9 +2203,12 @@ function drawCrop(id) {
   const fin = $("#finish");
   if (fin) fin.onclick = () => change("POST", `/api/crops/${c.id}/finish`, null, "Cleared - the space is free for something new 🌱");
   $("#remove").onclick = async () => {
-    if (!confirm(`Remove ${p.name} from your garden?`)) return;
-    if (await change("DELETE", `/api/crops/${c.id}`, null, "Removed")) closeSheet();
+    const m = mixOf(c);
+    if (!confirm(m ? `Remove the whole ${m.name.split(":")[0].toLowerCase()} planting (${groupOf(c).length} plants)?` : `Remove ${p.name} from your garden?`)) return;
+    if (await change("DELETE", `/api/crops/${c.id}${m ? "?whole_group=true" : ""}`, null, "Removed")) closeSheet();
   };
+  const ug = $("#ungroup");
+  if (ug) ug.onclick = () => change("PATCH", `/api/crops/${c.id}`, { plant_id: c.plant_id, ungroup: true }, "Split up - they're separate crops now");
 }
 
 // ---- plants ----------------------------------------------------------------------------------------
@@ -2502,8 +2525,12 @@ function bedLayout(s) {
   const used = (c) => c.area || plant(c.plant_id).area_each * c.qty;
   const edge = here.filter((c) => plant(c.plant_id).group === "companion");
   const byPlant = {};
-  here.filter((c) => !edge.includes(c)).forEach((c) => (byPlant[c.plant_id] = byPlant[c.plant_id] || []).push(c));
-  const groups = Object.values(byPlant).map((cs) => ({ crops: cs, p: plant(cs[0].plant_id), need: cs.reduce((m, c) => m + used(c), 0) }));
+  here.filter((c) => !edge.includes(c)).forEach((c) => { const k = c.mixgrp ? "g" + c.mixgrp : c.plant_id; (byPlant[k] = byPlant[k] || []).push(c); });
+  const groups = Object.values(byPlant).map((cs) => {
+    const tallest = cs.map((c) => plant(c.plant_id)).sort((a, b) => b.height_cm - a.height_cm)[0];
+    return { crops: cs, p: tallest, mix: mixOf(cs[0]) && cs[0].mixgrp ? mixOf(cs[0]) : null, plants: [...new Set(cs.map((c) => c.plant_id))],
+      emojis: cs.map((c) => plant(c.plant_id).emoji), need: cs[0].mixgrp ? Math.max(...cs.map(used)) : cs.reduce((m, c) => m + used(c), 0) };
+  });
   const area = (s.usage && s.usage.area) || sz.w * sz.h, need = groups.reduce((n, g) => n + g.need, 0);
   const squeeze = need > area ? area / need : 1;
   // tall (80cm+), medium and short: one band each, with the plants of that height side by side in it
@@ -2546,7 +2573,7 @@ function bedPlanSvg(L) {
       const inner = Array.from({ length: steps + 1 }, (_, i) => at(part.x1 - ((part.x1 - part.x0) * i) / steps, r0));
       bands += `<polygon points="${[...outer, ...inner].map((q) => q.join(",")).join(" ")}" fill="${tone(k)}"/>`;
       const r = a === 0 && tier.parts.length === 1 ? 0 : (r0 + r1) / 2, m = r === 0 ? 1 : Math.max(1, Math.min(count(part), Math.round((part.x1 - part.x0) * 12)));
-      for (let i = 0; i < m; i++) { const q = at(part.x0 + ((part.x1 - part.x0) * (i + 0.5)) / m, r || 0.001); mark(q[0], q[1], part.p.emoji); }
+      for (let i = 0; i < m; i++) { const q = at(part.x0 + ((part.x1 - part.x0) * (i + 0.5)) / m, r || 0.001); mark(q[0], q[1], part.emojis[i % part.emojis.length]); }
       const q = at((part.x0 + part.x1) / 2, r ? r : 0.001); num(q[0] - (r ? 0 : fs), q[1] - fs * 0.9, part.n);
       return;
     }
@@ -2554,7 +2581,7 @@ function bedPlanSvg(L) {
       const pt2 = (c, f) => [c * w * (1 - f), c * h * f];
       bands += `<polygon points="${[pt2(b, part.x0), pt2(b, part.x1), pt2(a, part.x1), pt2(a, part.x0)].map((q) => q.join(",")).join(" ")}" fill="${tone(k)}"/>`;
       const m = Math.max(1, Math.min(count(part), Math.round(((part.x1 - part.x0) * mid * Math.hypot(w, h)) / (fs * 1.3))));
-      for (let i = 0; i < m; i++) { const q = pt2(mid, part.x0 + ((part.x1 - part.x0) * (i + 0.5)) / m); mark(q[0], q[1], part.p.emoji); }
+      for (let i = 0; i < m; i++) { const q = pt2(mid, part.x0 + ((part.x1 - part.x0) * (i + 0.5)) / m); mark(q[0], q[1], part.emojis[i % part.emojis.length]); }
       const q = pt2(mid, (part.x0 + part.x1) / 2); num(q[0] - fs * 0.6, q[1] - fs * 0.6, part.n);
       return;
     }
@@ -2565,7 +2592,7 @@ function bedPlanSvg(L) {
       const yy = (a + ((b - a) * (r + 0.5)) / rowsN) * h, half = L.t === "triangle" ? (yy / h) * (w / 2) : w / 2;
       const x0 = Math.max(part.x0 * w, w / 2 - half), x1 = Math.min(part.x1 * w, w / 2 + half), span = Math.max(0, x1 - x0);
       const m = Math.max(1, Math.min(Math.ceil(count(part) / rowsN), Math.round(span / (fs * 1.3))));
-      for (let i = 0; i < m; i++) mark(x0 + (span * (i + 0.5)) / m, yy, part.p.emoji);
+      for (let i = 0; i < m; i++) mark(x0 + (span * (i + 0.5)) / m, yy, part.emojis[(i + r) % part.emojis.length]);
     }
     const yy = mid * h, half = L.t === "triangle" ? (yy / h) * (w / 2) : w / 2;
     num(Math.min(part.x1 * w, w / 2 + half) - fs * 0.45, L.t === "triangle" ? yy : a * h + fs * 0.45, part.n);
@@ -2586,14 +2613,14 @@ function openBedPlan(id) {
 function drawBedPlan(id) {
   const s = space(id), L = bedLayout(s), cost = s.cost;
   const parts = L.tiers.flatMap((tier) => tier.parts.map((part) => ({ tier, part })));
-  const zoneOf = (pid) => parts.find((x) => x.part.p.id === pid);
+  const zoneOf = (pid) => parts.find((x) => x.part.plants.includes(pid));
   const order = (it) => (zoneOf(it.plant_id) ? zoneOf(it.plant_id).part.n : 99);
   const row = (it) => {
     const p = plant(it.plant_id), z = zoneOf(it.plant_id), crops = activeCrops().filter((c) => c.space_id === id && c.plant_id === it.plant_id && c.method === it.method);
     const started = crops.some((c) => c.sown_on || c.planted_on), vs = [...new Set(crops.map((c) => c.variety).filter(Boolean))];
     return `<div class="bp-row"><span class="bp-num">${z ? z.part.n : "•"}</span><span class="e">${p.emoji}</span><div style="flex:1;min-width:0">
       <b>${it.qty} × ${esc(p.name)}${vs.length ? ` <span class="vname">'${vs.map(esc).join("', '")}'</span>` : ""}</b>
-      <div class="small">${z ? esc(zoneWords(L, z.tier, z.part)) : p.group === "companion" ? "Dotted round the edges and ends, between your veg" : ""}</div>
+      <div class="small">${z && z.part.mix ? `${z.part.mix.emoji} Part of ${esc(z.part.mix.name.toLowerCase())}, sown together - ` : ""}${z ? esc(zoneWords(L, z.tier, z.part)) : p.group === "companion" ? "Dotted round the edges and ends, between your veg" : ""}</div>
       ${started ? `<div class="small muted">${methodLabel(p, it.method)} - already started</div>`
         : `<div class="chips" style="margin-top:4px">${Object.keys(it.options).map((m) => `<button class="btn small ${m === it.method ? "primary" : "ghost"}" data-bpm="${it.plant_id}|${it.method}|${m}">${methodLabel(p, m)} · ${money(it.options[m])}</button>`).join("")}</div>`}
       <div class="small muted">🛒 ${esc(it.how)} = ${money(it.total)} · <b>${pence(it.per_plant)} a plant</b>${it.note ? ` (${esc(it.note)})` : ""}${it.bought ? " · ✅ bought" : ""}</div></div><b class="bp-cost">${money(it.total)}</b></div>`;
@@ -2617,11 +2644,15 @@ function drawBedPlan(id) {
   }));
 }
 
+// Plantings sown together stay one planting: the crops in it, and its name
+const mixOf = (c) => (c && c.mix ? S.cat.mixes.find((m) => m.id === c.mix) : null);
+const groupOf = (c) => (c && c.mixgrp ? activeCrops().filter((x) => x.mixgrp === c.mixgrp) : [c]);
+
 // Sowing together: crops sharing a row, each picked before the next needs the room
 const mixOrder = (m) => [...m.plants].sort((a, b) => a.ready - b.ready);
-function mixButton(id) {
+function mixButton(id, spaceId) {
   const m = S.cat.mixes.find((x) => x.id === id);
-  return `<button class="nb" data-open-mix="${m.id}"><span class="e">${m.emoji}</span><span><b>${esc(m.name)}</b>
+  return `<button class="nb" data-open-mix="${m.id}" ${spaceId ? `data-space="${spaceId}"` : ""}><span class="e">${m.emoji}</span><span><b>${esc(m.name)}</b>
     <small>${mixOrder(m).map((x) => plant(x.plant_id).emoji).join(" → ")} · picked one after another</small></span></button>`;
 }
 function mixStrip() {
@@ -2629,7 +2660,7 @@ function mixStrip() {
     <div class="strip">${S.cat.mixes.map((m) => `<button class="tile" data-open-mix="${m.id}"><span class="blob">${m.emoji}</span><span class="n">${esc(m.name)}</span>
       <span class="when">${mixOrder(m).map((x) => plant(x.plant_id).emoji).join(" → ")}</span></button>`).join("")}</div>`;
 }
-function openMix(id) {
+function openMix(id, spaceId) {
   const m = S.cat.mixes.find((x) => x.id === id), order = mixOrder(m), beds = S.g.spaces.filter((sp) => sp.kind !== "pot");
   S.sheet = null;
   openSheet(`<h2>${m.emoji} ${esc(m.name)}</h2><p>${esc(m.why)}</p>
@@ -2641,13 +2672,14 @@ function openMix(id) {
       ${order.map((x) => { const q = plant(x.plant_id); return q.seedling ? `<p style="margin:0 0 8px"><b>${q.emoji} ${esc(q.name)}:</b> ${esc(q.seedling)}</p>` : ""; }).join("")}
       <ul class="small" style="margin:0;padding-left:18px">${S.cat.weed_tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></div>
     <div class="card"><h3>🌱 Add it to my garden</h3>
-      ${beds.length ? `<label class="field" for="mixbed">Which bed?</label><select id="mixbed"><option value="">📍 Decide later</option>${beds.map((b) => `<option value="${b.id}">${esc(b.name)}</option>`).join("")}</select>` : ""}
-      <p class="small muted" style="margin:8px 0 0">Adds ${order.map((x) => `${x.qty} ${esc(plant(x.plant_id).name.toLowerCase())}`).join(", ")} - about a 1m row. Each gets its own dates and jobs; change the numbers on each after.</p>
+      ${beds.length ? `<label class="field" for="mixbed">Which bed?</label><select id="mixbed"><option value="">📍 Decide later</option>${beds.map((b) => `<option value="${b.id}" ${b.id === spaceId ? "selected" : ""}>${esc(b.name)}</option>`).join("")}</select>` : ""}
+      <p class="small muted" style="margin:8px 0 0">Adds ${order.map((x) => `${x.qty} ${esc(plant(x.plant_id).name.toLowerCase())}`).join(", ")} as <b>one planting</b> - they share the space and stay together in the bed. Each still gets its own dates and jobs.</p>
       <button class="btn primary wide" id="mixgo" style="margin-top:12px">Add the mix 🤝</button></div>`);
   $("#mixgo").onclick = async () => {
     const sel = $("#mixbed");
-    if (await change("POST", "/api/crops/bulk", { crops: m.plants.map((x) => ({ plant_id: x.plant_id, quantity: x.qty })), space_id: sel && sel.value ? Number(sel.value) : null },
-      `${m.emoji} ${m.name} added - each one has its own dates 📅`)) closeSheet();
+    const where = sel && sel.value ? Number(sel.value) : null;
+    if (await change("POST", "/api/crops/bulk", { crops: m.plants.map((x) => ({ plant_id: x.plant_id, quantity: x.qty })), space_id: where, mix: m.id },
+      `${m.emoji} ${m.name} planted together - each has its own jobs 📅`)) { if (where) openSpace(where); else closeSheet(); }
   };
 }
 

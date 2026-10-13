@@ -488,11 +488,17 @@ def pot_capacity(space):
 def usage(space, crops_with_jobs, extra=None):
     """How full a bed gets. Returns the busiest moment: {'peak': m2, 'on': date, 'area': m2, 'crops': [ids]}.
     `extra` is a (crop, jobs) pair being tried out, not yet saved."""
-    spans = []
+    spans, groups = [], {}
     for crop, jobs in list(crops_with_jobs) + ([extra] if extra else []):
         if crop.get("space_id") != space["id"] or crop.get("finished_on"):
             continue
         start, end = crop_starts(crop, jobs), crop_finishes(crop, jobs)
+        if start and end and crop.get("mixgrp") and not pot_capacity(space):
+            # sown together: they share one patch - the biggest one's room, while any of them is growing
+            g = groups.setdefault(crop["mixgrp"], [start, end, 0.0, crop.get("id")])
+            g[0], g[1] = min(g[0], start), max(g[1], end)
+            g[2] = max(g[2], quantity(crop) * area_each(catalogue.BY_ID[crop["plant_id"]]))
+            continue
         if start and end:
             plant = catalogue.BY_ID[crop["plant_id"]]
             if pot_capacity(space):  # how many pots it fills
@@ -500,6 +506,7 @@ def usage(space, crops_with_jobs, extra=None):
                 spans.append((start, end, quantity(crop) / fits if fits else 99.0, crop.get("id")))
             else:
                 spans.append((start, end, quantity(crop) * area_each(plant), crop.get("id")))
+    spans += [tuple(g) for g in groups.values()]
     points = [sp[0] for sp in spans]  # the busiest moment is always when something goes in
     if extra:  # only moments while the new crop would be in the ground matter
         new = [sp for sp in spans if sp[3] == extra[0].get("id")]
@@ -721,7 +728,7 @@ def suggest_layout(spaces, crops_with_jobs, today, only_unplaced=False):
       - plants that like pots best (herbs, blueberries, chillies...) go in pots when there are some
     Returns [{crop_id, space_id, from_space_id, note}]."""
     work = [(dict(c), j) for c, j in crops_with_jobs]
-    moving = [(c, j) for c, j in work if not c.get("finished_on") and movable(c, j, today)
+    moving = [(c, j) for c, j in work if not c.get("finished_on") and movable(c, j, today) and not c.get("mixgrp")
               and (not only_unplaced or not c.get("space_id"))]
     ids = {c["id"] for c, _ in moving}
     for c, _ in moving:  # start from a clean slate for everything that's being placed

@@ -778,3 +778,27 @@ def test_the_app_tells_phones_when_a_new_version_is_live(client):
     assert 'name="app-version" content="%s"' % version in page.text
     assert "/static/app.js?v=%s" % version in page.text and page.headers["cache-control"] == "no-cache"
     assert client.get("/health").headers["x-app-version"] == version
+
+
+def test_sown_together_stays_one_planting(client):
+    _join(client)
+    bed = client.post("/api/spaces", json={"name": "Bed 1", "kind": "bed", "width_m": 2, "length_m": 2}).json()["spaces"][0]["id"]
+    bed2 = client.post("/api/spaces", json={"name": "Bed 2", "kind": "bed"}).json()["spaces"][-1]["id"]
+    trio = [{"plant_id": "sweetcorn", "quantity": 4}, {"plant_id": "french_beans", "quantity": 4}, {"plant_id": "squash", "quantity": 1}]
+    g = client.post("/api/crops/bulk", json={"crops": trio, "space_id": bed, "mix": "three_sisters"}).json()
+    crops = [c for c in g["crops"] if c["space_id"] == bed]
+    assert len(crops) == 3 and {c["mix"] for c in crops} == {"three_sisters"} and len({c["mixgrp"] for c in crops}) == 1
+    # they share one patch: the biggest footprint, not all three added up
+    use = next(s for s in g["spaces"] if s["id"] == bed)["usage"]
+    assert use["peak"] == 1.5  # the squash (1.5 m²) - not squash + sweetcorn (0.81) + beans (0.18)
+    # moving one moves them all; taking one out takes them all out
+    g = client.patch("/api/crops/%d" % crops[1]["id"], json={"plant_id": "french_beans", "space_id": bed2}).json()
+    assert {c["space_id"] for c in g["crops"] if c["mix"]} == {bed2}
+    # removing the whole planting
+    g = client.delete("/api/crops/%d?whole_group=true" % crops[0]["id"]).json()
+    assert not g["crops"]
+    # split up: separate crops again
+    g = client.post("/api/crops/bulk", json={"crops": trio, "space_id": bed, "mix": "three_sisters"}).json()
+    first = g["crops"][0]
+    g = client.patch("/api/crops/%d" % first["id"], json={"plant_id": first["plant_id"], "ungroup": True}).json()
+    assert not any(c["mix"] for c in g["crops"])

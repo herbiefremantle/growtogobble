@@ -767,6 +767,7 @@ class CropIn(BaseModel):
     planted_on: Optional[str] = None
     harvested_on: Optional[str] = None
     variety: Optional[str] = None     # e.g. 'Nantes 2' - "" clears it
+    ungroup: bool = False             # split a sow-together planting back into separate crops
 
 
 def _variety_name(v):
@@ -834,6 +835,7 @@ def add_crop(body: CropIn, user=Depends(auth.current_user)):
 class CropsIn(BaseModel):
     crops: list                       # plant ids, or {"plant_id", "quantity"}
     space_id: Optional[int] = None    # a whole group of flowers going into one bed, when the user taps "add these"
+    mix: Optional[str] = None         # sown together (app/extras.py MIXES): kept as one planting from then on
 
 
 @app.post("/api/crops/bulk")
@@ -843,11 +845,15 @@ def add_crops(body: CropsIn, user=Depends(auth.current_user)):
     with db.connect() as conn:
         if body.space_id is not None:
             _own(conn, "spaces", body.space_id, user)
+        mix = body.mix if any(m["id"] == body.mix for m in catalogue.MIXES) else None
+        made = []
         for item in body.crops[:40]:
             plant_id, qty = (item.get("plant_id"), item.get("quantity")) if isinstance(item, dict) else (item, None)
             plant = catalogue.BY_ID.get(str(plant_id))
             if plant:
-                _new_crop(conn, user, plant["id"], body.space_id, None, quantity=qty)
+                made.append(_new_crop(conn, user, plant["id"], body.space_id, None, quantity=qty))
+        if mix and len(made) > 1:  # one planting: the group is known by its first crop's id
+            conn.execute("UPDATE crops SET mix = ?, mixgrp = ? WHERE id IN (%s)" % ",".join("?" * len(made)), [mix, made[0]] + made)
         return garden.payload(conn, user)
 
 
@@ -928,11 +934,16 @@ def space_check(plant_id: str, space_id: Optional[int] = None, method: Optional[
 def edit_crop(crop_id: int, body: CropIn, user=Depends(auth.current_user)):
     with db.connect() as conn:
         crop = _own(conn, "crops", crop_id, user)
+        # plants sown together move together: a bed change applies to the whole planting
+        members = _group_ids(conn, crop, user)
+        where = "id IN (%s)" % ",".join("?" * len(members))
+        if body.ungroup:
+            conn.execute("UPDATE crops SET mix = NULL, mixgrp = NULL WHERE " + where, members)
         if body.space_id is not None:
             _own(conn, "spaces", body.space_id, user)
-            conn.execute("UPDATE crops SET space_id = ? WHERE id = ?", (body.space_id, crop_id))
+            conn.execute("UPDATE crops SET space_id = ? WHERE " + where, [body.space_id] + members)
         elif body.clear_space:
-            conn.execute("UPDATE crops SET space_id = NULL WHERE id = ?", (crop_id,))
+            conn.execute("UPDATE crops SET space_id = NULL WHERE " + where, members)
         if body.quantity is not None:
             conn.execute("UPDATE crops SET quantity = ? WHERE id = ?", (_qty(body.quantity), crop_id))
         if body.variety is not None:
@@ -976,12 +987,25 @@ def finish_crop(crop_id: int, user=Depends(auth.current_user)):
 
 
 @app.delete("/api/crops/{crop_id}")
-def delete_crop(crop_id: int, user=Depends(auth.current_user)):
+def delete_crop(crop_id: int, whole_group: bool = False, user=Depends(auth.current_user)):
+    """Remove a crop - or, for plants sown together, the whole planting."""
     with db.connect() as conn:
-        _own(conn, "crops", crop_id, user)
-        conn.execute("DELETE FROM crops WHERE id = ?", (crop_id,))
-        conn.execute("DELETE FROM done WHERE user_id = ? AND key LIKE ?", (user["id"], "c%d:%%" % crop_id))
+        crop = _own(conn, "crops", crop_id, user)
+        for cid in (_group_ids(conn, crop, user) if whole_group else [crop_id]):
+            conn.execute("DELETE FROM crops WHERE id = ?", (cid,))
+            conn.execute("DELETE FROM done WHERE user_id = ? AND key LIKE ?", (user["id"], "c%d:%%" % cid))
+        if not whole_group and crop.get("mixgrp"):  # one taken out of a group: a group of one isn't a group
+            left = conn.execute("SELECT id FROM crops WHERE user_id = ? AND mixgrp = ?", (user["id"], crop["mixgrp"])).fetchall()
+            if len(left) < 2:
+                conn.execute("UPDATE crops SET mix = NULL, mixgrp = NULL WHERE user_id = ? AND mixgrp = ?", (user["id"], crop["mixgrp"]))
         return garden.payload(conn, user)
+
+
+def _group_ids(conn, crop, user):
+    """This crop and the others it was sown together with (just itself if it isn't in a group)."""
+    if not crop.get("mixgrp"):
+        return [crop["id"]]
+    return [r["id"] for r in conn.execute("SELECT id FROM crops WHERE user_id = ? AND mixgrp = ?", (user["id"], crop["mixgrp"]))]
 
 
 class DoneIn(BaseModel):

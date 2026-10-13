@@ -141,7 +141,8 @@ MIGRATIONS = [("spaces", "width_m", "REAL"), ("spaces", "length_m", "REAL"), ("c
               ("users", "path_w", "REAL"), ("spaces", "grp", "INTEGER"), ("features", "grp", "INTEGER"),
               ("features", "variety", "TEXT"), ("spaces", "shape", "TEXT"), ("spaces", "sun", "TEXT"),
               ("crops", "variety", "TEXT"), ("features", "cultivar", "TEXT"),
-              ("spaces", "pot_size", "TEXT"), ("spaces", "pot_count", "INTEGER")]
+              ("spaces", "pot_size", "TEXT"), ("spaces", "pot_count", "INTEGER"),
+              ("crops", "mix", "TEXT"), ("crops", "mixgrp", "INTEGER")]
 
 
 def init():

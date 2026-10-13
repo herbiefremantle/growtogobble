@@ -718,3 +718,10 @@ details.later[open] > summary::after { transform: rotate(-90deg); }
   background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 8px 8px 8px 12px; margin-bottom: 12px; box-shadow: var(--shadow-lift); }
 #save.dirty, #save-top.dirty { box-shadow: 0 0 0 3px color-mix(in srgb, var(--forest-2) 30%, transparent); }
 #save-top.dirty::after { content: "changes"; }  /* the button's gap supplies the space */
+
+/* a planting sown together: one box in the bed */
+.mixbox { border: 1px solid color-mix(in srgb, var(--forest-2) 35%, var(--line)); background: color-mix(in srgb, var(--sage) 45%, var(--card));
+  border-radius: 12px; padding: 8px 10px 2px; margin-bottom: 10px; }
+.mixbox .mixhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-bottom: 4px; }
+.mixbox .crop-row { background: transparent; }
+.mixnote { padding-bottom: 10px; margin-top: 4px; }
