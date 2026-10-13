@@ -2107,6 +2107,7 @@ function drawSpace(id) {
       ${bedsNextTo(s.id).length ? `<p class="small muted" style="margin:10px 0 0">Nearby: ${bedsNextTo(s.id).map((n) => { const cs = activeCrops().filter((c) => c.space_id === n.id); return `${esc(n.name)} (${gapText(n.gap)})${cs.length ? " " + emojiList(cs) : " - empty"}`; }).join(" · ")}</p>` : ""}
       <div class="row" style="margin-top:10px"><a class="btn small" href="#/plants" data-close>Add plants</a>
       ${here.length ? `<button class="btn small ghost" data-empty="${s.id}">Take everything out</button>` : ""}</div></div>
+    ${bedScene(s)}
     ${!here.length && !pot ? `<div class="card"><h3>Grow together</h3><p class="small muted" style="margin:0 0 8px">Fill the bed with plants that share the space - added as one planting.</p>
       <div class="nbs">${S.cat.mixes.map((m) => mixButton(m.id, s.id)).join("")}</div></div>` : ""}
     ${pot ? "" : build}
@@ -2669,20 +2670,22 @@ function sceneSvg(rows, m) {
   const maxH = Math.max(120, ...all.map((p) => p.height_cm)), scale = 128 / maxH;
   const n = rows.length, out = [];
   rows.forEach((row, k) => {
-    const depth = n - 1 - k, y = ground - depth * 9, shrink = 1 - depth * 0.06;
-    const pool = row.items.flatMap((it) => Array(Math.max(1, Math.min(it.count, 6))).fill(it.p));
-    const slots = Math.max(3, Math.min(9, pool.length)), list = Array.from({ length: slots }, (_, i) => pool[Math.floor((i / slots) * pool.length)]);
+    const depth = n - 1 - k, y = ground - depth * 12, shrink = 1 - depth * 0.06;
+    // as many across as fit for the size of plant; each row sits staggered from the one behind, so nothing hides
+    const pool = row.items.flatMap((it) => Array(Math.max(1, Math.min(it.count, 12))).fill(it.p));
+    const wide = Math.max(...row.items.map((it) => Math.min(44, Math.max(14, (it.p.sp_cm || 30) * 0.5 * shrink))));
+    const slots = Math.max(3, Math.min(14, Math.floor((W - 40) / (wide * 0.95)))), list = Array.from({ length: slots }, (_, i) => pool[Math.floor((i / slots) * pool.length)]);
     list.forEach((p, i) => {
       const state = lifeState(p, m);
       if (state === "none") return;
-      const h = p.height_cm * scale * shrink * (state === "show" ? 1 : 0.7), w = Math.min(44, Math.max(14, (p.sp_cm || 30) * 0.5 * shrink));
-      const x = 24 + ((i + 0.5) / slots) * (W - 36) + ((i * 37) % 7) - 3;
+      const h = Math.max(16, p.height_cm * scale * shrink * (state === "show" ? 1 : 0.7)), w = Math.min(44, Math.max(14, (p.sp_cm || 30) * 0.5 * shrink));
+      const step = (W - 40) / slots, x = 26 + (i + 0.5) * step + (depth % 2 ? step / 2 : 0) * (k ? 1 : -0.5) + ((i * 37) % 5) - 2;
       out.push(`<g opacity="${1 - depth * 0.12}">${plantShape(p, x, y, h, w, state)}</g>`);
     });
   });
   const ruler = [100, 200].filter((c) => c * scale < 150).map((c) => `<line x1="8" x2="14" y1="${ground - c * scale}" y2="${ground - c * scale}" class="sv-rule"/><text x="16" y="${ground - c * scale + 3}" class="sv-rule-t">${c / 100}m</text>`).join("");
   return `<svg class="sideview" viewBox="0 0 ${W} ${H}" role="img" aria-label="What it looks like in ${MONTHS_LONG[m - 1]}">
-    <rect x="0" y="0" width="${W}" height="${H}" class="sv-sky"/><rect x="0" y="${ground - (n - 1) * 9 - 4}" width="${W}" height="${H}" class="sv-soil"/>
+    <rect x="0" y="0" width="${W}" height="${H}" class="sv-sky"/><rect x="0" y="${ground - (n - 1) * 12 - 4}" width="${W}" height="${H}" class="sv-soil"/>
     <line x1="11" x2="11" y1="${ground}" y2="${ground - Math.min(150, 200 * scale)}" class="sv-rule"/>${ruler}${out.join("")}</svg>`;
 }
 // the best month to show first: when most of it is at its best
@@ -2801,6 +2804,15 @@ function bedPlanSvg(L) {
     <defs><clipPath id="${clip}">${shapeSvg(s, 0, 0, w, h, "")}</clipPath></defs>${shapeSvg(s, 0, 0, w, h, 'class="fd-bed"')}
     <g clip-path="url(#${clip})">${bands}${marks}</g>${nums}${labels}</svg>`;
 }
+// "What it'll look like" for a bed: what's planned in it, from the front, to scale, through the year
+function bedScene(s) {
+  const L = bedLayout(s);
+  if (!L.tiers.length || s.kind === "pot") return "";
+  const rows = [...L.tiers.map((t) => ({ items: t.parts.flatMap((pt) => pt.plants.map((pid) => ({ p: plant(pid), count: pt.crops.filter((c) => c.plant_id === pid).reduce((n, c) => n + c.qty, 0) }))) })),
+    ...(L.edge.length ? [{ items: L.edge.map((c) => ({ p: plant(c.plant_id), count: c.qty })) }] : [])];
+  return `<div class="card"><h3>What it'll look like</h3><p class="small muted" style="margin:-4px 0 8px">From the front, to scale. Slide through the year.</p>${sceneBox("bed" + s.id, rows)}</div>`;
+}
+
 function openBedPlan(id) {
   S.sheet = () => { if (space(id)) drawBedPlan(id); else closeSheet(); };
   drawBedPlan(id);
@@ -2822,9 +2834,7 @@ function drawBedPlan(id) {
   };
   openSheet(`<h2>📐 ${esc(s.name)}: where to plant</h2>
     ${L.tiers.length || L.edge.length ? bedPlanSvg(L) : ""}
-    ${L.tiers.length ? `<div class="card"><h3>What it'll look like</h3><p class="small muted" style="margin:-4px 0 8px">From the front, to scale. Slide through the year.</p>
-      ${sceneBox("bed" + s.id, [...L.tiers.map((t) => ({ items: t.parts.flatMap((pt) => pt.plants.map((pid) => ({ p: plant(pid), count: pt.crops.filter((c) => c.plant_id === pid).reduce((n, c) => n + c.qty, 0) }))) })),
-        ...(L.edge.length ? [{ items: L.edge.map((c) => ({ p: plant(c.plant_id), count: c.qty })) }] : [])])}</div>` : ""}
+    ${bedScene(s)}
     ${L.over ? `<div class="checkbox warn small">⚠️ There's more planned than fits - it's squeezed up here. Take something out, plant fewer, or use a bigger bed.</div>` : ""}
     ${L.spare > 0.1 && !L.over ? `<p class="small muted">🟫 About ${Math.round(L.spare * 100)}% of the bed is still free${L.island ? " round the outside" : " at the front"} - room for more.</p>` : ""}
     <div class="card"><h3>🌱 What goes where</h3>${[...cost.items].sort((x, y) => order(x) - order(y)).map(row).join("") || `<p class="small muted">Nothing in this bed yet.</p>`}
