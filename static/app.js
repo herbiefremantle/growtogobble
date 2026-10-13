@@ -224,6 +224,9 @@ function render() {
   if (route === "reset") { $("#topbar").hidden = $("#tabs").hidden = true; resetPage(); return; }
   if (PUBLIC[route]) { go("#/"); return; }
   $("#top-me").textContent = (S.me.name || "Me").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+  const sb = $("#samplebar");
+  sb.hidden = !(loggedIn && S.g.has_sample && route !== "start");
+  if (!sb.hidden) sb.innerHTML = `<span><b>Sample garden</b> - explore and change anything</span><button class="btn small" data-clear-sample>Clear sample and start mine</button>`;
   const tab = route === "shop" ? "" : route;
   document.querySelectorAll(".tabs a").forEach((a) => a.classList.toggle("on", (a.dataset.tab === "home" ? "" : a.dataset.tab) === tab));
   (PAGES[route] || home)();
@@ -318,72 +321,208 @@ function joinPage() {
 
 // ---- onboarding ------------------------------------------------------------------------------------
 
-const onb = { step: 1, counts: { bed: 1, pot: 0, allotment: 0 }, built: null, picked: new Set(), filter: "all" };
+// ---- first-run setup: a short quiz, then a starter plan -----------------------------------------------------
+// The answers are saved to the user's onboarding profile; the tour, the starter plan and the sample garden all
+// work from that (see app/onboarding.py).
+const QUIZ = [
+  { key: "experience", q: "How much have you grown before?", opts: [["beginner", "🌱", "Complete beginner"], ["some", "🌿", "Grown a bit"], ["confident", "🌳", "Confident"]] },
+  { key: "space", q: "Where will you grow?", opts: [["pots", "🪴", "Pots or a balcony"], ["small", "🟫", "Small garden or raised beds"], ["medium", "🏡", "Medium garden"], ["large", "🚜", "Large plot or allotment"]] },
+  { key: "goals", q: "What would you like to grow?", multi: true, sub: "Pick as many as you like.",
+    opts: [["veg", "🥕", "Veg"], ["fruit", "🍓", "Fruit"], ["herbs_flowers", "🌸", "Herbs and flowers"], ["cooking", "🍳", "Cooking ingredients"], ["kids", "🧒", "Fun with kids"]] },
+  { key: "time", q: "How much time have you got?", opts: [["minimal", "⏱️", "A few minutes a week"], ["moderate", "🕐", "An hour or two"], ["plenty", "☀️", "As much as it takes"]] },
+  { key: "postcode", q: "Where are you?", sub: "Your postcode sets your frost dates and sowing times. Just the first part (like BS8) is enough." },
+];
+const quiz = { step: 0, a: { goals: [] } };
+const saveProfile = async (changes) => { S.me.onboarding = await api("PATCH", "/api/me/onboarding", { changes }); return S.me.onboarding; };
 
 function onboarding() {
-  if (onb.step === 1) {
-    view.innerHTML = `<div class="hero" style="padding-top:10px"><div class="big">🏡</div><h1>Hi ${esc(S.me.name)}! Where will you grow?</h1>
-      <p>Pick as many as you like. You can add more later.</p></div>
-      ${Object.entries(SPACE_KINDS).map(([k, v]) => `
-        <div class="card choice">
-          <span class="e">${v.emoji}</span>
-          <div><b>${v.label}</b><div class="small muted">${
-            { bed: "Made with cardboard and compost", pot: "Pots, tubs, grow bags, window boxes", allotment: "A whole plot to fill" }[k]}</div></div>
-          <div class="counter"><button class="btn small" data-dec="${k}" aria-label="Fewer">−</button><b>${onb.counts[k]}</b><button class="btn small" data-inc="${k}" aria-label="More">+</button></div>
-        </div>`).join("")}
-      ${onb.counts.bed + onb.counts.allotment ? `<div class="card"><b>Are your beds already built?</b>
-        <div class="chips" style="margin-top:8px"><button class="btn small ${onb.built === true ? "primary" : ""}" data-built="1">✅ Yes, ready to plant</button>
-        <button class="btn small ${onb.built === false ? "primary" : ""}" data-built="0">🛠️ Not yet - show me how</button></div></div>` : ""}
-      <button class="btn primary wide" id="next" ${Object.values(onb.counts).some((n) => n) ? "" : "disabled"}>Next: choose your food 👉</button>`;
-    view.onclick = (e) => {
-      const inc = e.target.closest("[data-inc]"), dec = e.target.closest("[data-dec]");
-      if (inc) { onb.counts[inc.dataset.inc] = Math.min(9, onb.counts[inc.dataset.inc] + 1); onboarding(); }
-      if (dec) { onb.counts[dec.dataset.dec] = Math.max(0, onb.counts[dec.dataset.dec] - 1); onboarding(); }
-      const bt = e.target.closest("[data-built]");
-      if (bt) { onb.built = bt.dataset.built === "1"; onboarding(); }
-    };
-    $("#next").onclick = async () => {
-      for (const [kind, n] of Object.entries(onb.counts)) {
-        const base = { bed: "Bed", pot: "Pot", allotment: "Allotment" }[kind];
-        for (let i = 1; i <= n; i++) S.g = await api("POST", "/api/spaces", { name: n > 1 ? `${base} ${i}` : (kind === "pot" ? "My pots" : "My " + base.toLowerCase()), kind,
-          built: kind === "pot" ? null : onb.built });
+  if (quiz.step >= QUIZ.length) { starterPlan(); return; }
+  const Q = QUIZ[quiz.step], n = quiz.step + 1, val = quiz.a[Q.key];
+  view.innerHTML = `<div class="quiz">
+    <div class="quiz-top"><button class="btn small ghost" id="q-back" ${quiz.step ? "" : "disabled"}>‹ Back</button>
+      <span class="small muted">${n} of ${QUIZ.length}</span><button class="btn small ghost" id="q-skipall">Skip setup</button></div>
+    <div class="progress" aria-hidden="true"><i style="width:${(100 * n) / QUIZ.length}%"></i></div>
+    <h1 id="q-title" tabindex="-1">${Q.q}</h1>${Q.sub ? `<p class="muted">${Q.sub}</p>` : ""}
+    ${Q.key === "postcode" ? `<label class="field" for="q-pc">Postcode</label><input id="q-pc" type="text" autocomplete="postal-code" value="${esc(quiz.a.postcode ?? S.me.outcode ?? "")}" placeholder="e.g. BS8 or LS6 2AB">
+      <div id="q-err"></div>`
+      : `<div class="quiz-opts" role="${Q.multi ? "group" : "radiogroup"}" aria-labelledby="q-title">${Q.opts.map(([k, e, l]) => {
+        const on = Q.multi ? (val || []).includes(k) : val === k;
+        return `<button class="quiz-opt ${on ? "on" : ""}" role="${Q.multi ? "checkbox" : "radio"}" aria-checked="${on}" data-q="${k}"><span class="e">${e}</span><b>${l}</b></button>`; }).join("")}</div>`}
+    <div class="quiz-bottom">${Q.multi || Q.key === "postcode" ? `<button class="btn primary wide" id="q-next">${n === QUIZ.length ? "See my starter plan" : "Next"}</button>` : ""}
+      <button class="btn ghost wide" id="q-skip">Skip this question</button></div></div>`;
+  $("#q-title").focus();
+  const next = () => { quiz.step += 1; onboarding(); };
+  view.onclick = (e) => {
+    const o = e.target.closest("[data-q]");
+    if (!o) return;
+    if (Q.multi) { const g = new Set(quiz.a.goals); g.has(o.dataset.q) ? g.delete(o.dataset.q) : g.add(o.dataset.q); quiz.a.goals = [...g]; onboarding(); return; }
+    quiz.a[Q.key] = o.dataset.q; next();
+  };
+  $("#q-back").onclick = () => { quiz.step = Math.max(0, quiz.step - 1); onboarding(); };
+  $("#q-skip").onclick = () => { if (Q.key !== "goals") delete quiz.a[Q.key]; next(); };
+  $("#q-skipall").onclick = async () => {  // sensible defaults; finish it later from Me
+    await saveProfile({ ...answersOnly(), skip: true, skippedAt: new Date().toISOString(), completedAt: new Date().toISOString() });
+    quiz.step = 0; go("#/");
+  };
+  const nx = $("#q-next");
+  if (nx) nx.onclick = async () => {
+    if (Q.key === "postcode") {
+      const pc = $("#q-pc").value.trim();
+      if (pc && pc !== (S.me.outcode || "")) {
+        try { S.me = { ...(await api("PATCH", "/api/me", { postcode: pc })), onboarding: S.me.onboarding }; S.cat = await api("GET", "/api/plants"); }
+        catch (err) { $("#q-err").innerHTML = `<div class="error">${esc(err.message)}</div>`; return; }
       }
-      onb.step = 2; view.onclick = null; onboarding();
-    };
-    return;
-  }
-  if (onb.step === 2) {
-    const onlyPots = S.g.spaces.every((s) => s.kind === "pot");
-    const list = filteredPlants(onb.filter, ["veg", "herb"]).filter((p) => !onlyPots || p.where.includes("pot"));
-    view.innerHTML = `<div class="hero" style="padding-top:10px"><div class="big">😋</div><h1>What do you love to eat?</h1>
-      <p>Only grow what you'll eat, so nothing goes to waste. Tap your favourites. Green ones are the easiest to start with.</p></div>
-      ${filterBar(onb.filter)}
-      <div class="grid">${list.map((p) => tile(p, onb.picked.has(p.id))).join("")}</div>
-      <div style="position:sticky;bottom:12px;margin-top:16px"><button class="btn primary wide" id="add" ${onb.picked.size ? "" : "disabled"}>
-        ${onb.picked.size ? `Add ${onb.picked.size} to my garden 🌱` : "Tap the food you like"}</button></div>`;
-    view.onclick = (e) => {
-      const f = e.target.closest("[data-filter]");
-      if (f) { onb.filter = f.dataset.filter; onboarding(); return; }
-      const t = e.target.closest("[data-plant]");
-      if (t) { const id = t.dataset.plant; onb.picked.has(id) ? onb.picked.delete(id) : onb.picked.add(id); onboarding(); }
-    };
-    $("#add").onclick = async () => {
-      view.onclick = null;
-      S.g = await api("POST", "/api/crops/bulk", { crops: [...onb.picked] });
-      onb.step = 3; onboarding();
-    };
-    return;
-  }
-  confetti();
-  const first = S.g.crops.flatMap((c) => c.jobs).filter((j) => j.kind !== "buy" && j.status !== "done").sort((a, b) => a.start.localeCompare(b.start))[0];
-  view.innerHTML = `<div class="hero"><div class="big">🎉</div><h1>Your garden plan is ready!</h1>
-    <p>We've worked out when to do everything for ${esc(S.me.region.name)}.</p></div>
-    ${first ? `<div class="card tint-leaf"><div class="small muted"><b>Your first job</b></div><div class="job"><div class="job-emoji">${plant(first.plant_id).emoji}</div>
-      <div class="job-body"><div class="job-title">${esc(first.title)}</div><div class="job-when">${whenText(first)}</div></div></div></div>` : ""}
-    <div class="card tint-sun"><b>📍 Next: choose where they grow</b><p class="small muted" style="margin:4px 0 0">They aren't in any beds yet. Put each one where you want it, or tap "Suggest a layout" and we'll share them out for you to check first.</p></div>
-    <div class="card"><b>🛒 Then: get your seeds</b><p class="small muted" style="margin:4px 0 0">Your shopping list has a one-tap link for each one.</p></div>
-    <button class="btn primary wide" id="done">Let's go! 👉</button>`;
-  $("#done").onclick = () => { onb.step = 1; go("#/"); };
+      quiz.a.postcode = pc;
+    }
+    next();
+  };
+}
+const answersOnly = () => ({ experience: quiz.a.experience, space: quiz.a.space, goals: quiz.a.goals, time: quiz.a.time });
+
+// The payoff: things to start now, with a mini calendar - then the tour, a sample garden, or straight in
+async function starterPlan() {
+  await saveProfile({ ...answersOnly(), completedAt: new Date().toISOString() });
+  const plan = await api("GET", "/api/onboarding/starter"), big = ["medium", "large"].includes(S.me.onboarding.space);
+  const nowM = today().getMonth() + 1;
+  const mini = (p) => `<div class="mini-cal" aria-label="When to sow and pick">${MONTHS.map((m, i) => {
+    const k = p.months.harvest.includes(i + 1) ? "pick" : [...p.months.sow_in, ...p.months.sow_out, ...p.months.plant_out].includes(i + 1) ? "sow" : "";
+    return `<span class="${k} ${i + 1 === nowM ? "now" : ""}" title="${m}">${m[0]}</span>`; }).join("")}</div>`;
+  view.innerHTML = `<div class="quiz">
+    <h1>Your starter plan</h1><p class="muted">Good things to start ${plan.plants.length && daysBetween(today(), d(plan.plants[0].from)) <= 0 ? "now" : "soon"}, picked for your space and what you'd like to grow.</p>
+    <div class="card">${plan.plants.map((x) => { const p = plant(x.plant_id); return `<button class="starter" data-open-plant="${p.id}" data-method="${x.method}">
+      <span class="e ${blobCls(p)}">${pic(p)}</span><span class="t"><b>${esc(p.name)}</b><span class="small muted">${methodLabel(p, x.method).replace(/^\S+\s/, "")} · ${daysBetween(today(), d(x.from)) <= 0 ? "now until " + fmt(x.to) : "from " + fmt(x.from)}</span>${mini(p)}</span></button>`; }).join("")
+      || `<p class="muted">Nothing to start just now - have a look round, and we'll suggest things as the seasons change.</p>`}
+      <div class="legend small" style="margin-top:8px"><span><i class="sow"></i>Sow or plant</span><span><i class="pick"></i>Pick</span></div></div>
+    <button class="btn primary wide" id="sp-tour">Start the tour</button>
+    <button class="btn wide" id="sp-sample" style="margin-top:8px">Explore a sample garden first</button>
+    <button class="btn wide" id="sp-first" style="margin-top:8px">${big ? "Draw your plot" : "Add your first crop"}</button>
+    <button class="btn ghost wide" id="sp-skip" style="margin-top:4px">Skip for now</button></div>`;
+  $("#sp-tour").onclick = () => { go("#/"); startTour(); };
+  $("#sp-sample").onclick = async () => { await loadSample(plan.sample); startTour(); };
+  $("#sp-first").onclick = () => { if (big) { gardenView = "plot"; plotEdit = true; go("#/garden"); } else go("#/plants"); };
+  $("#sp-skip").onclick = () => go("#/");
+}
+
+// ---- sample gardens: ordinary beds and crops marked as a sample, cleared in one go ---------------------------
+async function loadSample(kind) {
+  S.g = await api("POST", "/api/sample", { kind });
+  gardenView = "plot"; plotZoom = 1;
+  go("#/garden");
+  toast("Sample garden loaded - have a look round");
+}
+document.addEventListener("click", async (e) => {
+  if (!e.target.closest("[data-clear-sample]")) return;
+  if (!confirm("Clear the sample garden? Only the sample goes - nothing of yours is touched.")) return;
+  rotYear = 1;
+  await change("DELETE", "/api/sample", null, "Sample cleared - over to you 🌱");
+});
+
+// ---- the guided tour: a step at a time, pointing at the real screen ------------------------------------------
+const TOUR = { steps: null, i: 0, path: null };
+const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+async function startTour(path, from = 0) {
+  const t = await api("GET", "/api/onboarding/tour" + (path ? "?path=" + path : ""));
+  TOUR.steps = t.steps; TOUR.path = t.path;
+  showStep(from, 1);
+}
+function saveTour(completed) {
+  const tp = { path: TOUR.path, stepIndex: TOUR.i, completed: !!completed };
+  if (S.me.onboarding) S.me.onboarding.tourProgress = tp;  // straight away, so the next page already knows
+  saveProfile({ tourProgress: tp }).catch(() => {});
+}
+function tourPrep(prep) {
+  if (prep === "list") gardenView = "list";
+  if (prep === "plot") { gardenView = "plot"; plotEdit = false; }
+  if (prep === "veg") { plantGroup = "veg"; plantFilter = "all"; plantSearch = ""; }
+  if (prep === "groups") plantGroup = "groups";
+}
+async function showStep(i, dir) {
+  if (i < 0) i = 0;
+  if (i >= TOUR.steps.length) { endTour(true); return; }
+  const st = TOUR.steps[i];
+  TOUR.i = i; saveTour(false);
+  closeSheet(); tourPrep(st.prep);
+  if (location.hash !== st.route) go(st.route); else render();
+  let el = null;
+  for (let k = 0; k < 20 && !el; k++) { await new Promise((r) => setTimeout(r, 100)); el = document.querySelector(st.anchor); }
+  if (!el || !el.getClientRects().length) { showStep(i + (dir || 1), dir || 1); return; }  // not on screen (or switched off): skip it
+  drawTour(el, st, i);
+}
+function drawTour(el, st, i) {
+  let box = $("#tour");
+  if (!box) { box = document.createElement("div"); box.id = "tour"; document.body.appendChild(box); }
+  const last = i === TOUR.steps.length - 1;
+  box.innerHTML = `<div class="tour-block"></div><div class="tour-ring"></div>
+    <div class="tour-bubble" role="dialog" aria-modal="true" aria-labelledby="tour-t" aria-describedby="tour-b">
+      <div class="small muted">Step ${i + 1} of ${TOUR.steps.length}</div>
+      <h3 id="tour-t">${esc(st.title)}</h3><p id="tour-b">${esc(st.body)}</p>
+      ${st.why ? `<details class="tour-why"><summary>Why this matters</summary><p class="small">${esc(st.why)}</p></details>` : ""}
+      <div class="row" style="justify-content:space-between;margin-top:10px"><button class="btn small ghost" id="tour-skip">Skip tour</button>
+        <span class="row" style="gap:6px">${i ? `<button class="btn small" id="tour-back">Back</button>` : ""}<button class="btn small primary" id="tour-next">${last ? "Done" : st.optional ? "Show me" : "Next"}</button></span></div></div>`;
+  const place = () => {
+    const r = el.getBoundingClientRect(), pad = 6, ring = box.querySelector(".tour-ring"), b = box.querySelector(".tour-bubble");
+    Object.assign(ring.style, { left: r.left - pad + "px", top: r.top - pad + "px", width: r.width + pad * 2 + "px", height: r.height + pad * 2 + "px" });
+    const below = r.bottom + 12, bh = b.offsetHeight, vh = innerHeight;
+    b.style.top = (below + bh < vh - 8 ? below : Math.max(8, r.top - bh - 12)) + "px";
+  };
+  el.scrollIntoView({ block: "center", behavior: reduceMotion() ? "auto" : "smooth" });
+  setTimeout(place, reduceMotion() ? 0 : 350);
+  box._place = place;
+  $("#tour-next").focus();
+  $("#tour-next").onclick = () => showStep(i + 1, 1);
+  const bk = $("#tour-back"); if (bk) bk.onclick = () => showStep(i - 1, -1);
+  $("#tour-skip").onclick = () => endTour(false);
+}
+function endTour(finished) {
+  const box = $("#tour"); if (box) box.remove();
+  if (TOUR.steps) saveTour(true);  // finished or skipped: don't nag - it can be replayed from Me
+  TOUR.steps = null;
+  if (finished) { go("#/"); toast("You're set up! First job: add your first crop 🌱"); }
+}
+window.addEventListener("resize", () => { const b = $("#tour"); if (b && b._place) b._place(); });
+window.addEventListener("scroll", () => { const b = $("#tour"); if (b && b._place) b._place(); }, true);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("#tour")) endTour(false); });
+
+// Replay the tour (any path) or retake the quiz - from Me
+function helpSheet() {
+  const mine = S.me.onboarding && S.me.onboarding.space;
+  openSheet(`<h2>Help</h2>
+    <h3>Replay the tour</h3><div class="nbs">${[["A", "🪴", "Pots and balcony"], ["B", "🟫", "Small garden or raised beds"], ["C", "🏡", "Medium garden, large plot or allotment"]].map(([k, e, l]) =>
+      `<button class="nb" data-tourpath="${k}"><span class="e">${e}</span><span><b>${l}</b>${({ pots: "A", small: "B" }[mine] || (mine ? "C" : "")) === k ? "<small>Your garden</small>" : ""}</span></button>`).join("")}</div>
+    <h3 style="margin-top:16px">Explore a sample garden</h3><div class="nbs">${[["A", "🌇", "Sunny Balcony", "6 pots, grow bags and a window box"], ["B", "🏠", "Backyard Beds", "3 raised beds and a border"], ["C", "🚜", "The Allotment", "10 × 20 m plot, crops in rotation"]].map(([k, e, l, s]) =>
+      `<button class="nb" data-samplekind="${k}"><span class="e">${e}</span><span><b>${l}</b><small>${s}</small></span></button>`).join("")}</div>
+    <button class="btn wide" id="retake" style="margin-top:16px">Retake the setup quiz</button>`);
+  const card = $("#sheet-card");
+  card.querySelectorAll("[data-tourpath]").forEach((b) => (b.onclick = () => { closeSheet(); startTour(b.dataset.tourpath); }));
+  card.querySelectorAll("[data-samplekind]").forEach((b) => (b.onclick = async () => { closeSheet(); await loadSample(b.dataset.samplekind); }));
+  $("#retake").onclick = () => { closeSheet(); quiz.step = 0; quiz.a = { ...answersOnly(), ...(S.me.onboarding || {}), goals: (S.me.onboarding || {}).goals || [] }; go("#/start"); };
+}
+
+function tourResume() {
+  const tp = S.me.onboarding && S.me.onboarding.tourProgress;
+  if (!tp || !tp.path || tp.completed || !tp.stepIndex || $("#tour")) return "";
+  return `<div class="card row" style="justify-content:space-between"><span><b>Carry on with the tour?</b><span class="small muted" style="display:block">You got to step ${tp.stepIndex + 1}.</span></span>
+    <span class="row" style="gap:6px"><button class="btn small ghost" id="tour-stop">No thanks</button><button class="btn small primary" id="tour-resume">Carry on</button></span></div>`;
+}
+
+// Getting started: ticks itself off from real things you've done (never from a sample garden)
+function checklistCard() {
+  const o = S.me.onboarding, cl = S.g.checklist;
+  if (!o || o.checklistDismissed || !cl) return "";
+  const items = [["firstCrop", "Add your first crop", `<a class="btn small" href="#/plants">Choose plants</a>`],
+    ["firstBed", "Add your first bed or pots", `<button class="btn small" id="cl-bed">Add one</button>`],
+    ["reminders", "Turn on reminders", `<button class="btn small" id="cl-push">Turn on</button>`]];
+  const done = items.filter(([k]) => cl[k]).length;
+  if (done === items.length) return "";
+  return `<div class="card" id="checklist"><div class="row" style="justify-content:space-between"><b>Getting started</b><span class="small muted">${done} of ${items.length}</span></div>
+    <div class="progress" style="margin:8px 0"><i style="width:${(100 * done) / items.length}%"></i></div>
+    ${items.map(([k, l, act]) => `<div class="cl-row ${cl[k] ? "done" : ""}"><span class="cl-tick" aria-hidden="true">${cl[k] ? "✓" : ""}</span><span class="n">${l}</span>${cl[k] ? "" : act}</div>`).join("")}
+    <button class="btn small ghost" id="cl-hide" style="margin-top:6px">Hide this</button></div>`;
+}
+function wireChecklist() {
+  const b = $("#cl-bed"); if (b) b.onclick = addSpaceSheet;
+  const p = $("#cl-push"); if (p) p.onclick = () => enablePush();
+  const h = $("#cl-hide"); if (h) h.onclick = async () => { await saveProfile({ checklistDismissed: new Date().toISOString() }); home(); };
 }
 
 function filteredPlants(filter, group = "veg") {
@@ -563,7 +702,7 @@ function home() {
   const hour = new Date().getHours();
   const hello = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
-  if (!S.g.spaces.length) { go("#/start"); return; }
+  if (!S.g.spaces.length && !S.me.onboarding) { go("#/start"); return; }
 
   const unbuilt = S.g.spaces.filter((s) => s.kind !== "pot" && s.built === 0 && s.nodig_done.length < S.cat.nodig_steps.length);
   const unknown = S.g.spaces.filter((s) => s.kind !== "pot" && s.built === null);
@@ -609,7 +748,7 @@ function home() {
       <div class="stat ${week.length ? "warn" : ""}"><b>${week.length}</b><span>job${week.length === 1 ? "" : "s"} this week</span></div>
       <a class="stat" href="#/shop"><b>${money(toBuy)}</b><span>seeds & plants still to buy</span></a>
     </div>
-    ${nudge}
+    ${tourResume()}${checklistCard()}${nudge}
     <div class="section-title"><h2>This week</h2><span class="small muted">next 7 days</span></div>
     <div class="card">${week.length ? week.map((j) => jobCard(j, { showSpace: true })).join("") :
       `<div class="empty"><b>Nothing to do this week.</b><br>Enjoy the garden.</div>`}</div>
@@ -619,6 +758,9 @@ function home() {
       ${byMonth.map((g) => { const [y, mo] = g.k.split("-").map(Number);
         return `<h4 class="month-head">${MONTHS_LONG[mo - 1]}${y !== t.getFullYear() ? " " + y : ""} <span class="small muted">${g.jobs.length}</span></h4>${g.jobs.map((j) => jobCard(j, { showSpace: true })).join("")}`; }).join("")}</details>` : ""}
     ${buyNow.length ? `<a href="#/shop" class="link-row">🛒 <b>${buyNow.length} thing${buyNow.length === 1 ? "" : "s"} to buy soon</b> <span>${buyNow.slice(0, 5).map((x) => plant(x.plant_id).emoji).join(" ")} 👉</span></a>` : ""}`;
+  wireChecklist();
+  const tr = $("#tour-resume"); if (tr) tr.onclick = () => startTour(S.me.onboarding.tourProgress.path, S.me.onboarding.tourProgress.stepIndex);
+  const ts = $("#tour-stop"); if (ts) ts.onclick = async () => { await saveProfile({ tourProgress: { ...S.me.onboarding.tourProgress, completed: true } }); home(); };
   const ofk = $("#overfull-ok");
   if (ofk) ofk.onclick = () => { try { localStorage.setItem(ofk.dataset.key, "1"); } catch (e) { /* private mode */ } home(); };
   const later = $("#later");
@@ -689,11 +831,11 @@ function pushBanner() {
   try { dismissed = localStorage.getItem("sts-push-later") === S.g.today; } catch (e) { /* private mode */ }
   if (dismissed) return "";
   if (isIOS && !standalone) {
-    return `<div class="card tint-sky"><b>🔔 Want reminders on your iPhone?</b>
+    return `<div class="card tint-sky" id="push-card"><b>🔔 Want reminders on your iPhone?</b>
       <p class="small" style="margin:6px 0 0">First add this app to your Home Screen: tap <b>Share</b> <span aria-hidden="true">⬆️</span> then <b>Add to Home Screen</b>. Open it from there and turn on reminders.</p></div>`;
   }
   if (!pushSupported) return "";
-  return `<div class="card tint-sky"><b>🔔 Get a nudge when it's time</b>
+  return `<div class="card tint-sky" id="push-card"><b>🔔 Get a nudge when it's time</b>
     <p class="small muted" style="margin:4px 0 10px">We'll tell you when to sow, plant, water and pick, and warn you about frost.</p>
     <div class="row"><button class="btn primary small" data-push-on>Turn on reminders</button><button class="btn ghost small" data-push-later>Not now</button></div></div>`;
 }
@@ -760,6 +902,7 @@ const inBedRow = (c) => cropRow(c, { unplace: true });
 
 // ---- the Garden tab: a bird's-eye plot (default) or a plain list -----------------------------------------
 
+let rotYear = 1;  // the sample allotment: Year 2 shows each rotation bed's crops moved one bed along
 let gardenView = "plot", plotMonth = 0, plotEdit = false, placing = null, plotZoom = 1, selected = null;
 const FAMILY_COLOUR = { cabbage: "#7fb06b", onion: "#d8c48a", bean: "#a6d98f", potato: "#e0ad74", squash: "#f2c45a", carrot: "#f2a564",
   beet: "#c07a9c", leaf: "#93d07f", corn: "#f5d76e", fruit: "#e88a8a", herb: "#7cc4a0", flower: "#f4a3b8", sweetpotato: "#dc9466" };
@@ -1142,7 +1285,7 @@ function plotSvg() {
 
   const beds = items.filter((i) => i.type === "space").map((i) => {
     const s = i.s, { x, y, w, h } = i;
-    const here = crops.filter((c) => c.space_id === s.id);
+    const here = crops.filter((c) => shownIn(c) === s.id);
     const growing = here.filter((c) => inGround(c, T)), later = here.length - growing.length;
     // sown together = one strip, as big as its biggest plant's room, with all of them in it
     const now = [];
@@ -1225,6 +1368,13 @@ function bedHandles(i, ppm) {
   return `<g class="bedit">${mids}${dots}</g>`;
 }
 
+// Year 2 of a rotation: whatever's in a rotation bed moves to the next bed in the sequence
+function shownIn(c) {
+  if (rotYear !== 2) return c.space_id;
+  const ring = S.g.spaces.filter((x) => x.rotation != null).sort((a, b) => a.rotation - b.rotation), k = ring.findIndex((x) => x.id === c.space_id);
+  return k < 0 ? c.space_id : ring[(k + 1) % ring.length].id;
+}
+
 function plotPage() {
   const unplaced = activeCrops().filter((c) => !c.space_id);
   const T = plotDate();
@@ -1234,6 +1384,7 @@ function plotPage() {
     ${plotEdit && !boundaryEdit ? `<div class="card tint-sky small" style="margin-bottom:10px"><b>✏️ Editing:</b> drag anything to move it - zoom in for a finer grid (down to 50cm squares). Tap something to change, turn or remove it. To move several beds together, tap <b>🔗 Group beds</b>.</div>` : ""}
     <div class="plan-bar"><button class="btn small ${plotEdit ? "primary" : ""}" id="edit">${plotEdit ? "✅ Done editing" : "✏️ Edit plan"}</button>
       ${plotEdit && !boundaryEdit ? `<button class="btn small groupbtn ${multi ? "on" : ""}" id="t-multi" aria-pressed="${multi}">${multi ? "☑️ Picking… tap to stop" : "🔗 Group beds"}</button>` : ""}
+      ${S.g.spaces.some((x) => x.rotation != null) && !plotEdit ? `<button class="btn small ${rotYear === 2 ? "primary" : ""}" id="t-rot" aria-pressed="${rotYear === 2}" title="Crop rotation">${rotYear === 2 ? "Year 2" : "Year 1"}</button>` : ""}
       <span class="toggles">${satAnchor() ? `<button class="btn small ${showSat ? "primary" : ""}" id="t-sat" aria-pressed="${showSat}" title="Satellite view">🛰️</button>` : ""}<button class="btn small ${showSizes ? "primary" : ""}" id="t-sizes" aria-pressed="${showSizes}">📏</button><button class="btn small ${showPaths ? "primary" : ""}" id="t-paths" aria-pressed="${showPaths}" title="Paths between beds">🚶</button></span>
       <span class="zoom"><button class="btn small" data-zoom="-1" aria-label="Zoom out">➖</button><button class="btn small ghost" data-zoom="0" aria-label="Fit the whole garden">${Math.round(plotZoom * 100)}%</button><button class="btn small" data-zoom="1" aria-label="Zoom in">➕</button></span></div>
     ${boundaryEdit ? `<div class="card tint-sun small row" style="justify-content:space-between;margin-bottom:10px"><span><b>📐 Editing the boundary:</b> drag a corner · tap ＋ to add a corner · tap a corner to remove it · tap a side to type its real length</span><button class="btn small primary" id="b-done">✅ Done</button></div>` : ""}
@@ -1403,6 +1554,8 @@ function wirePlot() {
   $("#edit").onclick = () => { plotEdit = !plotEdit; placing = null; selected = null; boundaryEdit = false; bSel = null; multi = false; picked.clear(); plotPage(); };
   const tm = $("#t-multi");
   if (tm) tm.onclick = () => { multi = !multi; picked.clear(); selected = null; redraw(); if (multi) toast("☑️ Now tap each bed you want in the group, then tap 🔗 Group them"); };
+  const tr = $("#t-rot");
+  if (tr) tr.onclick = () => { rotYear = rotYear === 2 ? 1 : 2; redraw(); toast(rotYear === 2 ? "Year 2: each crop moves one bed along - legumes, brassicas, roots, potatoes, onions" : "Year 1"); };
   const ts = $("#t-sat");
   if (ts) ts.onclick = () => { showSat = !showSat; remember("gtg-satview", showSat); redraw(); toast(showSat ? "🛰️ Satellite view on" : "Satellite view off"); };
   $("#t-sizes").onclick = () => { showSizes = !showSizes; remember("gtg-sizes", showSizes); redraw(); toast(showSizes ? "📏 Measurements on" : "Measurements off"); };
@@ -3326,6 +3479,11 @@ function allPlantsCalendar() {
 
 function calendarPage() {
   if (calTab === "all") { allPlantsCalendar(); return; }
+  setTimeout(() => {  // a nudge for better dates, when we don't know where they are
+    if (S.me.outcode || $("#pc-nudge")) return;
+    const h = view.querySelector("h1");
+    if (h) h.insertAdjacentHTML("afterend", `<a class="card tint-sun row" id="pc-nudge" href="#/me" style="text-decoration:none;color:inherit;justify-content:space-between"><span class="small"><b>Add your postcode for better dates</b> - these are for central England</span><span>›</span></a>`);
+  });
   const t = today();
   const months = Array.from({ length: 12 }, (_, i) => new Date(t.getFullYear(), t.getMonth() + i, 1));
   const colour = { sow_in: "var(--sky)", sow_out: "var(--leaf)", plant_out: "var(--soil)", harvest: "var(--marigold)" };
@@ -3398,6 +3556,7 @@ function mePage() {
     <p class="muted">${got} of ${S.g.badges.length} earned. Keep growing!</p>
     <div class="badges">${S.g.badges.map((b) => `<div class="badge ${b.earned_on ? "got" : "locked"}"><span class="e">${b.emoji}</span><b>${esc(b.name)}</b><small>${esc(b.text)}</small></div>`).join("")}</div>
     <div class="section-title"><h2>⚙️ My account</h2></div>
+    <button class="card row costcard" id="help" style="justify-content:space-between;width:100%"><span><b>Help</b><span class="small muted" style="display:block">Replay the tour, explore a sample garden, or retake the setup quiz</span></span><span class="small" style="color:var(--forest-2);font-weight:700">Open ›</span></button>
     <div class="card"><h3>Appearance</h3>
       <div class="seg" role="radiogroup" aria-label="Light or dark">${[["", "Match my phone"], ["light", "Light"], ["dark", "Dark"]].map(([k, l]) =>
         `<button role="radio" aria-checked="${(document.documentElement.getAttribute("data-theme") || "") === k}" class="${(document.documentElement.getAttribute("data-theme") || "") === k ? "on" : ""}" data-theme-set="${k}">${l}</button>`).join("")}</div>
@@ -3441,6 +3600,7 @@ function mePage() {
       : "You haven't invited anyone yet.";
   };
   api("GET", "/api/invites").then(tally, () => { $("#invite-tally").textContent = ""; });
+  $("#help").onclick = helpSheet;
   view.querySelectorAll("[data-theme-set]").forEach((b) => (b.onclick = () => { setTheme(b.dataset.themeSet); mePage(); }));
   $("#photos-pref").onchange = (e) => { showPhotos = e.target.checked; remember("gtg-photos", showPhotos); toast(showPhotos ? "Showing photos" : "Showing icons"); };
   $("#invite").onclick = async () => {
@@ -3483,7 +3643,7 @@ function mePage() {
     if (!confirm("Clear all your beds and plants and start again? This can't be undone.")) return;
     try {
       S.g = await api("POST", "/api/me/reset-garden", { password: $("#rspw").value });
-      onb.step = 1; onb.picked = new Set(); go("#/start"); toast("Fresh start! Let's set up your garden 🌱");
+      quiz.step = 0; quiz.a = { goals: [] }; go("#/start"); toast("Fresh start! Let's set up your garden 🌱");
     } catch (e) { toast(e.message); }
   };
   $("#delete").onclick = async () => {

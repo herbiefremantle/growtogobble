@@ -165,7 +165,7 @@ def run_once(get_forecast=forecast):
         users = db.rows(conn, "SELECT DISTINCT u.* FROM users u JOIN push_subs p ON p.user_id = u.id")
         cache = {}
         for user in users:
-            state = garden.load(conn, user)
+            state = garden.load(conn, user, real_only=True)  # never alerts about a sample garden
             sent = {r["key"] for r in db.rows(conn, "SELECT key FROM sent WHERE user_id = ?", user["id"])}
             lat, lon = user["lat"], user["lon"]
             if lat is None:
@@ -204,7 +204,7 @@ def _ics_escape(text):
 
 def ics(conn, user):
     """Every upcoming job as an all-day event, for Google/Apple Calendar to subscribe to."""
-    state = garden.load(conn, user)
+    state = garden.load(conn, user, real_only=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Grow to Gobble//Garden jobs//EN",
              "X-WR-CALNAME:Grow to Gobble garden jobs", "CALSCALE:GREGORIAN"]

@@ -10,7 +10,7 @@ import os
 import re
 import secrets
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import alerts, auth, clock, db, garden, planner, regions
+from . import alerts, auth, clock, db, garden, onboarding, planner, regions
 from . import plants as catalogue
 
 STATIC = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
@@ -155,6 +155,7 @@ def _me(user):
         "calendar_path": "/calendar/%s.ics" % user["cal_token"],
         "push_key": alerts.public_key(), "is_admin": bool(user["is_admin"]),
         "map_start": [user["lat"], user["lon"]] if user["lat"] is not None else [region["lat"], region["lon"]],
+        "onboarding": json.loads(user["onboarding"]) if user.get("onboarding") else None,
     }
 
 
@@ -349,7 +350,7 @@ def admin_overview(admin=Depends(auth.current_admin)):
     with db.connect() as conn:
         users = db.rows(conn, """
             SELECT u.id, u.name, u.email, u.outcode, u.region, u.is_admin, u.last_active, u.created_at,
-                   (SELECT COUNT(*) FROM crops c WHERE c.user_id = u.id) AS crops,
+                   (SELECT COUNT(*) FROM crops c WHERE c.user_id = u.id AND COALESCE(c.is_sample, 0) = 0) AS crops,
                    (SELECT COUNT(*) FROM push_subs p WHERE p.user_id = u.id) AS devices,
                    (SELECT COUNT(*) FROM invites i WHERE i.user_id = u.id) AS invites_sent,
                    (SELECT COUNT(*) FROM users j WHERE j.invited_by = u.id) AS invites_joined,
@@ -411,6 +412,108 @@ def admin_delete(user_id: int, admin=Depends(auth.current_admin)):
 
 
 # ---- plants & garden ------------------------------------------------------------------------------
+
+# ---- onboarding: quiz answers, the tour, the starter plan, and sample gardens ---------------------------------
+class OnboardingIn(BaseModel):
+    changes: dict
+
+
+@app.patch("/api/me/onboarding")
+def save_onboarding(body: OnboardingIn, user=Depends(auth.current_user)):
+    profile = onboarding.merge(json.loads(user["onboarding"]) if user.get("onboarding") else None, body.changes)
+    with db.connect() as conn:
+        conn.execute("UPDATE users SET onboarding = ? WHERE id = ?", (json.dumps(profile), user["id"]))
+    return profile
+
+
+@app.get("/api/onboarding/tour")
+def onboarding_tour(path: Optional[str] = None, user=Depends(auth.current_user)):
+    return onboarding.tour(json.loads(user["onboarding"]) if user.get("onboarding") else None, path)
+
+
+@app.get("/api/onboarding/starter")
+def onboarding_starter(user=Depends(auth.current_user)):
+    profile = json.loads(user["onboarding"]) if user.get("onboarding") else None
+    return {"plants": onboarding.starter_plan(profile, clock.today(), garden.shift_for(user)),
+            "path": onboarding.path_for(profile), "sample": onboarding.SAMPLE_FOR_SPACE[onboarding.answers(profile)["space"]]}
+
+
+class SampleIn(BaseModel):
+    kind: str
+
+
+@app.post("/api/sample")
+def load_sample(body: SampleIn, user=Depends(auth.current_user)):
+    """A ready-made sample garden to explore - ordinary beds and crops marked as a sample. Replaces any sample
+    already loaded; never touches the user's own garden."""
+    spec = onboarding.SAMPLES.get(body.kind)
+    if not spec:
+        raise HTTPException(400, "Unknown sample")
+    today, shift = clock.today(), garden.shift_for(user)
+    with db.connect() as conn:
+        _clear_sample(conn, user)
+        now = clock.now().isoformat()
+        # put it beside anything already on the plan, so it doesn't land on top
+        right = conn.execute("SELECT MAX(pos_x + COALESCE(width_m, 1.2)) FROM spaces WHERE user_id = ? AND pos_x IS NOT NULL", (user["id"],)).fetchone()[0]
+        dx = (right + 2) if right else 0
+        if spec.get("garden") and not user.get("garden_w"):
+            conn.execute("UPDATE users SET garden_w = ?, garden_h = ?, garden_shape = NULL WHERE id = ?", (*spec["garden"], user["id"]))
+            profile = onboarding.merge(json.loads(user["onboarding"]) if user.get("onboarding") else None, {})
+            profile["sampleGarden"] = True
+            conn.execute("UPDATE users SET onboarding = ? WHERE id = ?", (json.dumps(profile), user["id"]))
+        for n, sp in enumerate(spec["spaces"]):
+            cur = conn.execute(
+                "INSERT INTO spaces (user_id, name, kind, width_m, length_m, soil, built, pos_x, pos_y, pot_size, pot_count, rotation, is_sample, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)",
+                (user["id"], sp["name"], sp["kind"], sp.get("w"), sp.get("l"), "compost", 1 if sp["kind"] != "pot" else None,
+                 (sp.get("x") if "x" in sp else 0.5 + (n % 3) * 1.6) + dx, sp.get("y") if "y" in sp else 0.5 + (n // 3) * 1.6,
+                 sp.get("pot_size"), 1 if sp["kind"] == "pot" else None, sp.get("rotation"), now))
+            space_id = cur.lastrowid
+            for c in sp["crops"]:
+                plant = catalogue.BY_ID[c["plant_id"]]
+                method = c["method"] if c["method"] in planner.methods_for(plant) else planner.methods_for(plant)[0]
+                # aim at the window it was started in (so the jobs read as this season, not next year's)
+                started = today - timedelta(days=max(c.get("sown", 0) or 0, c.get("planted", 0) or 0))
+                win = planner.plan_anchor(plant, method, started, shift) or (started, started)
+                conn.execute(
+                    "INSERT INTO crops (user_id, plant_id, space_id, method, quantity, anchor, anchor_end, variety, sown_on, planted_on, harvested_on, is_sample, created_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)",
+                    (user["id"], plant["id"], space_id, method, c["quantity"], min(win[0], started).isoformat(), max(win[1], started).isoformat(),
+                     c.get("variety"), onboarding.dated(c.get("sown"), today), onboarding.dated(c.get("planted"), today),
+                     onboarding.dated(c.get("harvested"), today), now))
+        for f in spec.get("features", []):
+            conn.execute("INSERT INTO features (user_id, kind, name, x, y, w, h, is_sample, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)",
+                         (user["id"], f["kind"], f["name"], f["x"] + dx, f["y"], f["w"], f["h"], now))
+        return garden.payload(conn, _fresh(conn, user))
+
+
+def _fresh(conn, user):
+    """The user's details as they are now (a sample can change the plot size)."""
+    return dict(conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone())
+
+
+def _clear_sample(conn, user):
+    """Take away everything marked as a sample - and only that."""
+    ids = [r[0] for r in conn.execute("SELECT id FROM crops WHERE user_id = ? AND is_sample = 1", (user["id"],))]
+    for cid in ids:
+        conn.execute("DELETE FROM done WHERE user_id = ? AND key LIKE ?", (user["id"], "c%d:%%" % cid))
+    conn.execute("DELETE FROM crops WHERE user_id = ? AND is_sample = 1", (user["id"],))
+    conn.execute("DELETE FROM spaces WHERE user_id = ? AND is_sample = 1", (user["id"],))
+    conn.execute("DELETE FROM features WHERE user_id = ? AND is_sample = 1", (user["id"],))
+    row = conn.execute("SELECT onboarding FROM users WHERE id = ?", (user["id"],)).fetchone()
+    profile = json.loads(row["onboarding"]) if row and row["onboarding"] else None
+    if profile and profile.get("sampleGarden"):  # the sample set the plot size - put it back
+        conn.execute("UPDATE users SET garden_w = NULL, garden_h = NULL WHERE id = ?", (user["id"],))
+        profile.pop("sampleGarden")
+        conn.execute("UPDATE users SET onboarding = ? WHERE id = ?", (json.dumps(profile), user["id"]))
+
+
+@app.delete("/api/sample")
+def clear_sample(user=Depends(auth.current_user)):
+    with db.connect() as conn:
+        _clear_sample(conn, user)
+        return garden.payload(conn, _fresh(conn, user))
+
 
 @app.get("/api/plants")
 def plant_list(request: Request):

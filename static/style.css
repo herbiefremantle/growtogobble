@@ -772,3 +772,47 @@ svg.plot .grp-tag { fill: #fff; font-weight: 800; paint-order: stroke; stroke: r
 .noroom-opts { display: flex; flex-wrap: wrap; gap: 6px; }
 .use.tight .progress i { background: var(--marigold); }
 .use.over .progress i { background: var(--terra); }
+
+/* setup quiz and starter plan */
+.quiz { max-width: 520px; margin: 0 auto; }
+.quiz-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.quiz h1 { margin-top: 18px; outline: none; }
+.quiz-opts { display: grid; gap: 10px; margin: 16px 0; }
+.quiz-opt { display: flex; align-items: center; gap: 14px; padding: 16px; min-height: 64px; text-align: left; font: inherit; font-size: 17px; color: var(--ink);
+  background: var(--card); border: 1.5px solid var(--line); border-radius: 14px; cursor: pointer; }
+.quiz-opt .e { font-size: 28px; }
+.quiz-opt.on { border-color: var(--forest-2); background: color-mix(in srgb, var(--sage) 60%, var(--card)); }
+.quiz-opt:focus-visible { outline: 2px solid var(--forest-2); outline-offset: 2px; }
+.quiz-bottom { display: grid; gap: 6px; margin-top: 8px; }
+.starter { display: flex; gap: 12px; align-items: center; width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: 0;
+  border-bottom: 1px solid var(--line); padding: 10px 0; cursor: pointer; }
+.starter:last-of-type { border-bottom: 0; }
+.starter .e { font-size: 30px; width: 46px; height: 46px; display: grid; place-items: center; flex: none; border-radius: 12px; overflow: hidden; }
+.starter .t { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.mini-cal { display: grid; grid-template-columns: repeat(12, 1fr); gap: 2px; margin-top: 4px; }
+.mini-cal span { font-size: 9px; text-align: center; border-radius: 3px; background: var(--bg-2); color: var(--muted); line-height: 14px; }
+.mini-cal span.sow { background: var(--leaf); color: #fff; } .mini-cal span.pick { background: var(--marigold); color: #2b1d00; }
+.mini-cal span.now { outline: 1.5px solid var(--ink); }
+.legend i.sow { background: var(--leaf); } .legend i.pick { background: var(--marigold); }
+
+/* the guided tour */
+#tour { position: fixed; inset: 0; z-index: 50; }
+#tour .tour-block { position: absolute; inset: 0; }
+#tour .tour-ring { position: fixed; border-radius: 12px; box-shadow: 0 0 0 9999px rgba(10, 20, 14, .55); border: 2px solid var(--forest-2); pointer-events: none; transition: all .25s; }
+#tour .tour-bubble { position: fixed; left: 12px; right: 12px; max-width: 380px; margin: 0 auto; background: var(--card); color: var(--ink); border-radius: 16px;
+  padding: 14px 16px; box-shadow: var(--shadow-lift); border: 1px solid var(--line); }
+#tour .tour-bubble h3 { margin: 4px 0; }
+#tour .tour-bubble p { margin: 0; }
+.tour-why summary { cursor: pointer; font-weight: 700; font-size: 14px; color: var(--forest-2); margin-top: 8px; }
+@media (prefers-reduced-motion: reduce) { #tour .tour-ring { transition: none; } }
+
+/* getting started checklist */
+.cl-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+.cl-row .n { flex: 1; } .cl-row.done .n { color: var(--muted); text-decoration: line-through; }
+.cl-tick { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; font-size: 13px; color: var(--on-primary); flex: none; }
+.cl-row.done .cl-tick { background: var(--forest-2); border-color: var(--forest-2); }
+
+/* sample garden banner */
+.samplebar { position: sticky; top: calc(56px + env(safe-area-inset-top)); z-index: 4; display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  max-width: 760px; margin: 8px auto 0; padding: 8px 12px; border-radius: 12px; background: var(--marigold-soft); border: 1px solid color-mix(in srgb, var(--marigold) 40%, var(--line));
+  font-size: 14px; width: calc(100% - 32px); }

@@ -957,3 +957,80 @@ def test_start_indoors_goes_in_when_the_bed_frees_up():
     # lettuce's indoor season (to 10 April) is over by then, so that isn't offered - sowing later outside is
     assert planner.earliest_fit(bed, [(radish, jobs)], cat.BY_ID["salad"], "sow_in", 20, today, 0) is None
     assert planner.earliest_fit(bed, [(radish, jobs)], cat.BY_ID["salad"], "sow_out", 20, today, 0)["goes_in"] == "2027-06-10"
+
+
+# ---- onboarding ----------------------------------------------------------------------------------------
+def test_quiz_answers_are_saved_checked_and_can_be_skipped(client):
+    me = _join(client)
+    assert me["onboarding"] is None                       # a new user: the app sends them to the quiz
+    p = client.patch("/api/me/onboarding", json={"changes": {"experience": "beginner", "space": "pots", "goals": ["herbs_flowers", "nope"],
+                                                             "time": "lots"}}).json()
+    assert p["experience"] == "beginner" and p["space"] == "pots" and p["goals"] == ["herbs_flowers"] and p["time"] is None
+    p = client.patch("/api/me/onboarding", json={"changes": {"skip": True, "skippedAt": "2026-10-13"}}).json()
+    assert p["time"] == "moderate" and p["experience"] == "beginner" and p["skippedAt"]   # answered stays, the rest defaults
+    assert client.get("/api/me").json()["onboarding"]["space"] == "pots"
+
+
+def test_tour_path_follows_the_space_and_experience_changes_it(client):
+    from app import onboarding as ob
+    assert [ob.path_for({"space": s}) for s in ("pots", "small", "medium", "large")] == ["A", "B", "C", "C"]
+    assert ob.path_for(None) == "B"                        # skipped: a small garden
+    some = ob.tour({"space": "small", "experience": "some"})
+    assert some["path"] == "B" and len(some["steps"]) == 6 and not any("why" in s for s in some["steps"])
+    beginner = ob.tour({"space": "small", "experience": "beginner"})
+    assert all(s.get("why") for s in beginner["steps"][:-1])  # plain-English "why this matters" on each step
+    confident = ob.tour({"space": "large", "experience": "confident"})
+    assert confident["path"] == "C" and len(confident["steps"]) == 5   # 3 steps, the advanced pointer, the checklist
+    assert ob.tour({"space": "pots"}, path="C")["path"] == "C"         # replaying a different path from Help
+    _ = client
+
+
+def test_starter_plan_suits_the_month_space_and_time(monkeypatch):
+    from datetime import date
+    from app import onboarding as ob, plants as cat
+    october = date(2026, 10, 13)
+    plan = ob.starter_plan({"space": "small", "goals": ["veg"], "time": "moderate"}, october, 0)
+    ids = [x["plant_id"] for x in plan]
+    assert 3 <= len(plan) <= 5 and ({"garlic", "broad_beans", "onions"} & set(ids))   # autumn planting
+    assert all(x["from"] <= "2027-03-01" for x in plan[:3])
+    pots = ob.starter_plan({"space": "pots", "goals": ["veg", "herbs_flowers"], "time": "minimal"}, october, 0)
+    assert len(pots) <= 3 and all("pot" in cat.BY_ID[x["plant_id"]]["where"] and cat.BY_ID[x["plant_id"]]["level"] == 1 for x in pots)
+    kids = ob.starter_plan({"space": "medium", "goals": ["kids"], "time": "plenty"}, date(2027, 4, 1), 0)
+    assert kids and all(x["plant_id"] in ob.KID_FAVOURITES for x in kids)
+
+
+def test_sample_gardens_load_and_clear_without_touching_real_data(client, monkeypatch):
+    from datetime import date
+    from app import clock
+    monkeypatch.setattr(clock, "today", lambda: date(2026, 7, 1))
+    _join(client)
+    mine = _bed(client, 1.2, 2.4, "My bed")
+    client.post("/api/crops", json={"plant_id": "radish", "space_id": mine, "quantity": 10})
+    g = client.post("/api/sample", json={"kind": "B"}).json()
+    samples = [s for s in g["spaces"] if s["is_sample"]]
+    assert len(samples) == 4 and g["has_sample"]
+    # dates are worked out from today: carrots sown 50 days ago
+    carrots = next(c for c in g["crops"] if c["is_sample"] and c["plant_id"] == "carrots")
+    assert carrots["sown_on"] == "2026-05-12"
+    # Bed 2 is a deliberate squeeze: warned about, not blocked
+    from app import planner
+    bed2 = next(s for s in samples if s["name"] == "Bed 2")
+    assert 1.0 < bed2["usage"]["peak"] / bed2["usage"]["area"] <= 1.1
+    # the checklist only counts the user's own garden; samples never earn badges
+    assert g["checklist"] == {"firstCrop": True, "firstBed": True, "reminders": False}
+    # an allotment sample sets the plot size, rotation groups on the beds - and clearing puts things back
+    g = client.post("/api/sample", json={"kind": "C"}).json()
+    assert g["garden"]["w"] == 10 and g["garden"]["h"] == 20 and len(g["garden"]["features"]) == 4
+    assert sorted(s["rotation"] for s in g["spaces"] if s["is_sample"] and s["rotation"] is not None) == [0, 1, 2, 3, 4]
+    assert not any(s["name"] == "Bed 2" for s in g["spaces"])           # loading one sample replaces the other
+    g = client.delete("/api/sample").json()
+    assert [s["name"] for s in g["spaces"]] == ["My bed"] and [c["plant_id"] for c in g["crops"]] == ["radish"]
+    assert g["garden"]["w"] is None and not g["garden"]["features"] and not g["has_sample"]
+
+
+def test_samples_are_left_out_of_alerts_and_the_calendar_feed(client):
+    _join(client)
+    client.post("/api/sample", json={"kind": "A"})
+    me = client.get("/api/me").json()
+    feed = client.get(me["calendar_path"]).text
+    assert "tomatoes" not in feed.lower() and "chillies" not in feed.lower()

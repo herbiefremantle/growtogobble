@@ -12,13 +12,16 @@ def shift_for(user):
     return regions.REGIONS.get(user["region"], regions.REGIONS["central"])["shift"]
 
 
-def load(conn, user, today=None):
+def load(conn, user, today=None, real_only=False):
+    """real_only: leave out sample gardens - for alerts, the calendar feed, badges and anything else that's about
+    the user's own garden."""
     today = today or clock.today()
     shift = shift_for(user)
-    spaces = rows(conn, "SELECT * FROM spaces WHERE user_id = ? ORDER BY id", user["id"])
+    real = " AND COALESCE(is_sample, 0) = 0" if real_only else ""
+    spaces = rows(conn, "SELECT * FROM spaces WHERE user_id = ?%s ORDER BY id" % real, user["id"])
     for space in spaces:
         space["shape"] = planner.shape_of(space)
-    crops = rows(conn, "SELECT * FROM crops WHERE user_id = ? ORDER BY id", user["id"])
+    crops = rows(conn, "SELECT * FROM crops WHERE user_id = ?%s ORDER BY id" % real, user["id"])
     # ticked jobs, and the day each was ticked (ongoing jobs like weeding come round again a set time after)
     done = {r["key"]: r["done_on"] for r in rows(conn, "SELECT key, done_on FROM done WHERE user_id = ?", user["id"])}
     has_push = conn.execute("SELECT 1 FROM push_subs WHERE user_id = ?", (user["id"],)).fetchone() is not None
@@ -107,7 +110,9 @@ def payload(conn, user):
     """Everything the app screen needs, in one go."""
     state = load(conn, user)
     today = state["today"]
-    new_badges = update_badges(conn, user, state)
+    real = dict(state, spaces=[s for s in state["spaces"] if not s.get("is_sample")],
+                crops=[c for c in state["crops"] if not c.get("is_sample")])
+    new_badges = update_badges(conn, user, real)  # sample gardens never earn badges
     earned = {r["badge"]: r["earned_on"] for r in rows(conn, "SELECT * FROM badges WHERE user_id = ?", user["id"])}
     space_names = {s["id"]: s["name"] for s in state["spaces"]}
 
@@ -156,6 +161,9 @@ def payload(conn, user):
                    "path_w": user.get("path_w") if user.get("path_w") is not None else 0.5,
                    "features": rows(conn, "SELECT id, kind, name, x, y, w, h, angle, grp, variety, cultivar FROM features WHERE user_id = ? ORDER BY id", user["id"])},
         "spaces": spaces_out,
+        # the getting-started checklist ticks itself off from real things done (never from a sample garden)
+        "checklist": {"firstCrop": bool(real["crops"]), "firstBed": bool(real["spaces"]), "reminders": state["has_push"]},
+        "has_sample": any(s.get("is_sample") for s in state["spaces"]),
         "crops": crops_out,
         "shopping": shopping,
         "badges": [dict(b, earned_on=earned.get(b["id"])) for b in planner.BADGES],
