@@ -515,8 +515,6 @@ function home() {
   const jobs = allJobs();
   const t = today();
   const recentMiss = (j) => j.status === "missed" && ["sow", "plant"].includes(j.action) && daysBetween(d(j.end), t) <= 21;
-  const now = jobs.filter((j) => j.kind !== "buy" && (j.status === "now" || recentMiss(j))).sort((a, b) => a.end.localeCompare(b.end));
-  const soon = jobs.filter((j) => j.kind !== "buy" && j.status === "soon").sort((a, b) => a.start.localeCompare(b.start));
   const buyNow = S.g.shopping.filter((s) => s.job.status === "now" || s.job.status === "soon" || s.job.status === "missed");
   const hour = new Date().getHours();
   const hello = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
@@ -536,8 +534,12 @@ function home() {
       <div><b>📦 Build ${esc(unbuilt[0].name)}</b><div class="small muted">${unbuilt[0].nodig_done.length} of ${S.cat.nodig_steps.length} steps done</div></div><span class="btn small">Let's build 👉</span></div>`;
   else nudge = pushBanner();
 
-  const list = [...now, ...soon];
-  const shown = homeAll ? list : list.slice(0, 3);
+  // this week: anything you can do in the next 7 days; then what's coming in the 30 days after that
+  const open = (j) => j.kind !== "buy" && j.status !== "done" && j.status !== "waiting";
+  const week = jobs.filter((j) => open(j) && (recentMiss(j) || (j.status !== "missed" && daysBetween(t, d(j.start)) <= 7)))
+    .sort((a, b) => a.end.localeCompare(b.end));
+  const month = jobs.filter((j) => open(j) && j.status !== "missed" && daysBetween(t, d(j.start)) > 7 && daysBetween(t, d(j.start)) <= 30)
+    .sort((a, b) => a.start.localeCompare(b.start));
   // the numbers: how far through the season, what needs doing now, and what's still to buy
   const all = jobs.filter((j) => j.kind !== "buy"), doneN = all.filter((j) => j.status === "done").length;
   const pct = all.length ? Math.round((100 * doneN) / all.length) : 0, toBuy = S.g.spaces.reduce((n, sp) => n + sp.cost.to_buy, 0);
@@ -548,16 +550,18 @@ function home() {
       <div class="stat"><svg class="ring" viewBox="0 0 34 34" aria-hidden="true"><circle class="bg" cx="17" cy="17" r="14" fill="none" stroke-width="4"/>
         <circle class="fg" cx="17" cy="17" r="14" fill="none" stroke-width="4" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct / 100)}" transform="rotate(-90 17 17)"/></svg>
         <b>${pct}%</b><span>of the season's jobs done</span></div>
-      <div class="stat ${now.length ? "warn" : ""}"><b>${now.length}</b><span>job${now.length === 1 ? "" : "s"} to do now</span></div>
+      <div class="stat ${week.length ? "warn" : ""}"><b>${week.length}</b><span>job${week.length === 1 ? "" : "s"} this week</span></div>
       <a class="stat" href="#/shop"><b>${money(toBuy)}</b><span>seeds & plants still to buy</span></a>
     </div>
     ${nudge}
-    <div class="section-title"><h2>${now.length ? "Your next jobs" : "Coming up"}</h2>${list.length > 3 ? `<button class="btn small ghost" id="more">${homeAll ? "Show fewer" : `See all ${list.length}`}</button>` : ""}</div>
-    <div class="card">${shown.length ? shown.map((j) => jobCard(j, { showSpace: true })).join("") :
-      `<div class="empty"><b>Nothing to do right now.</b><br>Enjoy the garden.</div>`}</div>
+    <div class="section-title"><h2>This week</h2><span class="small muted">next 7 days</span></div>
+    <div class="card">${week.length ? week.map((j) => jobCard(j, { showSpace: true })).join("") :
+      `<div class="empty"><b>Nothing to do this week.</b><br>Enjoy the garden.</div>`}</div>
+    ${month.length ? `<details class="card later" ${homeAll ? "open" : ""} id="later"><summary><b>Next 30 days</b> <span class="small muted">${month.length} job${month.length === 1 ? "" : "s"}</span></summary>
+      ${month.map((j) => jobCard(j, { showSpace: true })).join("")}</details>` : ""}
     ${buyNow.length ? `<a href="#/shop" class="link-row">🛒 <b>${buyNow.length} thing${buyNow.length === 1 ? "" : "s"} to buy soon</b> <span>${buyNow.slice(0, 5).map((x) => plant(x.plant_id).emoji).join(" ")} 👉</span></a>` : ""}`;
-  const more = $("#more");
-  if (more) more.onclick = () => { homeAll = !homeAll; home(); };
+  const later = $("#later");
+  if (later) later.ontoggle = () => { homeAll = later.open; };  // stays open after ticking something
   wirePush();
 }
 

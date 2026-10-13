@@ -706,3 +706,9 @@ button.link-row { font: inherit; cursor: pointer; text-align: left; }
   font-size: 13px; cursor: pointer; opacity: .65; }
 .job-x:hover, .job-x:focus-visible { opacity: 1; background: var(--bg-2); color: var(--terra); }
 .crop-row .stage { display: none; }  /* the crop's own page shows how far along it is - lists stay tidy */
+
+details.later > summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+details.later > summary::-webkit-details-marker { display: none; }
+details.later > summary::after { content: "›"; color: var(--muted); font-size: 20px; transform: rotate(90deg); }
+details.later[open] > summary { margin-bottom: 12px; }
+details.later[open] > summary::after { transform: rotate(-90deg); }
