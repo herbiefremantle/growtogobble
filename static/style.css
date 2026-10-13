@@ -868,3 +868,21 @@ svg.plot .grp-tag { fill: #fff; font-weight: 800; paint-order: stroke; stroke: r
 .hero-title .g { color: var(--forest-2); }
 .hero p.hero-sub { font-size: 16.5px; line-height: 1.5; max-width: 25em; margin: 0 auto 18px; }
 .hero-sub b { color: var(--ink); font-weight: 800; }
+
+/* the reel's finish */
+.reel-finale { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; text-align: center; border-radius: 12px; padding: 14px 12px;
+  color: #fff; position: relative; overflow: hidden;
+  background: radial-gradient(120% 80% at 50% 0%, rgba(255, 255, 255, .18), transparent 60%), radial-gradient(90% 70% at 100% 100%, rgba(242, 179, 76, .35), transparent 60%), linear-gradient(160deg, #1e9e5a, #0f5e34); }
+.fin-veg { display: flex; gap: 4px; font-size: clamp(22px, 6.5vw, 30px); line-height: 1; }
+.fin-veg span { display: inline-block; animation: fin-pop .5s cubic-bezier(.3, 1.6, .5, 1) both; }
+.fin-title { font: 800 clamp(22px, 6.4vw, 30px)/1.05 var(--display); letter-spacing: -.02em; animation: fin-up .5s .55s ease-out both; }
+.fin-title span { color: #ffd479; display: inline-block; }
+.fin-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; }
+.fin-chips span { font: 700 11.5px "Figtree", sans-serif; background: rgba(255, 255, 255, .16); border: 1px solid rgba(255, 255, 255, .25); border-radius: 999px; padding: 4px 9px; animation: fin-up .45s ease-out both; }
+.fin-chips span:nth-child(1) { animation-delay: 1s; } .fin-chips span:nth-child(2) { animation-delay: 1.25s; } .fin-chips span:nth-child(3) { animation-delay: 1.5s; }
+.fin-cta { background: #fff; color: var(--forest); font: 800 15px "Figtree", sans-serif; text-decoration: none; border-radius: 999px; padding: 10px 20px;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, .15), 0 12px 24px -10px rgba(0, 0, 0, .5); animation: fin-up .45s 1.9s ease-out both, fin-pulse 1.6s 2.6s ease-in-out infinite; }
+@keyframes fin-pop { from { transform: scale(0) rotate(-20deg); opacity: 0; } }
+@keyframes fin-up { from { transform: translateY(10px); opacity: 0; } }
+@keyframes fin-pulse { 50% { transform: scale(1.05); } }
+.reel.ended .reel-play { left: auto; right: 22px; bottom: 34px; transform: none; width: 34px; height: 34px; padding: 0; font-size: 17px; background: rgba(255, 255, 255, .22); color: #fff; border: 1px solid rgba(255, 255, 255, .4); box-shadow: none; }

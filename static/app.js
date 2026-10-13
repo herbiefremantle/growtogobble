@@ -621,7 +621,7 @@ function clipCode(name) {
 const REEL = [
   { clip: "real_map", title: "Find your plot on a real satellite map", from: 0.3, s: 11.9 },
   { clip: "sat_veg", title: "Fill your beds - and cost the seeds", from: 0.5, s: 17 },
-  { card: "We tell you what to do, and when", sub: "Free to join", s: 1.2 },
+  { finale: true, s: 4 },
 ];
 function reelHtml() {
   if (reduceMotion()) return `<div class="reel still"><ol class="steps clip-steps">${["Type your postcode and find your plot on a satellite map", "Tap its corners - it's measured for you", "Add your beds, a tree, a shed", "Pick your veg or a grow-together group - we check it fits", "See what the seeds will cost", "We tell you what to do, and when"].map((t) => `<li>${t}</li>`).join("")}</ol></div>`;
@@ -634,12 +634,18 @@ function wireReel() {
   const screen = $("#reel-screen"), bars = box.querySelectorAll(".reel-bar i"), btn = $("#reel-play");
   let timer = null, raf = null;
   const card = (r) => `<div class="reel-card"><b>${esc(r.card)}</b>${r.sub ? `<span>${esc(r.sub)}</span>` : ""}</div>`;
+  // the finish: a harvest popping in, the promise, what you get, and the way in
+  const finale = () => `<div class="reel-finale">
+    <div class="fin-veg" aria-hidden="true">${["🥕", "🍅", "🧄", "🌽", "🫘", "🥬", "🍓"].map((e, i) => `<span style="animation-delay:${i * 0.08}s">${e}</span>`).join("")}</div>
+    <b class="fin-title">Plan it. Grow it. <span>Gobble it.</span></b>
+    <div class="fin-chips"><span>🛰️ Your real plot, to scale</span><span>🔔 Nudges when it's time</span><span>💷 Seeds costed up front</span></div>
+    <a class="fin-cta" href="#/join">Start growing - it's free</a></div>`;
   const stop = () => { clearTimeout(timer); cancelAnimationFrame(raf); };
   const show = (i) => {
     stop();
-    if (i >= REEL.length || !document.body.contains(box)) { box.classList.remove("playing"); btn.textContent = "↻ Watch again"; btn.hidden = false; return; }
+    if (i >= REEL.length || !document.body.contains(box)) { box.classList.remove("playing"); box.classList.add("ended"); btn.textContent = "↻"; btn.setAttribute("aria-label", "Watch again"); btn.title = "Watch again"; btn.hidden = false; return; }
     const r = REEL[i];
-    screen.innerHTML = r.card ? card(r) : `<div class="reel-title">${esc(r.title)}</div>${clipCode(r.clip)}`;
+    screen.innerHTML = r.finale ? finale() : r.card ? card(r) : `<div class="reel-title">${esc(r.title)}</div>${clipCode(r.clip)}`;
     const svg = screen.querySelector("svg");
     if (svg) svg.setCurrentTime(r.from || 0);
     bars.forEach((b, j) => { b.style.width = j < i ? "100%" : "0"; });
@@ -648,7 +654,7 @@ function wireReel() {
     tick();
     timer = setTimeout(() => show(i + 1), r.s * 1000);
   };
-  btn.onclick = () => { btn.hidden = true; box.classList.add("playing"); show(0); };
+  btn.onclick = () => { btn.hidden = true; box.classList.remove("ended"); box.classList.add("playing"); show(0); };
   screen.innerHTML = card({ card: "Grow your own food, step by step", sub: "See it in 30 seconds" });
   // plays by itself the first time it scrolls into view
   if ("IntersectionObserver" in window) {
