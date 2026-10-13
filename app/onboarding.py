@@ -115,7 +115,7 @@ TOURS = {
     ],
 }
 CLOSER = {"route": "#/", "anchor": "#checklist, .today-head", "title": "You're set up",
-          "body": "First job: add your first crop. The checklist ticks itself off as you go."}
+          "body": "First job: add your first bed or pots, then choose what to grow in it. The checklist ticks itself off as you go."}
 CONFIDENT_EXTRA = {"route": "#/plants", "prep": "groups", "anchor": '[data-pgroup="groups"]', "title": "When you're ready",
                    "body": "Grow-together groups, rows sown a few weeks apart for a steady supply, and capacity checks for every bed."}
 
@@ -167,8 +167,13 @@ def starter_plan(profile, today, shift):
             ok = True
         return ok
 
+    flowers_only = goals <= {"herbs_flowers", "kids"} and "herbs_flowers" in goals
+    is_flower = lambda p: p["group"] in ("flower", "companion")
+
     def score(p, start):
         s = (start - today).days
+        if is_flower(p) and not flowers_only:  # food first - flowers are the extras
+            s += 90
         if "kids" in goals and p["id"] in KID_FAVOURITES:
             s -= 30
         if "fruit" in goals and p["family"] in FRUIT_GROUPS:
@@ -188,7 +193,14 @@ def starter_plan(profile, today, shift):
         if len(picks) >= 3:
             break
     picks.sort()
-    return [{"plant_id": pid, "method": m, "from": w[0].isoformat(), "to": w[1].isoformat()} for _, pid, m, w in picks[:most]]
+    chosen, flowers = [], 0
+    for pick in picks:  # at most one flower unless flowers are all they're after
+        if is_flower(catalogue.BY_ID[pick[1]]):
+            if flowers >= (most if flowers_only else 1):
+                continue
+            flowers += 1
+        chosen.append(pick)
+    return [{"plant_id": pid, "method": m, "from": w[0].isoformat(), "to": w[1].isoformat()} for _, pid, m, w in chosen[:most]]
 
 
 # ---- sample gardens ----------------------------------------------------------------------------------------

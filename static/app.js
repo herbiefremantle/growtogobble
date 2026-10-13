@@ -253,6 +253,7 @@ function welcome() {
       <div id="share-out"></div>
     </div>
   </section>
+  <section class="reel-wrap"><h2>See how it works</h2>${reelHtml()}</section>
   <div class="card tint-sun" style="margin-top:24px">
     <h3>🧒 Simple enough for a 10-year-old</h3>
     <p class="muted" style="margin:0">Every job is a short list of steps with pictures. Tick them off, earn badges and eat what you grow.</p>
@@ -261,6 +262,7 @@ function welcome() {
   <div class="card tint-sky"><h3>🔔 We'll remind you</h3><p class="muted" style="margin:0">Your phone gets a nudge when it's time to sow, plant, water, pick and protect from frost, with dates for where you live.</p></div>`;
   $("#share-app").onclick = () => shareApp($("#share-out"));
   showInviter($("#invited"));
+  wireReel();
 }
 
 // Share the app itself (not a personal invite) - the phone's share menu, or copy / WhatsApp / email / text
@@ -387,21 +389,24 @@ async function starterPlan() {
   const mini = (p) => `<div class="mini-cal" aria-label="When to sow and pick">${MONTHS.map((m, i) => {
     const k = p.months.harvest.includes(i + 1) ? "pick" : [...p.months.sow_in, ...p.months.sow_out, ...p.months.plant_out].includes(i + 1) ? "sow" : "";
     return `<span class="${k} ${i + 1 === nowM ? "now" : ""}" title="${m}">${m[0]}</span>`; }).join("")}</div>`;
+  const pots = S.me.onboarding.space === "pots";
+  const how = [!pots && ["1 · Draw your garden", "trace_plot"], [`${pots ? 1 : 2} · ${pots ? "Add your pots" : "Add your beds"}`, pots ? "pot_fit" : "add_bed"], [`${pots ? 2 : 3} · Add veg to them`, "add_veg"]].filter(Boolean);
   view.innerHTML = `<div class="quiz">
-    <h1>Your starter plan</h1><p class="muted">Good things to start ${plan.plants.length && daysBetween(today(), d(plan.plants[0].from)) <= 0 ? "now" : "soon"}, picked for your space and what you'd like to grow.</p>
+    <h1>Your starter plan</h1>
+    <div class="card"><h3>First, your space</h3><p class="small muted" style="margin:-4px 0 4px">Add where you'll grow, then choose what goes in it. Here's how:</p>
+      <div class="clip-pair">${how.map(([t, c]) => `<div><b class="small">${t}</b>${clipBlock(c)}</div>`).join("")}</div>
+      <button class="btn primary wide" id="sp-first" style="margin-top:10px">${big ? "Draw your plot" : pots ? "Add your first pots" : "Add your first bed"}</button></div>
+    <h2 style="margin-top:18px">Then, good things to grow</h2><p class="muted" style="margin-top:-4px">To start ${plan.plants.length && daysBetween(today(), d(plan.plants[0].from)) <= 0 ? "now" : "soon"}, picked for your space and what you'd like to grow.</p>
     <div class="card">${plan.plants.map((x) => { const p = plant(x.plant_id); return `<button class="starter" data-open-plant="${p.id}" data-method="${x.method}">
       <span class="e ${blobCls(p)}">${pic(p)}</span><span class="t"><b>${esc(p.name)}</b><span class="small muted">${methodLabel(p, x.method).replace(/^\S+\s/, "")} · ${daysBetween(today(), d(x.from)) <= 0 ? "now until " + fmt(x.to) : "from " + fmt(x.from)}</span>${mini(p)}</span></button>`; }).join("")
       || `<p class="muted">Nothing to start just now - have a look round, and we'll suggest things as the seasons change.</p>`}
       <div class="legend small" style="margin-top:8px"><span><i class="sow"></i>Sow or plant</span><span><i class="pick"></i>Pick</span></div></div>
-    <div class="card"><h3>How it works</h3>
-      <div class="clip-pair"><div>${big ? `<div><b class="small">Draw your plot</b>${clipBlock("trace_plot")}</div>` : ""}<div><b class="small">${S.me.onboarding.space === "pots" ? "Your pots" : "Add a bed"}</b>${clipBlock(S.me.onboarding.space === "pots" ? "pot_fit" : "add_bed")}</div><div><b class="small">Add veg to it</b>${clipBlock("add_veg")}</div></div></div>
-    <button class="btn primary wide" id="sp-tour">Start the tour</button>
+    <button class="btn wide" id="sp-tour">Take the tour</button>
     <button class="btn wide" id="sp-sample" style="margin-top:8px">Explore a sample garden first</button>
-    <button class="btn wide" id="sp-first" style="margin-top:8px">${big ? "Draw your plot" : "Add your first crop"}</button>
     <button class="btn ghost wide" id="sp-skip" style="margin-top:4px">Skip for now</button></div>`;
   $("#sp-tour").onclick = () => { go("#/"); startTour(); };
   $("#sp-sample").onclick = async () => { await loadSample(plan.sample); startTour(); };
-  $("#sp-first").onclick = () => { if (big) { gardenView = "plot"; plotEdit = true; go("#/garden"); } else go("#/plants"); };
+  $("#sp-first").onclick = () => { if (big) { gardenView = "plot"; plotEdit = true; go("#/garden"); } else { go("#/garden"); addSpaceSheet(); } };
   $("#sp-skip").onclick = () => go("#/");
 }
 
@@ -421,7 +426,8 @@ document.addEventListener("click", async (e) => {
 
 // ---- moving demos: a finger doing the real thing, on a mini version of the screen ---------------------------
 // Drawn here (no video files): SVG with its own timeline, looping every CLIP_S seconds. Times are fractions of the loop.
-const CLIP_S = 10;
+let CLIP_S = 10;
+const CLIP_LEN = { trace_plot: 15 };  // seconds, where a demo needs longer than 10
 const anim = (attr, vals, times) => `<animate attributeName="${attr}" values="${vals}" keyTimes="${times}" dur="${CLIP_S}s" repeatCount="indefinite"/>`;
 const during = (a, b) => (b >= 1 ? anim("opacity", "0;0;1;1", `0;${a};${a + 0.01};1`) : anim("opacity", "0;0;1;1;0;0", `0;${a};${a + 0.01};${b};${b + 0.01};1`));
 function moves(points) {  // [[t, x, y], ...]
@@ -440,7 +446,7 @@ const clipSvg = (label, body) => `<svg class="clip" viewBox="0 0 320 210" role="
 const CLIP_STEPS = {
   add_bed: ["Tap Edit plan", "Tap Bed or pots", "Type its size", "Drag it into place"],
   add_veg: ["Pick a crop", "Choose its bed - we check it fits", "It's planted, with its first job"],
-  trace_plot: ["Find your garden on the map", "Tap each corner", "Your plot appears, to scale", "Add beds inside it"],
+  trace_plot: ["Find your garden on the map", "Tap each corner", "Your plot appears, to scale", "Add beds, trees, a shed and more - where they really are"],
   pot_fit: ["Choose your pot size", "See what fits in it", "Tap one to plant it"],
 };
 const CLIPS = {
@@ -474,16 +480,24 @@ const CLIPS = {
     ${finger([[0, 260, 200], [0.12, 50, 86], [0.2, 50, 86], [0.32, 150, 66], [0.4, 150, 66], [0.48, 160, 151], [0.56, 160, 151], [0.66, 320, 230]], [0.18, 0.52])}
     ${captions([[0, 0.3, "1 · Pick a crop"], [0.3, 0.6, "2 · Choose its bed - we check it fits"], [0.6, 1, "3 · It's planted, with its first job"]])}`),
   trace_plot: () => {
-    const P = [[70, 52], [250, 46], [262, 160], [58, 164]], per = 620;
-    return clipSvg("How to draw your plot from the map", `<rect x="10" y="10" width="300" height="166" rx="10" class="clip-sat"/>
-      <ellipse cx="90" cy="70" rx="40" ry="24" class="clip-sat2"/><ellipse cx="220" cy="140" rx="50" ry="22" class="clip-sat2"/><rect x="200" y="58" width="44" height="30" class="clip-roof"/>
-      <path d="M10 28 L310 22" class="clip-road"/>
-      ${P.map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="5" class="clip-dot" opacity="0">${during(0.12 + i * 0.08, 0.98)}</circle>`).join("")}
-      <polygon points="${P.map((p) => p.join(",")).join(" ")}" class="clip-outline" stroke-dasharray="${per}" stroke-dashoffset="${per}">${anim("stroke-dashoffset", `${per};${per};0;0`, "0;0.44;0.56;1")}${anim("fill-opacity", "0;0;.28;.28", "0;0.56;0.6;1")}</polygon>
-      <g opacity="0">${during(0.58, 0.98)}<rect x="122" y="96" width="76" height="20" rx="10" class="clip-card"/><text x="160" y="110" text-anchor="middle" class="clip-t b">12 × 8 m</text></g>
-      <rect x="92" y="78" width="24" height="56" rx="3" class="clip-bed" opacity="0">${during(0.74, 0.98)}</rect><rect x="208" y="104" width="24" height="44" rx="3" class="clip-bed" opacity="0">${during(0.8, 0.98)}</rect>
-      ${finger([[0, 290, 200], [0.1, 70, 52], [0.14, 70, 52], [0.2, 250, 46], [0.22, 250, 46], [0.28, 262, 160], [0.3, 262, 160], [0.36, 58, 164], [0.4, 58, 164], [0.48, 320, 230], [0.7, 320, 230], [0.74, 104, 106], [0.78, 104, 106], [0.86, 320, 230]], [0.12, 0.2, 0.28, 0.36, 0.75])}
-      ${captions([[0, 0.12, "1 · Find your garden on the map"], [0.12, 0.44, "2 · Tap each corner"], [0.44, 0.72, "3 · Your plot appears, to scale"], [0.72, 1, "4 · Add beds inside it"]])}`);
+    const P = [[64, 40], [256, 34], [266, 136], [54, 140]], per = 660;
+    const kit = [["🟫", "Bed", 40], ["🌳", "Tree", 104], ["🏠", "Shed", 168], ["♻️", "Compost", 232]];
+    return clipSvg("How to draw your garden on a satellite map and add things to it", `<rect x="0" y="0" width="320" height="182" class="clip-sat"/>
+      <ellipse cx="96" cy="76" rx="44" ry="26" class="clip-sat2"/><ellipse cx="214" cy="142" rx="54" ry="24" class="clip-sat2"/><ellipse cx="290" cy="100" rx="22" ry="40" class="clip-sat2"/>
+      <path d="M0 26 L320 18" class="clip-road"/><rect x="276" y="140" width="34" height="30" class="clip-roof"/>
+      <g opacity="0">${during(0, 0.08)}<rect x="60" y="70" width="200" height="26" rx="13" class="clip-card"/><text x="78" y="87" class="clip-t">🔍 Find your garden…</text></g>
+      ${P.map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="5" class="clip-dot" opacity="0">${during(0.1 + i * 0.06, 0.99)}</circle>`).join("")}
+      <polygon points="${P.map((q) => q.join(",")).join(" ")}" class="clip-outline" stroke-dasharray="${per}" stroke-dashoffset="${per}">${anim("stroke-dashoffset", `${per};${per};0;0`, "0;0.33;0.41;1")}${anim("fill-opacity", "0;0;.22;.22", "0;0.41;0.44;1")}</polygon>
+      <g opacity="0">${during(0.42, 0.52)}<rect x="122" y="76" width="76" height="22" rx="11" class="clip-card"/><text x="160" y="91" text-anchor="middle" class="clip-t b">12 × 8 m</text></g>
+      <g opacity="0">${during(0.5, 0.99)}${kit.map(([e, n, x]) => `<rect x="${x}" y="150" width="58" height="24" rx="12" class="clip-card"/><text x="${x + 29}" y="166" text-anchor="middle" class="clip-t s">${e} ${n}</text>`).join("")}</g>
+      <rect x="84" y="52" width="26" height="62" rx="3" class="clip-bed" opacity="0">${during(0.57, 0.99)}</rect>
+      <rect x="120" y="52" width="26" height="62" rx="3" class="clip-bed" opacity="0">${during(0.62, 0.99)}</rect>
+      <g opacity="0">${during(0.7, 0.99)}<circle cx="214" cy="64" r="18" class="clip-tree"/><text x="214" y="70" text-anchor="middle" font-size="16">🌳</text></g>
+      <g opacity="0">${during(0.79, 0.99)}<rect x="196" y="94" width="44" height="30" rx="2" class="clip-shed"/><text x="218" y="114" text-anchor="middle" class="clip-t s w">Shed</text></g>
+      <g opacity="0">${during(0.87, 0.99)}<rect x="164" y="48" width="18" height="18" rx="2" class="clip-compost"/></g>
+      ${finger([[0, 290, 200], [0.08, 64, 40], [0.11, 64, 40], [0.16, 256, 34], [0.17, 256, 34], [0.22, 266, 136], [0.23, 266, 136], [0.28, 54, 140], [0.3, 54, 140], [0.36, 320, 230], [0.5, 320, 230],
+        [0.54, 69, 162], [0.56, 69, 162], [0.6, 69, 162], [0.66, 133, 162], [0.68, 133, 162], [0.74, 197, 162], [0.76, 197, 162], [0.82, 261, 162], [0.85, 261, 162], [0.93, 320, 230]], [0.1, 0.16, 0.22, 0.29, 0.56, 0.61, 0.69, 0.78, 0.86])}
+      ${captions([[0, 0.09, "1 · Find your garden on the map"], [0.09, 0.32, "2 · Tap each corner"], [0.32, 0.5, "3 · Your plot appears, to scale"], [0.5, 0.92, "4 · Add beds, trees, a shed - where they are"], [0.92, 1, "Your whole plot, ready to plan"]])}`);
   },
   pot_fit: () => clipSvg("How to see what fits in a pot", `<text x="20" y="28" class="clip-t b">How big are your pots?</text>
     ${[[15, "15cm"], [20, "20cm"], [30, "30cm"], [40, "40cm"]].map(([d, l], i) => { const cx = 50 + i * 74, r = d * 0.7;
@@ -500,7 +514,53 @@ const CLIPS = {
 function clipBlock(name) {
   if (!CLIPS[name]) return "";
   if (reduceMotion()) return `<ol class="steps clip-steps">${CLIP_STEPS[name].map((t) => `<li>${esc(t)}</li>`).join("")}</ol>`;
-  return `<div class="clip-box">${CLIPS[name]()}</div>`;
+  return `<div class="clip-box">${clipCode(name)}</div>`;
+}
+function clipCode(name) {
+  CLIP_S = CLIP_LEN[name] || 10;
+  try { return CLIPS[name](); } finally { CLIP_S = 10; }
+}
+
+// The 30-second reel on the front page: the best bits of the demos, one after another, like a short video
+const REEL = [
+  { card: "Grow your own food, step by step", s: 3 },
+  { clip: "trace_plot", title: "Draw your garden from the sky", from: 1.2, s: 10.5 },
+  { clip: "add_bed", title: "Add your beds", from: 0.8, s: 7 },
+  { clip: "add_veg", title: "Pick your veg - we check it fits", from: 1.5, s: 7 },
+  { card: "We tell you what to do, and when", sub: "Free to join", s: 2.5 },
+];
+function reelHtml() {
+  if (reduceMotion()) return `<div class="reel still"><ol class="steps clip-steps">${["Draw your garden from a satellite map", "Add your beds", "Pick your veg - we check it fits", "We tell you what to do, and when"].map((t) => `<li>${t}</li>`).join("")}</ol></div>`;
+  return `<div class="reel" id="reel"><div class="reel-screen" id="reel-screen"></div>
+    <div class="reel-bar">${REEL.map((r) => `<span style="flex:${r.s}"><i></i></span>`).join("")}</div>
+    <button class="reel-play" id="reel-play">▶ Watch the 30-second tour</button></div>`;
+}
+function wireReel() {
+  const box = $("#reel"); if (!box) return;
+  const screen = $("#reel-screen"), bars = box.querySelectorAll(".reel-bar i"), btn = $("#reel-play");
+  let timer = null, raf = null;
+  const card = (r) => `<div class="reel-card"><b>${esc(r.card)}</b>${r.sub ? `<span>${esc(r.sub)}</span>` : ""}</div>`;
+  const stop = () => { clearTimeout(timer); cancelAnimationFrame(raf); };
+  const show = (i) => {
+    stop();
+    if (i >= REEL.length || !document.body.contains(box)) { box.classList.remove("playing"); btn.textContent = "↻ Watch again"; btn.hidden = false; return; }
+    const r = REEL[i];
+    screen.innerHTML = r.card ? card(r) : `<div class="reel-title">${esc(r.title)}</div>${clipCode(r.clip)}`;
+    const svg = screen.querySelector("svg");
+    if (svg) svg.setCurrentTime(r.from || 0);
+    bars.forEach((b, j) => { b.style.width = j < i ? "100%" : "0"; });
+    const t0 = performance.now();
+    const tick = () => { bars[i].style.width = Math.min(100, ((performance.now() - t0) / (r.s * 1000)) * 100) + "%"; raf = requestAnimationFrame(tick); };
+    tick();
+    timer = setTimeout(() => show(i + 1), r.s * 1000);
+  };
+  btn.onclick = () => { btn.hidden = true; box.classList.add("playing"); show(0); };
+  screen.innerHTML = card(REEL[0]);
+  // plays by itself the first time it scrolls into view
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver((es) => { if (es[0].isIntersecting) { io.disconnect(); if (!box.classList.contains("playing")) btn.click(); } }, { threshold: 0.6 });
+    io.observe(box);
+  }
 }
 
 // ---- the guided tour: a step at a time, pointing at the real screen ------------------------------------------
@@ -564,7 +624,7 @@ function endTour(finished) {
   const box = $("#tour"); if (box) box.remove();
   if (TOUR.steps) saveTour(true);  // finished or skipped: don't nag - it can be replayed from Me
   TOUR.steps = null;
-  if (finished) { go("#/"); toast("You're set up! First job: add your first crop 🌱"); }
+  if (finished) { go("#/"); toast("You're set up! First job: add your first bed or pots 🌱"); }
 }
 window.addEventListener("resize", () => { const b = $("#tour"); if (b && b._place) b._place(); });
 window.addEventListener("scroll", () => { const b = $("#tour"); if (b && b._place) b._place(); }, true);
@@ -596,8 +656,8 @@ function tourResume() {
 function checklistCard() {
   const o = S.me.onboarding, cl = S.g.checklist;
   if (!o || o.checklistDismissed || !cl) return "";
-  const items = [["firstCrop", "Add your first crop", `<a class="btn small" href="#/plants">Choose plants</a>`],
-    ["firstBed", "Add your first bed or pots", `<button class="btn small" id="cl-bed">Add one</button>`],
+  const items = [["firstBed", "Add your first bed or pots", `<button class="btn small" id="cl-bed">Add one</button>`],
+    ["firstCrop", "Choose something to grow in it", `<a class="btn small" href="#/plants">Choose plants</a>`],
     ["reminders", "Turn on reminders", `<button class="btn small" id="cl-push">Turn on</button>`]];
   const done = items.filter(([k]) => cl[k]).length;
   if (done === items.length) return "";

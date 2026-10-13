@@ -1040,3 +1040,15 @@ def test_tour_steps_show_how_with_moving_demos():
     from app import onboarding as ob
     for space, clips in (("small", {"add_bed", "add_veg", "trace_plot"}), ("pots", {"pot_fit", "add_veg", "add_bed"}), ("large", {"trace_plot", "add_bed", "add_veg"})):
         assert {s.get("clip") for s in ob.tour({"space": space})["steps"]} >= clips
+
+
+def test_starter_plan_puts_food_before_flowers():
+    from datetime import date
+    from app import onboarding, plants as catalogue
+    flower = lambda pid: catalogue.BY_ID[pid]["group"] in ("flower", "companion")
+    for day in (date(2026, 10, 13), date(2026, 4, 1)):
+        mixed = onboarding.starter_plan({"goals": ["veg", "herbs_flowers"], "space": "small"}, day, 0)
+        ids = [x["plant_id"] for x in mixed]
+        assert sum(flower(i) for i in ids) <= 1 and not flower(ids[0])
+        only = onboarding.starter_plan({"goals": ["herbs_flowers"], "space": "small"}, day, 0)
+        assert any(flower(x["plant_id"]) for x in only)  # still flowers when that's all they asked for
