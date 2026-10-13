@@ -390,7 +390,7 @@ async function starterPlan() {
     const k = p.months.harvest.includes(i + 1) ? "pick" : [...p.months.sow_in, ...p.months.sow_out, ...p.months.plant_out].includes(i + 1) ? "sow" : "";
     return `<span class="${k} ${i + 1 === nowM ? "now" : ""}" title="${m}">${m[0]}</span>`; }).join("")}</div>`;
   const pots = S.me.onboarding.space === "pots";
-  const how = [!pots && ["1 · Find your garden on the map", "real_map"], [`${pots ? 1 : 2} · ${pots ? "Add your pots" : "Add your beds"}`, pots ? "pot_fit" : "add_bed"], [`${pots ? 2 : 3} · Add veg to them`, "add_veg"]].filter(Boolean);
+  const how = pots ? [["1 · Add your pots", "pot_fit"], ["2 · Add veg to them", "add_veg"]] : [["1 · Find your garden and add beds", "real_map"], ["2 · Put veg in your beds", "sat_veg"]];
   view.innerHTML = `<div class="quiz">
     <h1>Your starter plan</h1>
     <div class="card"><h3>First, your space</h3><p class="small muted" style="margin:-4px 0 4px">Add where you'll grow, then choose what goes in it. Here's how:</p>
@@ -427,11 +427,19 @@ document.addEventListener("click", async (e) => {
 // ---- moving demos: a finger doing the real thing, on a mini version of the screen ---------------------------
 // Drawn here (no video files): SVG with its own timeline, looping every CLIP_S seconds. Times are fractions of the loop.
 let CLIP_S = 10;
-const CLIP_LEN = { trace_plot: 15, real_map: 18 };
+const CLIP_LEN = { trace_plot: 15, real_map: 18, sat_veg: 14 };
+const realTree = (q) => { const [tx, ty] = q(0.72, 0.14); return `<circle cx="${tx}" cy="${ty}" r="7" class="clip-tree"/><text x="${tx}" y="${ty + 3}" text-anchor="middle" font-size="8">🍎</text>`; };
 // The real-map demo: a public allotment site in Leeds (St Anne's Road, LS6 3NZ) - live satellite tiles, shown not stored.
 // Centre in zoom-19 tile units, and one real plot's corners in the demo's own units (lined up by eye; about 13 x 29 m).
 const REAL = { pc: "LS6 3NZ", cx: 259831.49, cy: 168782.13, plot: [[145, 26], [200, 35], [178, 158], [119, 146]], size: "13 × 29 m" };
 const esriTile = (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+function realGeo() {
+  const P = REAL.plot, per = Math.round(P.reduce((t, q, i) => t + Math.hypot(q[0] - P[(i + 1) % 4][0], q[1] - P[(i + 1) % 4][1]), 0)) + 4;
+  const q = (u, v) => [0, 1].map((k) => +((1 - v) * ((1 - u) * P[0][k] + u * P[1][k]) + v * ((1 - u) * P[3][k] + u * P[2][k])).toFixed(1));  // a point inside the plot
+  const quad = (u0, v0, u1, v1, cls) => `<polygon points="${[q(u0, v0), q(u1, v0), q(u1, v1), q(u0, v1)].map((p) => p.join(",")).join(" ")}" class="${cls}"/>`;
+  const bed = (i, cls = "clip-bed", inset = 0) => quad(0.1 + i * 0.22 + inset, 0.3 + inset, 0.26 + i * 0.22 - inset, 0.82 - inset, cls);
+  return { P, per, q, quad, bed, bedAt: (i, v = 0.56) => q(0.18 + i * 0.22, v) };
+}
 function satLayer(z, cx, cy, T = 128) {  // tiles covering the 320 x 182 frame, centred on (cx, cy) in zoom-z tile units
   const out = [];
   for (let x = Math.floor(cx - 160 / T); x <= Math.floor(cx + 160 / T); x++)
@@ -457,6 +465,7 @@ const clipSvg = (label, body) => `<svg class="clip" viewBox="0 0 320 210" role="
 const CLIP_STEPS = {
   add_bed: ["Tap Edit plan", "Tap Bed or pots", "Type its size", "Drag it into place"],
   add_veg: ["Pick a crop", "Choose its bed - we check it fits", "It's planted, with its first job"],
+  sat_veg: ["Tap a bed on your plan and pick a crop", "We check how many fit", "It goes in, with its first job - then on to the next bed"],
   real_map: ["Type your postcode", "Zoom in to your garden or plot on the satellite map", "Tap each corner - it's measured for you", "Add beds, trees, a shed and more where they really are"],
   trace_plot: ["Find your garden on the map", "Tap each corner", "Your plot appears, to scale", "Add beds, trees, a shed and more - where they really are"],
   pot_fit: ["Choose your pot size", "See what fits in it", "Tap one to plant it"],
@@ -512,9 +521,7 @@ const CLIPS = {
       ${captions([[0, 0.09, "1 · Find your garden on the map"], [0.09, 0.32, "2 · Tap each corner"], [0.32, 0.5, "3 · Your plot appears, to scale"], [0.5, 0.92, "4 · Add beds, trees, a shed - where they are"], [0.92, 1, "Your whole plot, ready to plan"]])}`);
   },
   real_map: () => {
-    const P = REAL.plot, per = Math.round(P.reduce((t, q, i) => t + Math.hypot(q[0] - P[(i + 1) % 4][0], q[1] - P[(i + 1) % 4][1]), 0)) + 4;
-    const q = (u, v) => [0, 1].map((k) => +((1 - v) * ((1 - u) * P[0][k] + u * P[1][k]) + v * ((1 - u) * P[3][k] + u * P[2][k])).toFixed(1));  // a point inside the plot
-    const quad = (u0, v0, u1, v1, cls) => `<polygon points="${[q(u0, v0), q(u1, v0), q(u1, v1), q(u0, v1)].map((p) => p.join(",")).join(" ")}" class="${cls}"/>`;
+    const { P, per, q, quad, bed } = realGeo();
     const [mx, my] = q(0.5, 0.5);
     const typed = REAL.pc.split("").map((_, i) => REAL.pc.slice(0, i + 1));
     const kit = [["🟫", "Bed", 40], ["🌳", "Tree", 104], ["🏠", "Shed", 168], ["♻️", "Compost", 232]];
@@ -533,14 +540,45 @@ const CLIPS = {
       <polygon points="${P.map((q) => q.join(",")).join(" ")}" class="clip-outline" stroke-dasharray="${per}" stroke-dashoffset="${per}">${anim("stroke-dashoffset", `${per};${per};0;0`, "0;0.43;0.49;1")}${anim("fill-opacity", "0;0;.18;.18", "0;0.49;0.52;1")}</polygon>
       <g opacity="0">${during(0.5, 0.62)}<rect x="${mx - 32}" y="${my - 11}" width="64" height="22" rx="11" class="clip-card"/><text x="${mx}" y="${my + 4}" text-anchor="middle" class="clip-t b">${REAL.size}</text></g>
       <g opacity="0">${during(0.58, 0.99)}${kit.map(([e, n, kx]) => `<rect x="${kx}" y="6" width="58" height="24" rx="12" class="clip-card"/><text x="${kx + 29}" y="22" text-anchor="middle" class="clip-t s">${e} ${n}</text>`).join("")}</g>
-      ${[0, 1, 2].map((i) => `<g opacity="0">${during(0.64 + i * 0.04, 0.99)}${quad(0.1 + i * 0.22, 0.3, 0.26 + i * 0.22, 0.82, "clip-bed")}</g>`).join("")}
-      <g opacity="0">${during(0.77, 0.99)}<circle cx="${q(0.72, 0.14)[0]}" cy="${q(0.72, 0.14)[1]}" r="7" class="clip-tree"/><text x="${q(0.72, 0.14)[0]}" y="${q(0.72, 0.14)[1] + 3}" text-anchor="middle" font-size="8">🍎</text></g>
+      ${[0, 1, 2].map((i) => `<g opacity="0">${during(0.64 + i * 0.04, 0.99)}${bed(i)}</g>`).join("")}
+      <g opacity="0">${during(0.77, 0.99)}${realTree(q)}</g>
       <g opacity="0">${during(0.84, 0.99)}${quad(0.6, 0.87, 0.92, 0.97, "clip-shed")}</g>
       <g opacity="0">${during(0.9, 0.99)}${quad(0.08, 0.88, 0.26, 0.96, "clip-compost")}</g>
       ${finger([[0, 290, 200], [0.09, 250, 29], [0.11, 250, 29], [0.15, 320, 230], [0.27, 320, 230], ...P.flatMap(([px, py], i) => [[0.29 + i * 0.04, px, py], [0.31 + i * 0.04, px, py]]), [0.46, 320, 230], [0.58, 320, 230],
         [0.62, 69, 18], [0.64, 69, 18], [0.72, 69, 18], [0.75, 133, 18], [0.77, 133, 18], [0.82, 197, 18], [0.84, 197, 18], [0.88, 261, 18], [0.9, 261, 18], [0.96, 320, 230]],
         [0.1, 0.3, 0.34, 0.38, 0.42, 0.63, 0.67, 0.71, 0.76, 0.83, 0.89])}
       ${captions([[0, 0.14, "1 · Type your postcode"], [0.14, 0.28, "2 · Zoom to your plot"], [0.28, 0.5, "3 · Tap each corner - it's measured"], [0.5, 0.58, "Your real plot, to scale"], [0.58, 0.96, "4 · Add beds, a tree, a shed"], [0.96, 1, "Ready to plan"]])}`);
+  },
+  // carrying on from real_map: the same plot on the same satellite picture, now with veg going into its beds
+  sat_veg: () => {
+    const { P, q, quad, bed, bedAt } = realGeo();
+    const crops = [  // [bed, name, emoji, fill class, room, first job, tap bed at, added at]
+      [0, "Garlic", "🧄", "clip-crop-garlic", "Room for 40 cloves in Bed 1", "🧄 Plant garlic cloves · this week", 0.08, 0.36],
+      [1, "Broad beans", "🫘", "clip-crop-beans", "Room for 24 in Bed 2", "🫘 Sow broad beans · by 23 Nov", 0.54, 0.76],
+    ];
+    const panel = (a, b, inner) => `<g opacity="0">${during(a, b)}<rect x="206" y="8" width="108" height="168" rx="10" class="clip-card"/>${inner}</g>`;
+    const tiles = (hi) => [["🧄", "Garlic"], ["🫘", "Beans"], ["🧅", "Onions"], ["🥬", "Lettuce"]].map(([e, n], i) => {
+      const tx = 214 + (i % 2) * 48, ty = 34 + Math.floor(i / 2) * 50;
+      return `<rect x="${tx}" y="${ty}" width="44" height="44" rx="8" class="clip-input"/><text x="${tx + 22}" y="${ty + 24}" font-size="17" text-anchor="middle">${e}</text><text x="${tx + 22}" y="${ty + 39}" text-anchor="middle" class="clip-t s">${n}</text>${n.startsWith(hi) ? `<rect x="${tx}" y="${ty}" width="44" height="44" rx="8" class="clip-hi"/>` : ""}`;
+    }).join("");
+    return clipSvg("Adding veg to the beds on your satellite plan", `
+      <clipPath id="sv-frame"><rect x="0" y="0" width="320" height="182"/></clipPath>
+      <g clip-path="url(#sv-frame)">${satLayer(19, REAL.cx, REAL.cy, 192)}</g>
+      <text x="200" y="178" text-anchor="end" class="clip-attr">Imagery © Esri</text>
+      <polygon points="${P.map((p) => p.join(",")).join(" ")}" class="clip-outline" fill-opacity=".18"/>
+      ${P.map(([px, py]) => `<circle cx="${px}" cy="${py}" r="3" class="clip-dot"/>`).join("")}
+      ${[0, 1, 2].map((i) => bed(i)).join("")}${realTree(q)}${quad(0.6, 0.87, 0.92, 0.97, "clip-shed")}${quad(0.08, 0.88, 0.26, 0.96, "clip-compost")}
+      ${crops.map(([i, n, e, cls, room, job, tap, added]) => `
+        <g opacity="0">${during(added, 1)}${bed(i, cls, 0.012)}${[0.4, 0.56, 0.72].map((v, k) => { const [ex, ey] = bedAt(i, v); return `<text x="${ex}" y="${ey + 3}" font-size="8" text-anchor="middle" opacity="0">${e}${during(added + 0.02 + k * 0.015, 1)}</text>`; }).join("")}</g>
+        ${panel(tap + 0.03, tap + 0.13, `<text x="214" y="25" class="clip-t b">Bed ${i + 1} - add what?</text>${tiles(n.slice(0, 5))}`)}
+        ${panel(tap + 0.13, added, `<text x="260" y="34" font-size="20" text-anchor="middle">${e}</text><text x="260" y="54" text-anchor="middle" class="clip-t b">${n}</text>
+          <text x="214" y="74" class="clip-t s">Where?</text><rect x="214" y="78" width="92" height="18" rx="5" class="clip-input"/><text x="220" y="91" class="clip-t s">🟫 Bed ${i + 1}  ▾</text>
+          <text x="214" y="112" class="clip-t s ok" opacity="0">✅ ${room.replace(/ in Bed \d/, "")}${during(tap + 0.17, added)}</text>
+          <rect x="214" y="140" width="92" height="24" rx="8" class="clip-primary"/><text x="260" y="156" text-anchor="middle" class="clip-t w">Add ${n.split(" ")[0].toLowerCase()}</text>`)}
+        <g opacity="0">${during(added + 0.05, added + 0.16)}<rect x="12" y="8" width="190" height="22" rx="11" class="clip-card"/><text x="22" y="23" class="clip-t s">${job}</text></g>`).join("")}
+      ${finger([[0, 300, 220], [0.06, ...bedAt(0)], [0.1, ...bedAt(0)], [0.16, 236, 56], [0.2, 236, 56], [0.3, 260, 152], [0.34, 260, 152], [0.42, 320, 230],
+        [0.5, 320, 230], [0.53, ...bedAt(1)], [0.56, ...bedAt(1)], [0.62, 284, 56], [0.66, 284, 56], [0.71, 260, 152], [0.74, 260, 152], [0.82, 320, 230]], [0.08, 0.18, 0.33, 0.55, 0.64, 0.73])}
+      ${captions([[0, 0.2, "5 · Tap a bed, pick a crop"], [0.2, 0.36, "We check how many fit"], [0.36, 0.52, "In it goes - with its first job"], [0.52, 0.9, "Next bed: broad beans"], [0.9, 1, "Every job lands in your calendar"]])}`);
   },
   pot_fit: () => clipSvg("How to see what fits in a pot", `<text x="20" y="28" class="clip-t b">How big are your pots?</text>
     ${[[15, "15cm"], [20, "20cm"], [30, "30cm"], [40, "40cm"]].map(([d, l], i) => { const cx = 50 + i * 74, r = d * 0.7;
@@ -568,12 +606,11 @@ function clipCode(name) {
 const REEL = [
   { card: "Grow your own food, step by step", s: 2 },
   { clip: "real_map", title: "Find your plot on a real satellite map", from: 0.2, s: 14 },
-  { clip: "add_bed", title: "Add your beds", from: 1, s: 6.5 },
-  { clip: "add_veg", title: "Pick your veg - we check it fits", from: 2.5, s: 5.5 },
+  { clip: "sat_veg", title: "Put veg in your beds - we check it fits", from: 0.3, s: 12 },
   { card: "We tell you what to do, and when", sub: "Free to join", s: 2 },
 ];
 function reelHtml() {
-  if (reduceMotion()) return `<div class="reel still"><ol class="steps clip-steps">${["Type your postcode and find your plot on a satellite map", "Tap its corners - it's measured for you", "Add your beds", "Pick your veg - we check it fits", "We tell you what to do, and when"].map((t) => `<li>${t}</li>`).join("")}</ol></div>`;
+  if (reduceMotion()) return `<div class="reel still"><ol class="steps clip-steps">${["Type your postcode and find your plot on a satellite map", "Tap its corners - it's measured for you", "Add your beds, a tree, a shed", "Pick your veg - we check it fits", "We tell you what to do, and when"].map((t) => `<li>${t}</li>`).join("")}</ol></div>`;
   return `<div class="reel" id="reel"><div class="reel-screen" id="reel-screen"></div>
     <div class="reel-bar">${REEL.map((r) => `<span style="flex:${r.s}"><i></i></span>`).join("")}</div>
     <button class="reel-play" id="reel-play">▶ Watch the 30-second tour</button></div>`;
