@@ -43,6 +43,17 @@ try { showPhotos = localStorage.getItem("gtg-photos") === "1"; } catch (e) { /* 
 const pic = (p) => (showPhotos && p.photo ? `<img class="pic" src="${esc(p.photo.src)}" alt="${esc(p.name)}" loading="lazy" data-fallback="${esc(p.emoji)}">` : p.emoji);
 const blobCls = (p) => (showPhotos && p.photo ? "has-pic" : "");
 const photoToggle = () => `<button class="btn small ${showPhotos ? "primary" : ""}" data-photos aria-pressed="${showPhotos}">${showPhotos ? "🖼️ Photos" : "😀 Icons"}</button>`;
+// Plain headings and buttons: strip a decorative emoji from the start of the text (only when words follow it)
+const LEAD_EMOJI = /^\s*(?:\p{Extended_Pictographic}|\p{Regional_Indicator}{2})(?:\uFE0F|\u200D\p{Extended_Pictographic}|\p{Emoji_Modifier})*\s*(?=[\p{L}£0-9])/u;
+function plainText(root) {
+  root.querySelectorAll("h1, h2, h3, h4, .btn, summary b, .seg button, .filter button, .section-title a").forEach((el) => {
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let n;
+    while ((n = w.nextNode()) && !n.nodeValue.trim()) { /* the first bit of real text */ }
+    if (n && LEAD_EMOJI.test(n.nodeValue)) n.nodeValue = n.nodeValue.replace(LEAD_EMOJI, "");
+  });
+}
+for (const id of ["view", "sheet-card"]) new MutationObserver(() => plainText(document.getElementById(id))).observe(document.getElementById(id), { childList: true, subtree: true });
 // a photo that won't load goes back to its emoji
 document.addEventListener("error", (e) => { const t = e.target; if (t.tagName === "IMG" && t.dataset && t.dataset.fallback) t.replaceWith(t.dataset.fallback); }, true);
 const SUN_EMOJI = { sun: "☀️", part: "⛅", shade: "🌥️" };
@@ -414,6 +425,7 @@ function jobCard(job, opts = {}) {
     <div class="job-emoji k-${job.kind}">${p.emoji}<small>${job.emoji}</small></div>
     <div class="job-body">
       <div class="job-title">${esc(job.title)}</div>
+      ${opts.noDrop ? "" : `<button class="job-x" data-dropcrop="${c.id}" aria-label="Remove ${esc(p.name.toLowerCase())} from my plan" title="Not growing this? Remove it">✕</button>`}
       <div class="job-when ${hot ? "hot" : ""}">${job.emoji} ${whenText(job)}${where}</div>
       ${job.steps.length ? `<details class="how" data-key="${esc(job.key)}" ${opts.open ? "open" : ""}><summary>Show me how</summary><ol class="steps">${job.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></details>` : ""}
       ${extra}
@@ -426,6 +438,15 @@ const CHEERS = { sow: "Brilliant! Seeds sown 🌱", plant: "Nice planting! 🌿"
 
 // one click handler for every job button, wherever it appears
 document.addEventListener("click", async (e) => {
+  // just trying things out? take a plant (and all its jobs) off the plan in one go
+  const drop = e.target.closest("[data-dropcrop]");
+  if (drop) {
+    e.stopPropagation();
+    const c = crop(Number(drop.dataset.dropcrop)), p = plant(c.plant_id), row = rowLabel(c);
+    if (!confirm(`Remove ${p.name.toLowerCase()}${row ? " (" + row + ")" : ""}${c.space_name ? " in " + c.space_name : ""} from your plan? Its jobs go too.`)) return;
+    await change("DELETE", `/api/crops/${c.id}`, null, `${p.name} removed from your plan`);
+    return;
+  }
   const out = e.target.closest("[data-unplace]");
   if (out) {
     e.stopPropagation();
@@ -509,9 +530,6 @@ function home() {
   // only the single most useful nudge, in this order
   let nudge = "";
   if (!activeCrops().length) nudge = `<div class="card tint-leaf"><b>🌱 Your garden is empty</b><p class="small muted">Pick some food you love to eat and we'll plan it for you.</p><a class="btn primary" href="#/plants">Choose plants</a></div>`;
-  else if (unplaced.length) nudge = `<div class="card tint-sun"><b>📍 ${unplaced.length} plant${unplaced.length === 1 ? " isn't" : "s aren't"} in a bed yet</b>
-      <div class="small muted" style="margin:2px 0 8px">${unplaced.slice(0, 8).map((c) => plant(c.plant_id).emoji).join(" ")}</div>
-      <div class="row"><a class="btn small primary" href="#/garden">🗺️ Place them on my plot</a><button class="btn small" data-layout="unplaced">🧩 Suggest a layout</button></div></div>`;
   else if (unknown.length) nudge = `<div class="card tint-soil"><b>🟫 Is ${esc(unknown[0].name)} already built?</b>
       <div class="row" style="margin-top:8px"><button class="btn small primary" data-setbuilt="${unknown[0].id}" data-v="1">✅ Yes, it's ready</button><button class="btn small" data-setbuilt="${unknown[0].id}" data-v="0">🛠️ Not yet - show me how</button></div></div>`;
   else if (unbuilt.length) nudge = `<div class="card tint-soil row" style="justify-content:space-between" data-open-space="${unbuilt[0].id}">
@@ -566,7 +584,7 @@ function plantNowStrip() {
   const list = plantNow();
   if (!list.length) return "";
   const t = today();
-  return `<div class="section-title"><h2>🌱 You could plant now</h2><a href="#/plants?now">See all</a></div>
+  return `<div class="section-title"><h2>Plant now</h2><a href="#/plants?now">See all</a></div>
     <div class="strip">${list.map(({ p, m, w }) => {
       const open = d(w[0]) <= t;
       return `<button class="tile" data-open-plant="${p.id}" data-method="${m}"><span class="blob l${p.level} ${blobCls(p)}">${pic(p)}</span>
@@ -1139,7 +1157,7 @@ function plotPage() {
     ${plotEdit ? editPanel() : `
     <div class="month-row"><b>📅 ${esc(label)}</b><input type="range" id="month" min="0" max="11" value="${plotMonth}" aria-label="Show the garden in a later month">
       ${plotMonth ? `<button class="btn small ghost" id="now">Today</button>` : ""}</div>
-    <p class="small muted" style="margin:0 0 12px">Each coloured strip is a crop, sized by the room it needs. Tap a crop or bed to open it. Slide to see later in the year. The bar in the corner shows the grid size.</p>
+
     ${unplaced.length ? `<div class="card"><b>📍 Not in a bed yet</b> <span class="small muted">- tap one, then tap a bed</span>
       <div class="suggest">${unplaced.map((c) => `<button data-place="${c.id}" class="${placing === c.id ? "on" : ""}">${plant(c.plant_id).emoji} ${esc(plant(c.plant_id).name)}${rowLabel(c) ? " · " + rowLabel(c) : ""}</button>`).join("")}</div></div>` : ""}
     ${activeCrops().length ? `<div class="row"><button class="btn small" data-layout="all">🧩 Suggest a layout</button></div>` : ""}`}`;
@@ -1990,28 +2008,35 @@ function drawSpace(id) {
       <div class="row" style="margin-top:8px"><button class="btn small primary" data-setbuilt="${s.id}" data-v="1">✅ Yes, it's ready</button><button class="btn small" data-setbuilt="${s.id}" data-v="0">🛠️ Not yet - show me how</button></div></div>`;
   openSheet(`<div class="plant-head"><span class="e">${SPACE_KINDS[s.kind].emoji}</span><div><h2 style="margin:0">${esc(s.name)}</h2>
       <div class="muted">${pot ? "Growing in pots" : s.built === 1 ? "Built and ready to plant ✅" : s.built === 0 ? "Let's build it" : "Your bed"}</div></div></div>
-    ${here.length ? `<button class="card tint-sun row costcard" data-bedplan="${s.id}" style="justify-content:space-between;width:100%">
-      <span><b>💷 About ${money(s.cost.total)} to plant</b><span class="small" style="display:block">${s.cost.to_buy < s.cost.total ? `${money(s.cost.to_buy)} still to buy · ` : ""}seeds & plants, roughly</span></span><span class="btn small">See plan 👉</span></button>` : ""}
-    ${pot ? potCard(s) : ""}
-    <div class="card"><h3>🌱 Growing here</h3>${veg.map(inBedRow).join("") || (here.length ? "" : `<p class="small muted" style="margin:0">Nothing yet.</p>`)}
+    <div class="seg sticky-tabs" role="tablist"><button role="tab" data-pane="plants" class="on">Plants</button><button role="tab" data-pane="ideas">Ideas</button><button role="tab" data-pane="about">Details</button></div>
+    <div data-panel="plants">
+    ${here.length ? `<button class="card row costcard" data-bedplan="${s.id}" style="justify-content:space-between;width:100%">
+      <span><b>About ${money(s.cost.total)} to plant</b><span class="small muted" style="display:block">${s.cost.to_buy < s.cost.total ? `${money(s.cost.to_buy)} still to buy · ` : ""}where each plant goes</span></span><span class="small" style="color:var(--forest-2);font-weight:700">Plan ›</span></button>` : ""}
+    <div class="card"><h3>Growing here</h3>${veg.map(inBedRow).join("") || (here.length ? "" : `<p class="small muted" style="margin:0">Nothing yet.</p>`)}
       ${herbs.length ? `<h3 style="margin-top:14px">🌿 Herbs</h3>${herbs.map(inBedRow).join("")}` : ""}
       ${comps.length ? `<h3 style="margin-top:14px">🐞 Companion plants</h3>${comps.map(inBedRow).join("")}` : ""}
       ${flowers.length ? `<h3 style="margin-top:14px">🌸 Flowers</h3>${flowers.map(inBedRow).join("")}` : ""}
-      <div class="row" style="margin-top:10px"><a class="btn small" href="#/plants" data-close>➕ Add plants</a>${here.length ? `<button class="btn small primary" data-bedplan="${s.id}">📐 Where to plant & cost</button>` : ""}
-      ${here.length ? `<button class="btn small ghost" data-empty="${s.id}">📤 Take everything out</button>` : ""}</div>
-      ${here.length ? `<p class="small muted" style="margin:8px 0 0">✕ takes a plant out of this bed - it stays in your plan under "Not placed yet".</p>` : ""}</div>
-    ${helpList.length ? `<div class="card tint-leaf"><h3>🐞 Keep pests off</h3><p class="small" style="margin:0 0 8px">Flowers to grow among what's in this bed:</p>
+      <div class="row" style="margin-top:10px"><a class="btn small" href="#/plants" data-close>Add plants</a>
+      ${here.length ? `<button class="btn small ghost" data-empty="${s.id}">Take everything out</button>` : ""}</div></div>
+    ${pot ? "" : build}
+    </div>
+    <div data-panel="ideas" hidden>
+    ${pot ? potCard(s) : ""}
+    ${helpList.length ? `<div class="card"><h3>Keep pests off</h3><p class="small" style="margin:0 0 8px">Flowers to grow among what's in this bed:</p>
       <div class="nbs">${helpList.map(([id2, veg2]) => { const q = plant(id2); return `<div class="nb comp"><span class="e">${q.emoji}</span><span style="flex:1"><b>${esc(q.name)}</b>
         <small>Helps your ${veg2.map((v) => esc(v.name.toLowerCase())).join(", ")}</small></span>
-        <button class="btn small" data-addcomp="${id2}" data-space="${s.id}">➕ Add</button></div>`; }).join("")}</div></div>` : ""}
-    ${allRound.length ? `<div class="card tint-leaf"><h3>🐞 Keep pests off</h3><p class="small" style="margin:0 0 8px">Good all-rounders to dot round any ${s.kind === "allotment" ? "allotment" : "bed"} - they bring in bees and the bugs that eat greenfly, or lure pests away:</p>
+        <button class="btn small" data-addcomp="${id2}" data-space="${s.id}">Add</button></div>`; }).join("")}</div></div>` : ""}
+    ${allRound.length ? `<div class="card"><h3>Keep pests off</h3><p class="small" style="margin:0 0 8px">Good all-rounders to dot round any ${s.kind === "allotment" ? "allotment" : "bed"} - they bring in bees and the bugs that eat greenfly, or lure pests away:</p>
       <div class="nbs">${allRound.map((id2) => { const q = plant(id2); return `<div class="nb comp"><span class="e">${q.emoji}</span><span style="flex:1"><b>${esc(q.name)}</b>
         <small>${esc(q.blurb)}</small></span><button class="btn small" data-addcomp="${id2}" data-space="${s.id}">➕ Add</button></div>`; }).join("")}</div></div>` : ""}
-    <div class="card tint-plum row" style="justify-content:space-between"><div><b>🌸 Flower ideas</b><div class="small">Flowers that go together, laid out for this ${pot ? "pot" : "bed's shape"}${s.sun ? ` (${S.cat.sun_spots[s.sun].emoji} ${S.cat.sun_spots[s.sun].name.toLowerCase()})` : ""}</div></div>
-      <button class="btn small" data-flowers="${s.id}">Show me 👉</button></div>
-    <details class="card" data-key="about-${s.id}" ${s.width_m || s.built !== null ? "" : "open"}><summary><b>✏️ About this ${pot ? "space" : "bed"}</b> <span class="small muted">name, size, soil${pot ? "" : ", built?"}</span></summary>${spaceForm(s)}
-      <div class="row" style="margin-top:14px"><button class="btn primary" id="save">Save</button><button class="btn danger small" id="del">🗑️ Delete</button></div></details>
-    ${build}`);
+    <button class="card row costcard" data-flowers="${s.id}" style="justify-content:space-between;width:100%"><span><b>Flower ideas</b><span class="small muted" style="display:block">Flowers that go together, laid out for this ${pot ? "pot" : "bed"}</span></span><span class="small" style="color:var(--forest-2);font-weight:700">Show ›</span></button>
+    </div>
+    <div data-panel="about" hidden>
+    <div class="card">${spaceForm(s)}
+      <div class="row" style="margin-top:14px"><button class="btn primary" id="save">Save</button><button class="btn danger small" id="del">Delete</button></div></div>
+    ${pot ? build : ""}
+    </div>`);
+  wirePanes("space-" + s.id);
   wireSpaceForm(s);
   $("#del").onclick = async () => {
     if (!confirm(`Delete ${s.name}? Plants in it stay in your plan, just not placed.`)) return;
@@ -2075,8 +2100,8 @@ function drawCrop(id) {
     <div class="seg sticky-tabs" role="tablist">
       <button role="tab" data-pane="jobs" class="on">📋 Jobs</button><button role="tab" data-pane="details">⚙️ Details</button><button role="tab" data-pane="next">🔁 What next</button></div>
     <div data-panel="jobs">
-      <div class="card">${todo.map((j) => jobCard(j)).join("") || `<div class="empty"><div class="big">🎉</div>Nothing left to do for this one!</div>`}</div>
-      ${doneJobs.length ? `<details class="card" data-key="done-${c.id}"><summary><b>✅ Done (${doneJobs.length})</b> <span class="small muted">tap to see or undo</span></summary>${doneJobs.map((j) => jobCard(j)).join("")}</details>` : ""}
+      <div class="card">${todo.map((j) => jobCard(j, { noDrop: true })).join("") || `<div class="empty"><div class="big">🎉</div>Nothing left to do for this one!</div>`}</div>
+      ${doneJobs.length ? `<details class="card" data-key="done-${c.id}"><summary><b>✅ Done (${doneJobs.length})</b> <span class="small muted">tap to see or undo</span></summary>${doneJobs.map((j) => jobCard(j, { noDrop: true })).join("")}</details>` : ""}
       <button class="btn wide" data-open-plant="${p.id}">📖 All about ${esc(p.name.toLowerCase())}</button>
     </div>
     <div data-panel="details" hidden>
@@ -2135,26 +2160,22 @@ function plantsPage() {
   const have = new Set(activeCrops().map((c) => c.plant_id));
   const q = plantSearch.toLowerCase();
   const list = filteredPlants(plantFilter, plantGroup).filter((p) => !q || p.name.toLowerCase().includes(q));
-  const head = {
-    veg: `<h1>🥕 What would you like to grow?</h1><p class="muted">Pick things you love to eat. Start with green ones if you're new.</p>`,
-    herb: `<h1>🌿 Herbs</h1><p class="muted">Easy flavour for cooking - most are happy in a pot by the kitchen door, and many come back every year.</p>`,
-    companion: `<h1>🐞 Companion plants</h1><p class="muted">Flowers to grow in among your veg. They bring in bees to pollinate, and bugs that eat greenfly - or lure pests away from your crops.</p>`,
-    flower: `<h1>🌸 Flower garden</h1><p class="muted">Just for colour, smell and bees. Choose by how sunny your spot is. For a whole bed of flowers that go together, open a bed and tap 🌸 Flower ideas.</p>`,
-  }[plantGroup];
-  view.innerHTML = `<div class="row" style="justify-content:flex-end;margin:-6px 0 6px"><span class="small muted">Show plants as</span>${photoToggle()}</div>
-    <div class="seg" role="tablist" style="margin-bottom:12px">${Object.entries(GROUPS).map(([k, g]) => `<button data-pgroup="${k}" class="${plantGroup === k ? "on" : ""}">${g.emoji} ${g.name}</button>`).join("")}</div>
+  const head = plantGroup === "companion" ? `<p class="muted small" style="margin:0 0 10px">Flowers to grow among your veg - they bring in bees and bug-eaters, or lure pests away.</p>` : "";
+  view.innerHTML = `<div class="seg" role="tablist" style="margin-bottom:12px">${Object.entries(GROUPS).map(([k, g]) => `<button data-pgroup="${k}" class="${plantGroup === k ? "on" : ""}">${g.emoji} ${g.name}</button>`).join("")}</div>
     ${head}
-    ${plantGroup === "veg" && plantFilter === "all" && !plantSearch ? plantNowStrip() + mixStrip() : ""}
+    ${plantGroup === "veg" && plantFilter === "all" && !plantSearch ? plantNowStrip() : ""}
     <input type="text" id="q" placeholder="🔍 Search, e.g. ${plantGroup === "veg" ? "tomatoes" : plantGroup === "flower" ? "sunflowers" : plantGroup === "herb" ? "parsley" : "marigolds"}" value="${esc(plantSearch)}" style="margin-bottom:10px">
     ${plantGroup === "companion" ? "" : filterBar(plantFilter, plantGroup)}
     <div class="grid">${list.map((p) => tile(p, false, have.has(p.id))).join("") || `<p class="muted">Nothing matches.</p>`}</div>
+    ${plantGroup === "veg" && !plantSearch ? `<button class="link-row" data-mixes style="margin-top:14px;width:100%"><b>Sow together to save space</b> <span>${S.cat.mixes.length} ideas ›</span></button>` : ""}
     ${plantGroup === "companion" ? `<h2 style="margin-top:20px">🌻 Flowers & herbs that help too</h2>
-      <p class="muted">These are in the Flowers and Herbs lists, but they also bring in bees and bug-eaters - or confuse pests. Sunflowers are great on an allotment: put them on the north side so they don't shade your veg (and keep them away from potatoes).</p>
+
       <div class="grid">${S.cat.plants.filter((p) => p.helps && p.group !== "companion" && (!q || p.name.toLowerCase().includes(q))).map((p) => tile(p, false, have.has(p.id), true)).join("")}</div>` : ""}`;
   $("#q").oninput = (e) => { plantSearch = e.target.value; const pos = e.target.selectionStart; plantsPage(); const q2 = $("#q"); q2.focus(); q2.setSelectionRange(pos, pos); };
   view.onclick = (e) => {
     const f = e.target.closest("[data-filter]");
     if (f) { plantFilter = f.dataset.filter; plantsPage(); return; }
+    if (e.target.closest("[data-mixes]")) { openSheet(`<h2>Sow together to save space</h2><p class="muted small">One is picked before the next needs the room.</p><div class="nbs">${S.cat.mixes.map((m) => mixButton(m.id)).join("")}</div>`); return; }
     if (e.target.closest("[data-photos]")) { showPhotos = !showPhotos; remember("gtg-photos", showPhotos); plantsPage(); toast(showPhotos ? "🖼️ Showing photos" : "😀 Showing icons"); return; }
     const g = e.target.closest("[data-pgroup]");
     if (g) { plantGroup = g.dataset.pgroup; plantFilter = "all"; plantSearch = ""; plantsPage(); return; }
@@ -2287,11 +2308,11 @@ function openPlant(id, spaceId, startMethod, after) {
   let method = p.methods.includes(startMethod) ? startMethod : p.methods[0];
   let qty = p.default_qty, batches = 1, every = p.succession || 2, variety = "", vtag = null;
   const vtags = [...new Set(p.varieties.flatMap((v) => v.tags))];
-  const varietyHtml = () => !p.varieties.length ? "" : `<label class="field">Which variety? <span class="muted small">(optional - tap what you like for the best one)</span></label>
+  const varietyHtml = () => !p.varieties.length ? "" : `<details class="vfold" ${variety ? "open" : ""}><summary>Variety <span class="muted small">${variety ? esc(variety) : "optional - see the best ones"}</span></summary>
     ${vtags.length > 3 ? `<div class="chips">${vtags.map((t) => `<button class="btn small ${vtag === t ? "primary" : "ghost"}" data-vtag="${esc(t)}">${esc(t)}</button>`).join("")}</div>` : ""}
     <div class="varieties">${p.varieties.filter((v) => !vtag || v.tags.includes(vtag)).map((v) => `<button class="variety ${variety === v.name ? "on" : ""}" data-variety="${esc(v.name)}">
       <b>${esc(v.name)}</b>${v.tags.map((t) => `<span class="vt">${esc(t)}</span>`).join("")}<small>${esc(v.why)}</small></button>`).join("")}</div>
-    <input id="vother" type="text" maxlength="40" placeholder="Got a different one? Type its name" value="${p.varieties.some((v) => v.name === variety) ? "" : esc(variety)}" style="margin-top:8px">`;
+    <input id="vother" type="text" maxlength="40" placeholder="Got a different one? Type its name" value="${p.varieties.some((v) => v.name === variety) ? "" : esc(variety)}" style="margin-top:8px"></details>`;
   const buyHtml = () => {
     const v = p.varieties.find((x) => x.name === variety);
     return `<h3>🛒 Buy ${v ? `'${esc(v.name)}' ` : ""}${p.buy_word ? esc(p.buy_word) : "seeds"}</h3><div class="shop-links">${(v ? v.links : p.links[p.methods[0]]).map((l) => `<a class="btn small" href="${esc(l.url)}" target="_blank" rel="sponsored noopener">${esc(l.shop)} ↗</a>`).join("")}</div>
@@ -2342,12 +2363,11 @@ function openPlant(id, spaceId, startMethod, after) {
         : `<p class="small muted">${p.where.includes("pot") ? "" : "This one needs a bed - it's too big for pots. "}Add a ${p.where.includes("pot") ? "bed or pot" : "bed"} in My garden to place it.</p>`}
       <div id="check" class="check-box" aria-live="polite"></div>
       <button class="btn primary wide" style="margin-top:14px" id="add">Add ${esc(p.name.toLowerCase())} 🌱</button></div>
-    ${roomCard(p)}
-    ${p.mixes.length ? `<div class="card tint-leaf"><h3>🤝 Sow it together - save space</h3><p class="small" style="margin:0 0 8px">Grow it in the same row as something else - one is picked before the next needs the room.</p>
-      <div class="nbs">${p.mixes.map(mixButton).join("")}</div></div>` : ""}
     <div class="card" id="buy">${buyHtml()}</div>
     </div>
     <div data-panel="how" hidden>
+    ${roomCard(p)}
+    ${p.mixes.length ? `<div class="card"><h3>Sow it together - save space</h3><div class="nbs">${p.mixes.map(mixButton).join("")}</div></div>` : ""}
     ${p.tips.length ? `<div class="card tint-sun pip">${PIP}<div><h3 style="margin-bottom:4px">Pip's top tips</h3><ul>${p.tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></div></div>` : ""}
     ${p.prep.map((x) => `<div class="card tint-soil"><h3>🪜 Before you plant: ${esc(x.title.charAt(0).toLowerCase() + x.title.slice(1))}</h3><ol class="steps">${x.steps.map((st) => `<li>${esc(st)}</li>`).join("")}</ol></div>`).join("")}
     ${p.seedling ? `<div class="card tint-sky"><h3>🌱 Is it a seedling or a weed?</h3><p style="margin:0 0 8px"><b>${p.emoji} ${esc(p.name)}:</b> ${esc(p.seedling)}</p>

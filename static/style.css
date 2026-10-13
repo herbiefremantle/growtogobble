@@ -690,3 +690,19 @@ details.how summary::before { content: "▸ "; } details.how[open] summary::befo
 .stat .ring .bg { stroke: var(--line); } .stat .ring .fg { stroke: var(--forest-2); }
 .stat.warn b { color: var(--warn-ink); }
 @media (max-width: 380px) { .stat b { font-size: 19px; } .stat .ring { display: none; } }
+
+/* tidier: folded variety list, link rows */
+details.vfold { margin-top: 12px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+details.vfold summary { cursor: pointer; font-weight: 700; font-size: 14px; list-style: none; display: flex; justify-content: space-between; gap: 8px; }
+details.vfold summary::-webkit-details-marker { display: none; }
+details.vfold summary::after { content: "›"; color: var(--muted); transform: rotate(90deg); }
+details.vfold[open] summary::after { transform: rotate(-90deg); }
+button.link-row { font: inherit; cursor: pointer; text-align: left; }
+.costcard { background: var(--card); }
+
+/* remove a plant straight from its job */
+.job-body { position: relative; padding-right: 26px; }
+.job-x { position: absolute; top: -2px; right: 0; width: 26px; height: 26px; border: 0; border-radius: 50%; background: none; color: var(--muted);
+  font-size: 13px; cursor: pointer; opacity: .65; }
+.job-x:hover, .job-x:focus-visible { opacity: 1; background: var(--bg-2); color: var(--terra); }
+.crop-row .stage { display: none; }  /* the crop's own page shows how far along it is - lists stay tidy */
