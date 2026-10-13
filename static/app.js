@@ -187,7 +187,10 @@ function openSheet(html) {
   document.body.style.overflow = "hidden";
 }
 function closeSheet() { $("#sheet").hidden = true; document.body.style.overflow = ""; S.sheet = null; updateIfReady(); }
-$("#sheet").addEventListener("click", (e) => { if (e.target.id === "sheet" || e.target.closest("[data-close]")) closeSheet(); });
+$("#sheet").addEventListener("click", (e) => {
+  // a link to another page (e.g. a Build It guide) takes you there - so the pop-up goes, rather than staying on top of it
+  if (e.target.id === "sheet" || e.target.closest("[data-close]") || e.target.closest('a[href^="#/"]')) closeSheet();
+});
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheet(); });
 
 // ---- routing ---------------------------------------------------------------------------------------
@@ -3838,6 +3841,30 @@ const BA = (() => {
   return { soil, line, label, vine, tomato, seedling };
 })();
 const BUILD_ART = {
+  raised_bed: (s) => {
+    const X = (x, y, z) => [20 + x * 0.85 + z * 0.6, 150 - y * 1.6 - z * 0.45];
+    const poly = (pts, cls) => `<polygon points="${pts.map((p) => X(...p).join(",")).join(" ")}" class="${cls}"/>`;
+    const P = (n, c) => (n > s ? "" : `<g class="${n === s ? "ba-new" : ""}">${c}</g>`);
+    const ground = `<polygon points="0,150 320,150 320,180 0,180" class="ba-soil"/><polygon points="${[[-10, 0, -10], [250, 0, -10], [250, 0, 130], [-10, 0, 130]].map((p) => X(...p).join(",")).join(" ")}" class="ba-grass"/>`;
+    if (s === 1) return `${ground}<g class="ba-new">${poly([[0, 0, 0], [240, 0, 0], [240, 0, 120], [0, 0, 120]], "ba-mark")}${BA.label(160, 168, "1.2m x 2.4m")}</g>`;
+    if (s === 2) return `${BA.soil}<g class="ba-new">${[0, 1, 2, 3].map((i) => `<rect x="20" y="${18 + i * 17}" width="200" height="12" class="ba-wood"/>`).join("")}${BA.label(120, 14, "4 x 2.4m (long sides)")}
+      ${[0, 1, 2, 3].map((i) => `<rect x="${232 + (i % 2) * 44}" y="${18 + Math.floor(i / 2) * 17}" width="40" height="12" class="ba-wood"/>`).join("")}${BA.label(274, 62, "4 x 1.2m (ends)")}
+      ${[0, 1, 2, 3].map((i) => `<rect x="${40 + i * 30}" y="96" width="10" height="40" class="ba-wood-side"/>`).join("")}${BA.label(90, 146, "4 posts, 40cm")}</g>`;
+    // an end: two boards on two posts (z runs front to back)
+    const end = (x) => `${poly([[x, -6, 0], [x, -6, 6], [x, 30, 6], [x, 30, 0]], "ba-wood-side")}${poly([[x, -6, 114], [x, -6, 120], [x, 30, 120], [x, 30, 114]], "ba-wood-side")}
+      ${poly([[x, 0, 0], [x, 0, 120], [x, 15, 120], [x, 15, 0]], "ba-wood")}${poly([[x, 15, 0], [x, 15, 120], [x, 30, 120], [x, 30, 0]], "ba-wood")}`;
+    if (s === 3) return `${ground}<g class="ba-new">${end(0)}${end(240)}</g>${BA.label(160, 24, "two boards on two posts, each end")}`;
+    const side = (z) => `${poly([[0, 0, z], [240, 0, z], [240, 15, z], [0, 15, z]], "ba-wood")}${poly([[0, 15, z], [240, 15, z], [240, 30, z], [0, 30, z]], "ba-wood")}`;
+    const box = `${side(120)}${end(0)}${end(240)}`;
+    const front = side(0);
+    const fill = s >= 6 ? `${poly([[2, 26, 2], [238, 26, 2], [238, 26, 118], [2, 26, 118]], "ba-compost")}${[[40, 60], [100, 40], [160, 80], [200, 50]].map(([x, z]) => BA.seedling(...X(x, 26, z))).join("")}` : "";
+    return `${ground}
+      ${s >= 6 ? poly([[2, 1, 2], [238, 1, 2], [238, 1, 118], [2, 1, 118]], "ba-card") : ""}
+      <g class="${s === 4 ? "ba-new" : ""}">${box}</g>${s === 6 ? `<g class="ba-new">${fill}</g>` : fill}<g class="${s === 4 ? "ba-new" : ""}">${front}</g>
+      ${s === 4 ? `<line x1="${X(0, 30, 0)[0]}" y1="${X(0, 30, 0)[1]}" x2="${X(240, 30, 120)[0]}" y2="${X(240, 30, 120)[1]}" class="ba-cutline"/><line x1="${X(240, 30, 0)[0]}" y1="${X(240, 30, 0)[1]}" x2="${X(0, 30, 120)[0]}" y2="${X(0, 30, 120)[1]}" class="ba-cutline"/>${BA.label(160, 20, "both diagonals the same = square")}` : ""}
+      ${s === 5 ? `<g class="ba-new"><rect x="${X(80, 30, 0)[0]}" y="${X(80, 30, 0)[1] - 8}" width="70" height="8" rx="2" class="ba-level"/><circle cx="${X(80, 30, 0)[0] + 35}" cy="${X(80, 30, 0)[1] - 4}" r="2.5" class="ba-bubble"/></g>${BA.label(160, 20, "check it's level")}` : ""}
+      ${s === 6 ? BA.label(160, 20, "cardboard, then compost to the top") : ""}`;
+  },
   bean_wigwam: (s) => {
     const base = Array.from({ length: 8 }, (_, i) => { const a = (i / 8) * Math.PI * 2 + 0.2; return [160 + 70 * Math.cos(a), 150 + 14 * Math.sin(a), Math.sin(a)]; })
       .sort((a, b) => a[2] - b[2]);  // back ones first
@@ -3946,7 +3973,7 @@ function buildsYouNeed() {
   const crops = activeCrops();
   return S.cat.build.builds.map((b) => {
     const mine = crops.filter((c) => b.for.includes(c.plant_id));
-    if (!mine.length) return null;
+    if (!mine.length || (b.needs_no_bed && S.g.spaces.some((sp) => sp.kind !== "pot"))) return null;
     // only plants still to go in - once they're planted, the moment's passed
     const starts = mine.flatMap((c) => c.jobs.filter((j) => (["plant_out", "sow_out"].includes(j.kind) || (b.id === "cold_frame" && j.kind === "sow_in")) && !["done", "missed"].includes(j.status)).map((j) => j.start));
     if (!starts.length) return null;

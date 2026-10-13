@@ -930,3 +930,4 @@ svg.plot .grp-tag { fill: #fff; font-weight: 800; paint-order: stroke; stroke: r
 @keyframes ba-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .ba .ba-new { animation: none; } }
 .ba-plain .ba-label { display: none; }
+.ba .ba-grass { fill: #7fae5a; } .ba .ba-compost { fill: #3d2a1c; } .ba .ba-card { fill: #c9a77a; } .ba .ba-level { fill: #f2b01e; stroke: #8e6a10; } .ba .ba-bubble { fill: #9be07a; }

@@ -14,6 +14,36 @@ GARDEN = ["thompson_morgan", "suttons", "bq", "wickes", "amazon"]
 DIY = ["bq", "wickes", "amazon"]
 
 BUILDS = [
+    {"id": "raised_bed", "name": "Raised bed", "emoji": "🟫", "section": "beds", "level": "Medium", "time": "2-3 hours", "size": "1.2 x 2.4m, 30cm deep",
+     "why": "A raised bed warms up quicker in spring, drains well, and keeps paths and beds apart, so you never tread on the "
+            "soil you grow in. 1.2m wide means you can reach the middle from either side.",
+     "for": ["carrots", "salad", "onions", "garlic", "beetroot", "radish", "strawberries", "chard", "spring_onions", "potatoes", "courgette", "kale",
+             "leeks", "parsnips", "peas", "french_beans", "broad_beans"], "lead_weeks": 3, "needs_no_bed": True,
+     "materials": [
+         {"name": "Treated timber boards, 150 x 38mm x 2.4m", "qty": 6, "pack": "each", "packs": 6, "price": 10.0, "search": "treated timber board 150 x 38mm 2.4m", "shops": DIY,
+          "note": "4 for the long sides, 2 cut in half for the ends"},
+         {"name": "Treated timber post, 47 x 50mm x 1.8m", "qty": 1, "pack": "each", "packs": 1, "price": 6.0, "search": "treated timber post 47 x 50mm", "shops": DIY,
+          "note": "cut into 4 corner posts"},
+         {"name": "Exterior wood screws, 5 x 70mm", "qty": 1, "pack": "box", "packs": 1, "price": 7.0, "search": "exterior wood screws 5 x 70mm", "shops": DIY},
+         {"name": "Plain brown cardboard", "qty": 1, "pack": "enough to cover the bottom", "packs": 0, "price": 0.0, "free": True},
+         {"name": "To fill it - pick one:", "choose": [
+             {"name": "Peat-free compost, 15 bags of 50 litres", "for": "a small bed, carried in by hand", "price": 82.5, "search": "peat free compost 50 litre"},
+             {"name": "Bulk bag of topsoil and compost mix", "for": "a bed or two, delivered", "price": 90.0, "search": "bulk bag topsoil compost mix"},
+         ], "shops": GARDEN},
+     ],
+     "tools": ["Saw", "Drill or screwdriver", "Tape measure and pencil", "Spirit level", "Spade"],
+     "steps": [
+         {"pic": 1, "text": "Pick a flat, sunny spot and mark out a rectangle 1.2m x 2.4m. No need to dig or lift the grass."},
+         {"pic": 2, "text": "Cut two boards in half to make four 1.2m end pieces. Cut the post into four 40cm corner posts."},
+         {"pic": 3, "text": "Make each end: lay two 1.2m boards on top of each other and screw them to a post at each end, with the posts on the inside. Two screws per board into each post."},
+         {"pic": 4, "text": "Stand the two ends up and screw the long 2.4m boards onto the posts to make a box. Measure corner to corner both ways - if the two match, it's square."},
+         {"pic": 5, "text": "Move it into place. Push the corner posts into the ground (they stick out 10cm below the boards) and check it's level."},
+         {"pic": 6, "text": "Lay cardboard over the bottom, overlapping so there are no gaps, and soak it. Fill to the top with compost - it'll sink a bit, so top it up after a few weeks."},
+     ],
+     "tips": ["Never use old railway sleepers for food - many were treated with creosote.",
+              "Treated timber lasts about 10 years; untreated about 3-5.",
+              "Leave 45-60cm between beds for paths - enough for a wheelbarrow."],
+     "ready_made": {"text": "Rather buy one? Raised bed kits of this size cost about £50-120.", "search": "raised bed kit"}},
     {"id": "bean_wigwam", "name": "Bean wigwam", "emoji": "⛺", "section": "supports", "level": "Easy", "time": "20 minutes",
      "why": "Climbing beans grow 2m tall and need something to wind round. A wigwam of canes is quick, strong, "
             "takes up little room and looks great.",
@@ -179,7 +209,7 @@ BUILDS = [
               "Prop the lid open with a stick on sunny days - it gets hot inside fast."],
      "ready_made": {"text": "Rather buy one? Ready-made cold frames cost about £35-80.", "search": "cold frame"}},
 ]
-SECTIONS = [("supports", "Supports for climbers"), ("covers", "Covers to protect your veg"), ("coldframe", "Cold frame")]
+SECTIONS = [("beds", "Raised beds"), ("supports", "Supports for climbers"), ("covers", "Covers to protect your veg"), ("coldframe", "Cold frame")]
 
 
 def _cost(m):
