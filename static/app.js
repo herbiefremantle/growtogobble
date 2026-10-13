@@ -1979,10 +1979,15 @@ function wireSpaceForm(s, afterSave) {
     const t = S.cat.soil_types[val("soil") || "unknown"];
     $("#soiltip").innerHTML = `<div><b>${t.emoji} How to tell:</b> ${esc(t.test)}</div><div><b>🌱 What to do:</b> ${esc(t.tips)}</div>`;
   };
-  card.oninput = card.onchange = refresh;  // replaced (not added to) each time a bed form opens
-  card.onclick = (e) => { const b = e.target.closest("[data-pc]"); if (b) { const el = $("#pc"); el.value = Math.max(1, Math.min(200, (Number(el.value) || 1) + Number(b.dataset.pc))); } };
+  // something's changed: light up the save buttons so it isn't forgotten
+  const dirty = () => {
+    card.querySelectorAll("#save, #save-top").forEach((b) => b.classList.add("dirty"));
+    const st = $("#savestate"); if (st) st.textContent = "Unsaved changes";
+  };
+  card.oninput = card.onchange = () => { refresh(); dirty(); };  // replaced (not added to) each time a bed form opens
+  card.onclick = (e) => { const b = e.target.closest("[data-pc]"); if (b) { const el = $("#pc"); el.value = Math.max(1, Math.min(200, (Number(el.value) || 1) + Number(b.dataset.pc))); dirty(); } };
   refresh();
-  $("#save").onclick = async () => {
+  const save = async () => {
     const b = val("built");
     const body = { name: $("#sn").value || "My bed", kind: val("kind"), soil: val("soil"), built: b == null ? null : b === "1",
                    width_m: Number($("#sw").value) || null, length_m: Number($("#sl").value) || null,
@@ -1990,11 +1995,14 @@ function wireSpaceForm(s, afterSave) {
                    ...(val("kind") === "pot" ? { pot_size: val("potsize") || "", pot_count: Number($("#pc").value) || 1 } : {}) };
     if (await change(s ? "PATCH" : "POST", s ? `/api/spaces/${s.id}` : "/api/spaces", body, s ? "Saved ✅" : "Added ✅") && afterSave) afterSave();
   };
+  card.querySelectorAll("#save, #save-top").forEach((btn) => (btn.onclick = save));
 }
 
 function addSpaceSheet() {
   S.sheet = null;
-  openSheet(`<h2>Add a growing space</h2>${spaceForm(null)}
+  openSheet(`<h2>Add a growing space</h2>
+    <div class="savebar"><span class="small muted" id="savestate">Fill in what you know - you can change it later</span><button class="btn primary small" id="save-top">Add it</button></div>
+    ${spaceForm(null)}
     <button class="btn primary wide" id="save" style="margin-top:16px">Add it</button>`);
   wireSpaceForm(null, closeSheet);
 }
@@ -2058,6 +2066,7 @@ function drawSpace(id) {
     <button class="card row costcard" data-flowers="${s.id}" style="justify-content:space-between;width:100%"><span><b>Flower ideas</b><span class="small muted" style="display:block">Flowers that go together, laid out for this ${pot ? "pot" : "bed"}</span></span><span class="small" style="color:var(--forest-2);font-weight:700">Show ›</span></button>
     </div>
     <div data-panel="about" hidden>
+    <div class="savebar"><span class="small muted" id="savestate">Change anything, then save</span><button class="btn primary small" id="save-top">Save</button></div>
     <div class="card">${spaceForm(s)}
       <div class="row" style="margin-top:14px"><button class="btn primary" id="save">Save</button><button class="btn danger small" id="del">Delete</button></div></div>
     ${pot ? build : ""}

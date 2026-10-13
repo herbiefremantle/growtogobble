@@ -712,3 +712,9 @@ details.later > summary::-webkit-details-marker { display: none; }
 details.later > summary::after { content: "›"; color: var(--muted); font-size: 20px; transform: rotate(90deg); }
 details.later[open] > summary { margin-bottom: 12px; }
 details.later[open] > summary::after { transform: rotate(-90deg); }
+
+/* bed details: a save button that stays at the top, and lights up when something's changed */
+.savebar { position: sticky; top: 30px; z-index: 2; display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 8px 8px 8px 12px; margin-bottom: 12px; box-shadow: var(--shadow-lift); }
+#save.dirty, #save-top.dirty { box-shadow: 0 0 0 3px color-mix(in srgb, var(--forest-2) 30%, transparent); }
+#save-top.dirty::after { content: "changes"; }  /* the button's gap supplies the space */
