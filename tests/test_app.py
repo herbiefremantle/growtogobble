@@ -1052,3 +1052,22 @@ def test_starter_plan_puts_food_before_flowers():
         assert sum(flower(i) for i in ids) <= 1 and not flower(ids[0])
         only = onboarding.starter_plan({"goals": ["herbs_flowers"], "space": "small"}, day, 0)
         assert any(flower(x["plant_id"]) for x in only)  # still flowers when that's all they asked for
+
+
+def test_build_it_guides_have_everything(client):
+    from app import builds, plants as catalogue
+    data = client.get("/api/plants").json()["build"]
+    ids = [b["id"] for b in data["builds"]]
+    assert ids == ["bean_wigwam", "bean_aframe", "pea_frame", "tomato_stakes", "tomato_strings", "hoop_tunnel", "bottle_cloche", "cold_frame"]
+    for b in data["builds"]:
+        assert b["steps"] and b["tools"] and b["materials"] and b["why"]
+        assert all(p in catalogue.BY_ID for p in b["for"])
+        assert [s["pic"] for s in b["steps"]] == list(range(1, len(b["steps"]) + 1))  # a picture for every step
+        for m in b["materials"]:
+            for item in m.get("choose") or [m]:
+                assert item.get("free") or item["links"], item
+    by_id = {b["id"]: b for b in data["builds"]}
+    assert by_id["bottle_cloche"]["total"] == 0 and by_id["cold_frame"]["total"] > 40
+    shops_used = {l["shop"] for b in data["builds"] for m in b["materials"] for l in m.get("links", [])}
+    assert {"B&Q", "Wickes", "Suttons", "Thompson & Morgan", "Amazon"} <= shops_used
+    assert any("diy.com/search?term=" in l["url"] for l in by_id["cold_frame"]["materials"][0]["links"])

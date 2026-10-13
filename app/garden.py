@@ -3,7 +3,7 @@ Used by the API, the push alerts and the calendar feed, so they always agree wit
 import json
 from datetime import date
 
-from . import clock, planner, regions, shops
+from . import builds, clock, planner, regions, shops
 from . import plants as catalogue
 from .db import rows
 
@@ -212,6 +212,6 @@ def catalogue_payload(user=None):
         "nodig_steps": catalogue.NODIG_STEPS, "pot_steps": catalogue.POT_STEPS,
         "all_rounders": catalogue.ALL_ROUNDERS, "pot_sizes": catalogue.POT_SIZES, "seed_store": catalogue._extras.SEED_STORE,
         "nodig_planting": catalogue.NODIG_PLANTING, "soil_types": catalogue.SOIL_TYPES, "fruit": catalogue.FRUIT, "mixes": catalogue.MIXES, "weed_tips": catalogue.WEED_TIPS,
-        "combos": catalogue.COMBOS, "sun_spots": catalogue.SUN_SPOTS,
+        "combos": catalogue.COMBOS, "sun_spots": catalogue.SUN_SPOTS, "build": builds.payload(),
         "affiliate": shops.is_affiliate(),
     }

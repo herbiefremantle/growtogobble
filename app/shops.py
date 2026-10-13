@@ -1,9 +1,9 @@
-"""Where to buy seeds and plants: one-tap links to a search on each shop's site, for that plant.
+"""Where to buy seeds, plants and things to build with: one-tap links to a search on each shop's site, for that plant.
 
 Affiliate links: set the environment variables below and every link earns a commission, with no code changes.
   AMAZON_TAG=yourtag-21                 Amazon Associates UK tracking id
   AWIN_ID=123456                        your Awin publisher id, plus one merchant id per shop you've joined:
-  AWIN_MID_THOMPSON_MORGAN=...  AWIN_MID_SUTTONS=...
+  AWIN_MID_THOMPSON_MORGAN=...  AWIN_MID_SUTTONS=...  AWIN_MID_BQ=...  AWIN_MID_WICKES=...
 Without them the links still work - they just don't earn anything.
 """
 import os
@@ -14,6 +14,12 @@ SHOPS = [
     {"id": "suttons", "name": "Suttons", "search": "https://www.suttons.co.uk/search?q={q}"},
     {"id": "amazon", "name": "Amazon", "search": "https://www.amazon.co.uk/s?k={q}"},
 ]
+
+# for Build It: the seed shops plus DIY shops for timber, screws and sheeting
+BUILD_SHOPS = {s["id"]: s for s in SHOPS + [
+    {"id": "bq", "name": "B&Q", "search": "https://www.diy.com/search?term={q}"},
+    {"id": "wickes", "name": "Wickes", "search": "https://www.wickes.co.uk/search?text={q}"},
+]}
 
 
 def _wrap(shop, url):
@@ -39,6 +45,12 @@ def search_links(text):
     """Buy links searching for any text, e.g. a variety: 'Nantes 2 Carrots seeds'."""
     query = quote_plus(text)
     return [{"shop": s["name"], "url": _wrap(s, s["search"].format(q=query))} for s in SHOPS]
+
+
+def build_links(text, shop_ids):
+    """Links searching the given shops for a building material, e.g. 'bamboo canes 2.4m'."""
+    query = quote_plus(text)
+    return [{"shop": BUILD_SHOPS[i]["name"], "url": _wrap(BUILD_SHOPS[i], BUILD_SHOPS[i]["search"].format(q=query))} for i in shop_ids]
 
 
 def is_affiliate():
