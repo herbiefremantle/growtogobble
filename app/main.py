@@ -845,7 +845,9 @@ def add_crops(body: CropsIn, user=Depends(auth.current_user)):
     with db.connect() as conn:
         if body.space_id is not None:
             _own(conn, "spaces", body.space_id, user)
-        mix = body.mix if any(m["id"] == body.mix for m in catalogue.MIXES) else None
+        # a veg grow-together (MIXES), or a group of flowers that go together ("flower:<combo id>")
+        known = {m["id"] for m in catalogue.MIXES} | {"flower:" + c["id"] for c in catalogue.COMBOS}
+        mix = body.mix if body.mix in known else None
         made = []
         for item in body.crops[:40]:
             plant_id, qty = (item.get("plant_id"), item.get("quantity")) if isinstance(item, dict) else (item, None)

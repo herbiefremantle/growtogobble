@@ -640,3 +640,58 @@ WAKE_UP = {
         "Water lightly - shoots appear in a few weeks", "Big clumps can be split into pieces, each with a bit of old stem",
         "Plant out after the last frost (late May)"]),
 }
+
+# ---- more ways to grow together ---------------------------------------------------------------------
+MIXES += [
+    {"id": "tomato_basil", "name": "Tomatoes, basil & marigolds", "emoji": "🍅",
+     "why": "The classic: basil loves the same warm, sunny spot as tomatoes, and French marigolds' smell keeps whitefly "
+            "and greenfly away. Pick basil all summer while the tomatoes ripen.",
+     "plants": [{"plant_id": "tomatoes", "qty": 3, "up": "1 week (indoors)", "ready": 16},
+                {"plant_id": "basil", "qty": 4, "up": "1-2 weeks (indoors)", "ready": 8},
+                {"plant_id": "french_marigold", "qty": 3, "up": "1 week (indoors)", "ready": 10}],
+     "steps": ["Plant tomatoes 45cm apart once the frosts are over (late May) 🍅",
+               "Tuck basil plants between the tomatoes", "Dot French marigolds along the front and at the ends",
+               "Pick basil tips often - it keeps the plants bushy"],
+     "tip": "Water tomatoes at the roots, not the leaves - wet leaves invite blight."},
+    {"id": "peas_lettuce", "name": "Peas & lettuce", "emoji": "🫛",
+     "why": "Lettuce hates hot sun and runs to seed. Sow it on the shady side of a row of peas - the peas give it shade in summer, "
+            "and the lettuce is picked before the peas fill out.",
+     "plants": [{"plant_id": "peas", "qty": 20, "up": "1-2 weeks", "ready": 12},
+                {"plant_id": "salad", "qty": 6, "up": "7-10 days", "ready": 6}],
+     "steps": ["Put up the pea supports first, then sow peas along them", "Sow a short row of lettuce 20cm away, on the shady side",
+               "Cut lettuce leaves as you need them"],
+     "tip": "Peas add goodness to the soil - leave their roots in when you clear them."},
+    {"id": "courgette_nasturtium", "name": "Courgettes & nasturtiums", "emoji": "🥒",
+     "why": "Nasturtiums bring bees to pollinate the courgette flowers, and greenfly go for the nasturtiums instead. "
+            "They also cover the bare soil between the big courgette leaves.",
+     "plants": [{"plant_id": "courgette", "qty": 1, "up": "1 week (indoors)", "ready": 8},
+                {"plant_id": "nasturtium", "qty": 3, "up": "1-2 weeks", "ready": 8}],
+     "steps": ["Plant the courgette in the middle of a 1m patch once the frosts are over",
+               "Sow or plant nasturtiums round the edge", "Pick courgettes small and often - they grow fast!"],
+     "tip": "One or two courgette plants feed a family. Really."},
+    {"id": "cabbage_guard", "name": "Kale with nasturtiums & calendula", "emoji": "🥬",
+     "why": "Cabbage white butterflies lay their eggs on the nasturtiums instead of your kale (a decoy), "
+            "and calendula brings hoverflies whose babies eat greenfly.",
+     "plants": [{"plant_id": "kale", "qty": 4, "up": "1 week", "ready": 12},
+                {"plant_id": "nasturtium", "qty": 3, "up": "1-2 weeks", "ready": 8},
+                {"plant_id": "calendula", "qty": 2, "up": "1-2 weeks", "ready": 10}],
+     "steps": ["Plant kale 45cm apart and net it against pigeons", "Plant nasturtiums at the ends of the bed - outside the net",
+               "Sow calendula along the edge", "Check nasturtium leaves for caterpillars and move them off"],
+     "tip": "Keep the net tight - pigeons are the bigger problem in winter."},
+    {"id": "leek_carrot", "name": "Leeks & carrots", "emoji": "🥕",
+     "why": "Each hides the other: the smell of leeks puts off carrot fly, and the smell of carrots confuses leek moth. "
+            "Grow them in rows side by side.",
+     "plants": [{"plant_id": "carrots", "qty": 30, "up": "2-3 weeks", "ready": 12},
+                {"plant_id": "leeks", "qty": 10, "up": "2 weeks (in a seed tray)", "ready": 20}],
+     "steps": ["Sow carrots in a row in spring", "In June, plant young leeks in a row 25cm away - drop each into a deep hole and fill it with water",
+               "Pull carrots from summer; leeks stand through the winter"],
+     "tip": "Thin carrots in the evening so the smell doesn't bring carrot flies."},
+    {"id": "strawberry_patch", "name": "Strawberries, chives & borage", "emoji": "🍓",
+     "why": "Chive and borage flowers bring bees for more and bigger berries, and chives may help keep pests away.",
+     "plants": [{"plant_id": "strawberries", "qty": 6, "up": "planted as young plants", "ready": 10},
+                {"plant_id": "chives", "qty": 2, "up": "2 weeks", "ready": 10},
+                {"plant_id": "borage", "qty": 1, "up": "1-2 weeks", "ready": 8}],
+     "steps": ["Plant strawberries 40cm apart", "Plant chives at the corners and borage at one end - it gets big",
+               "Tuck straw under the berries as they form, to keep them clean"],
+     "tip": "Net the berries as they turn red - not before, or the bees can't get to the flowers."},
+]

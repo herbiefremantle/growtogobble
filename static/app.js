@@ -27,7 +27,7 @@ function plant(id) { return S.cat.plants.find((p) => p.id === id); }
 function crop(id) { return S.g.crops.find((c) => c.id === id); }
 function space(id) { return S.g.spaces.find((s) => s.id === id); }
 // Fruit & veg is the main thing; companion plants and flowers are kept in their own lists
-const GROUPS = { veg: { emoji: "🥕", name: "Fruit & veg" }, herb: { emoji: "🌿", name: "Herbs" }, companion: { emoji: "🐞", name: "Companions" }, flower: { emoji: "🌸", name: "Flowers" } };
+const GROUPS = { groups: { emoji: "🤝", name: "Groups" }, veg: { emoji: "🥕", name: "Fruit & veg" }, herb: { emoji: "🌿", name: "Herbs" }, companion: { emoji: "🐞", name: "Companions" }, flower: { emoji: "🌸", name: "Flowers" } };
 const isFlower = (p) => p.group !== "veg" && !p.eat;  // grown to look at, not eat
 const companionsFor = (p) => p.good_with.filter((x) => plant(x.plant_id).helps && plant(x.plant_id).group !== "veg");
 const money = (n) => "£" + (Math.round(n * 100) / 100).toFixed(2).replace(/\.00$/, "");
@@ -537,7 +537,7 @@ function allJobs() { return activeCrops().flatMap((c) => c.jobs); }
 // ---- today -----------------------------------------------------------------------------------------
 
 // Today: kept deliberately short - your next few jobs, and at most ONE reminder card.
-let homeAll = false;
+let homeAll = false, homeAhead = false;  // which fold-outs on Today are open
 function home() {
   const jobs = allJobs();
   const t = today();
@@ -567,6 +567,13 @@ function home() {
     .sort((a, b) => a.end.localeCompare(b.end));
   const month = jobs.filter((j) => open(j) && j.status !== "missed" && daysBetween(t, d(j.start)) > 7 && daysBetween(t, d(j.start)) <= 30)
     .sort((a, b) => a.start.localeCompare(b.start));
+  // ...and everything after that, in date order, for planning ahead
+  const ahead = jobs.filter((j) => open(j) && j.status !== "missed" && daysBetween(t, d(j.start)) > 30).sort((a, b) => a.start.localeCompare(b.start));
+  const byMonth = [];
+  ahead.forEach((j) => {
+    const k = j.start.slice(0, 7), last = byMonth[byMonth.length - 1];
+    if (last && last.k === k) last.jobs.push(j); else byMonth.push({ k, jobs: [j] });
+  });
   // the numbers: how far through the season, what needs doing now, and what's still to buy
   const all = jobs.filter((j) => j.kind !== "buy"), doneN = all.filter((j) => j.status === "done").length;
   const pct = all.length ? Math.round((100 * doneN) / all.length) : 0, toBuy = S.g.spaces.reduce((n, sp) => n + sp.cost.to_buy, 0);
@@ -586,9 +593,14 @@ function home() {
       `<div class="empty"><b>Nothing to do this week.</b><br>Enjoy the garden.</div>`}</div>
     ${month.length ? `<details class="card later" ${homeAll ? "open" : ""} id="later"><summary><b>Next 30 days</b> <span class="small muted">${month.length} job${month.length === 1 ? "" : "s"}</span></summary>
       ${month.map((j) => jobCard(j, { showSpace: true })).join("")}</details>` : ""}
+    ${ahead.length ? `<details class="card later" ${homeAhead ? "open" : ""} id="ahead"><summary><b>Further ahead</b> <span class="small muted">${ahead.length} job${ahead.length === 1 ? "" : "s"} · by month</span></summary>
+      ${byMonth.map((g) => { const [y, mo] = g.k.split("-").map(Number);
+        return `<h4 class="month-head">${MONTHS_LONG[mo - 1]}${y !== t.getFullYear() ? " " + y : ""} <span class="small muted">${g.jobs.length}</span></h4>${g.jobs.map((j) => jobCard(j, { showSpace: true })).join("")}`; }).join("")}</details>` : ""}
     ${buyNow.length ? `<a href="#/shop" class="link-row">🛒 <b>${buyNow.length} thing${buyNow.length === 1 ? "" : "s"} to buy soon</b> <span>${buyNow.slice(0, 5).map((x) => plant(x.plant_id).emoji).join(" ")} 👉</span></a>` : ""}`;
   const later = $("#later");
   if (later) later.ontoggle = () => { homeAll = later.open; };  // stays open after ticking something
+  const aheadEl = $("#ahead");
+  if (aheadEl) aheadEl.ontoggle = () => { homeAhead = aheadEl.open; };
   wirePush();
 }
 
@@ -1111,7 +1123,7 @@ function plotSvg() {
     // sown together = one strip, as big as its biggest plant's room, with all of them in it
     const now = [];
     growing.forEach((c) => {
-      const u = c.mixgrp && now.find((x) => x.mixgrp === c.mixgrp);
+      const u = sharesPatch(c) && now.find((x) => x.mixgrp === c.mixgrp);
       if (!u) now.push({ ...c, emojis: [plant(c.plant_id).emoji] });
       else { u.area = Math.max(u.area, c.area); u.qty += c.qty; u.emojis.push(plant(c.plant_id).emoji); }
     });
@@ -2219,20 +2231,32 @@ function plantsPage() {
   const q = plantSearch.toLowerCase();
   const list = filteredPlants(plantFilter, plantGroup).filter((p) => !q || p.name.toLowerCase().includes(q));
   const head = plantGroup === "companion" ? `<p class="muted small" style="margin:0 0 10px">Flowers to grow among your veg - they bring in bees and bug-eaters, or lure pests away.</p>` : "";
-  view.innerHTML = `<div class="seg" role="tablist" style="margin-bottom:12px">${Object.entries(GROUPS).map(([k, g]) => `<button data-pgroup="${k}" class="${plantGroup === k ? "on" : ""}">${g.emoji} ${g.name}</button>`).join("")}</div>
+  const mine = activeCrops().length;
+  const tabs = `<div class="seg scroll-seg" role="tablist" style="margin-bottom:12px">${Object.entries(GROUPS).map(([k, g]) => `<button data-pgroup="${k}" class="${plantGroup === k ? "on" : ""}">${g.name}</button>`).join("")}</div>`;
+  const yours = mine ? `<button class="link-row" data-myplants style="width:100%;margin-bottom:12px"><b>Your plants</b> <span>${mine} · edit ›</span></button>` : "";
+  if (plantGroup === "groups") {
+    view.innerHTML = `${yours}${tabs}
+      <h2>Veg grown together</h2><p class="small muted" style="margin:-4px 0 10px">Plants that share a bed - added as one planting, so they always stay together.</p>
+      <div class="nbs">${S.cat.mixes.map((m) => mixButton(m.id)).join("")}</div>
+      <h2 style="margin-top:22px">Flowers that go together</h2><p class="small muted" style="margin:-4px 0 10px">A ready-made flower bed - laid out for your bed's shape, and kept as one group.</p>
+      <div class="nbs">${S.cat.combos.map((c) => `<button class="nb" data-open-combo="${c.id}"><span class="e">${c.emoji}</span><span><b>${esc(c.name)}</b>
+        <small>${c.plants.map((id2) => plant(id2).emoji).join(" ")} · ${c.sun.map((x) => S.cat.sun_spots[x].name.toLowerCase()).join(" or ")}</small></span></button>`).join("")}</div>`;
+  } else view.innerHTML = `${yours}${tabs}
     ${head}
     ${plantGroup === "veg" && plantFilter === "all" && !plantSearch ? plantNowStrip() : ""}
     <input type="text" id="q" placeholder="🔍 Search, e.g. ${plantGroup === "veg" ? "tomatoes" : plantGroup === "flower" ? "sunflowers" : plantGroup === "herb" ? "parsley" : "marigolds"}" value="${esc(plantSearch)}" style="margin-bottom:10px">
     ${plantGroup === "companion" ? "" : filterBar(plantFilter, plantGroup)}
     <div class="grid">${list.map((p) => tile(p, false, have.has(p.id))).join("") || `<p class="muted">Nothing matches.</p>`}</div>
-    ${plantGroup === "veg" && !plantSearch ? `<button class="link-row" data-mixes style="margin-top:14px;width:100%"><b>Sow together to save space</b> <span>${S.cat.mixes.length} ideas ›</span></button>` : ""}
     ${plantGroup === "companion" ? `<h2 style="margin-top:20px">🌻 Flowers & herbs that help too</h2>
 
       <div class="grid">${S.cat.plants.filter((p) => p.helps && p.group !== "companion" && (!q || p.name.toLowerCase().includes(q))).map((p) => tile(p, false, have.has(p.id), true)).join("")}</div>` : ""}`;
-  $("#q").oninput = (e) => { plantSearch = e.target.value; const pos = e.target.selectionStart; plantsPage(); const q2 = $("#q"); q2.focus(); q2.setSelectionRange(pos, pos); };
+  if ($("#q")) $("#q").oninput = (e) => { plantSearch = e.target.value; const pos = e.target.selectionStart; plantsPage(); const q2 = $("#q"); q2.focus(); q2.setSelectionRange(pos, pos); };
   view.onclick = (e) => {
     const f = e.target.closest("[data-filter]");
     if (f) { plantFilter = f.dataset.filter; plantsPage(); return; }
+    if (e.target.closest("[data-myplants]")) { openMyPlants(); return; }
+    const oc = e.target.closest("[data-open-combo]");
+    if (oc) { openCombo(oc.dataset.openCombo); return; }
     if (e.target.closest("[data-mixes]")) { openSheet(`<h2>Sow together to save space</h2><p class="muted small">One is picked before the next needs the room.</p><div class="nbs">${S.cat.mixes.map((m) => mixButton(m.id)).join("")}</div>`); return; }
     if (e.target.closest("[data-photos]")) { showPhotos = !showPhotos; remember("gtg-photos", showPhotos); plantsPage(); toast(showPhotos ? "🖼️ Showing photos" : "😀 Showing icons"); return; }
     const g = e.target.closest("[data-pgroup]");
@@ -2525,11 +2549,12 @@ function bedLayout(s) {
   const used = (c) => c.area || plant(c.plant_id).area_each * c.qty;
   const edge = here.filter((c) => plant(c.plant_id).group === "companion");
   const byPlant = {};
-  here.filter((c) => !edge.includes(c)).forEach((c) => { const k = c.mixgrp ? "g" + c.mixgrp : c.plant_id; (byPlant[k] = byPlant[k] || []).push(c); });
+  here.filter((c) => !edge.includes(c)).forEach((c) => { const k = sharesPatch(c) ? "g" + c.mixgrp : c.plant_id; (byPlant[k] = byPlant[k] || []).push(c); });
   const groups = Object.values(byPlant).map((cs) => {
     const tallest = cs.map((c) => plant(c.plant_id)).sort((a, b) => b.height_cm - a.height_cm)[0];
-    return { crops: cs, p: tallest, mix: mixOf(cs[0]) && cs[0].mixgrp ? mixOf(cs[0]) : null, plants: [...new Set(cs.map((c) => c.plant_id))],
-      emojis: cs.map((c) => plant(c.plant_id).emoji), need: cs[0].mixgrp ? Math.max(...cs.map(used)) : cs.reduce((m, c) => m + used(c), 0) };
+    const shared = sharesPatch(cs[0]);
+    return { crops: cs, p: tallest, mix: shared ? mixOf(cs[0]) : null, plants: [...new Set(cs.map((c) => c.plant_id))],
+      emojis: cs.map((c) => plant(c.plant_id).emoji), need: shared ? Math.max(...cs.map(used)) : cs.reduce((m, c) => m + used(c), 0) };
   });
   const area = (s.usage && s.usage.area) || sz.w * sz.h, need = groups.reduce((n, g) => n + g.need, 0);
   const squeeze = need > area ? area / need : 1;
@@ -2644,8 +2669,59 @@ function drawBedPlan(id) {
   }));
 }
 
+// Your plants, all in one list - take out anything you've gone off (or picked at the start and changed your mind)
+function openMyPlants() {
+  S.sheet = () => drawMyPlants();
+  drawMyPlants();
+}
+function drawMyPlants() {
+  const crops = activeCrops();
+  if (!crops.length) { openSheet(`<h2>Your plants</h2><p class="muted">Nothing planned yet.</p>`); return; }
+  const where = [...S.g.spaces.map((sp) => ({ name: sp.name, crops: crops.filter((c) => c.space_id === sp.id) })), { name: "Not in a bed yet", crops: crops.filter((c) => !c.space_id), loose: true }]
+    .filter((w) => w.crops.length);
+  const line = (c) => { const p = plant(c.plant_id), row = rowLabel(c);
+    return `<div class="myrow"><span class="e">${p.emoji}</span><span class="n">${esc(p.name)}${c.variety ? ` <span class="vname">'${esc(c.variety)}'</span>` : ""}${row ? ` <span class="chip grey">${row}</span>` : ""}</span>
+      <button class="btn small ghost" data-open-crop="${c.id}">Open</button><button class="job-x static" data-dropcrop="${c.id}" aria-label="Remove ${esc(p.name.toLowerCase())}">✕</button></div>`; };
+  const block = (cs) => { const out = [], seen = new Set();
+    cs.forEach((c) => {
+      if (c.mixgrp && seen.has(c.mixgrp)) return;
+      if (c.mixgrp) { seen.add(c.mixgrp); const m = mixOf(c), g = cs.filter((x) => x.mixgrp === c.mixgrp);
+        out.push(`<div class="mixbox"><div class="mixhead"><b>${m ? m.emoji + " " + esc(m.name) : "Grown together"}</b><span class="small muted">one planting</span></div>${g.map(line).join("")}</div>`); }
+      else out.push(line(c));
+    });
+    return out.join(""); };
+  openSheet(`<h2>Your plants</h2><p class="small muted" style="margin-top:-6px">Changed your mind? Tap ✕ to take a plant off your plan - its jobs go too. Plants grown together are removed as one.</p>
+    ${where.map((w) => `<div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">${esc(w.name)}</h3>
+      ${w.loose && w.crops.length > 1 ? `<button class="btn small danger" id="drop-loose">Remove all ${w.crops.length}</button>` : ""}</div>${block(w.crops)}</div>`).join("")}`);
+  const dl = $("#drop-loose");
+  if (dl) dl.onclick = async () => {
+    const loose = crops.filter((c) => !c.space_id);
+    if (!confirm(`Remove all ${loose.length} plants that aren't in a bed? Their jobs go too.`)) return;
+    for (const c of loose.slice(0, -1)) await api("DELETE", `/api/crops/${c.id}`);
+    await change("DELETE", `/api/crops/${loose[loose.length - 1].id}`, null, `${loose.length} plants removed`);
+  };
+}
+
+// A group of flowers that go together, from the Plants page: pick a bed and it's laid out for that bed
+function openCombo(id) {
+  const c = S.cat.combos.find((x) => x.id === id), beds = S.g.spaces;
+  S.sheet = null;
+  openSheet(`<h2>${c.emoji} ${esc(c.name)}</h2><p>${esc(c.why)}</p>
+    <div class="nbs">${c.plants.map((id2) => { const q = plant(id2); return `<button class="nb" data-open-plant="${q.id}"><span class="e">${q.emoji}</span><span><b>${esc(q.name)}</b>
+      <small>${q.height_cm >= 100 ? q.height_cm / 100 + "m" : q.height_cm + "cm"} tall · flowers ${MONTHS[q.months.harvest[0] - 1] || ""}-${MONTHS[q.months.harvest[q.months.harvest.length - 1] - 1] || ""}</small></span></button>`; }).join("")}</div>
+    ${beds.length ? `<div class="card" style="margin-top:14px"><label class="field" for="combobed" style="margin-top:0">Which bed or pots?</label>
+      <select id="combobed">${beds.map((b) => `<option value="${b.id}">${esc(b.name)}</option>`).join("")}</select>
+      <p class="small muted" style="margin:8px 0 0">We'll work out how many of each fit and where they go - tall at the back - then you add them as one group.</p>
+      <button class="btn primary wide" id="combogo" style="margin-top:12px">Lay it out in this bed</button></div>` : `<p class="small muted">Add a bed in My garden first.</p>`}`);
+  const go2 = $("#combogo");
+  if (go2) go2.onclick = () => openFlowerPlan(Number($("#combobed").value), null, id);
+}
+
 // Plantings sown together stay one planting: the crops in it, and its name
-const mixOf = (c) => (c && c.mix ? S.cat.mixes.find((m) => m.id === c.mix) : null);
+const isFlowerMix = (c) => !!(c && c.mix && c.mix.startsWith("flower:"));
+const mixOf = (c) => (!c || !c.mix ? null : isFlowerMix(c) ? S.cat.combos.find((x) => "flower:" + x.id === c.mix) || null : S.cat.mixes.find((m) => m.id === c.mix) || null);
+// veg sown together share one patch; flowers in a group grow side by side, each in their own spot
+const sharesPatch = (c) => !!(c && c.mixgrp && !isFlowerMix(c));
 const groupOf = (c) => (c && c.mixgrp ? activeCrops().filter((x) => x.mixgrp === c.mixgrp) : [c]);
 
 // Sowing together: crops sharing a row, each picked before the next needs the room
@@ -2653,7 +2729,7 @@ const mixOrder = (m) => [...m.plants].sort((a, b) => a.ready - b.ready);
 function mixButton(id, spaceId) {
   const m = S.cat.mixes.find((x) => x.id === id);
   return `<button class="nb" data-open-mix="${m.id}" ${spaceId ? `data-space="${spaceId}"` : ""}><span class="e">${m.emoji}</span><span><b>${esc(m.name)}</b>
-    <small>${mixOrder(m).map((x) => plant(x.plant_id).emoji).join(" → ")} · picked one after another</small></span></button>`;
+    <small>${mixOrder(m).map((x) => plant(x.plant_id).emoji).join(" → ")} · one planting</small></span></button>`;
 }
 function mixStrip() {
   return `<div class="section-title"><h2>🤝 Sow together - save space</h2></div>
@@ -2700,7 +2776,7 @@ function companionPanel(p, spaceId) {
 }
 
 // The flower garden: flowers that go together, laid out to suit the bed's shape and sun
-async function openFlowerPlan(id, sun) {
+async function openFlowerPlan(id, sun, focus) {
   const s = space(id);
   sun = sun || s.sun || "sun";
   let plan;
@@ -2723,10 +2799,11 @@ async function openFlowerPlan(id, sun) {
     if (b.dataset.fsun !== s.sun) await patchSpace(s, { sun: b.dataset.fsun });
     openFlowerPlan(id, b.dataset.fsun);
   }));
+  if (focus) { const f = card.querySelector(`[data-addcombo="${focus}"]`); if (f) f.closest(".combo").scrollIntoView({ block: "start" }); }
   card.querySelectorAll("[data-addcombo]").forEach((b) => (b.onclick = async () => {
     const c = plan.combos.find((x) => x.id === b.dataset.addcombo);
     const crops = c.zones.flatMap((z) => z.plants.map((x) => ({ plant_id: x.plant_id, quantity: x.qty })));
-    if (await change("POST", "/api/crops/bulk", { crops, space_id: id }, `${c.emoji} ${c.name} added to ${s.name} - the dates are on your calendar 📅`)) openSpace(id);
+    if (await change("POST", "/api/crops/bulk", { crops, space_id: id, mix: "flower:" + c.id }, `${c.emoji} ${c.name} added to ${s.name} as one group 📅`)) openSpace(id);
   }));
 }
 

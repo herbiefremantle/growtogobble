@@ -802,3 +802,18 @@ def test_sown_together_stays_one_planting(client):
     first = g["crops"][0]
     g = client.patch("/api/crops/%d" % first["id"], json={"plant_id": first["plant_id"], "ungroup": True}).json()
     assert not any(c["mix"] for c in g["crops"])
+
+
+def test_flower_groups_stay_together_but_take_their_own_room(client):
+    _join(client)
+    cat = client.get("/api/plants").json()
+    assert len(cat["mixes"]) >= 12 and len(cat["combos"]) >= 16
+    bed = client.post("/api/spaces", json={"name": "Border", "kind": "bed", "width_m": 1, "length_m": 4}).json()["spaces"][0]["id"]
+    g = client.post("/api/crops/bulk", json={"crops": [{"plant_id": "cosmos", "quantity": 5}, {"plant_id": "cornflower", "quantity": 8}],
+                                            "space_id": bed, "mix": "flower:bees"}).json()
+    crops = [c for c in g["crops"] if c["space_id"] == bed]
+    assert {c["mix"] for c in crops} == {"flower:bees"} and len({c["mixgrp"] for c in crops}) == 1
+    # flowers in a group grow side by side, so their room adds up (unlike veg sown into the same patch)
+    use = next(s for s in g["spaces"] if s["id"] == bed)["usage"]
+    assert use["peak"] == round(5 * 0.16 + 8 * 0.0625, 2)
+    assert client.post("/api/crops/bulk", json={"crops": ["radish", "salad"], "mix": "made-up"}).json()["crops"][-1]["mix"] is None

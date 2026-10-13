@@ -493,7 +493,7 @@ def usage(space, crops_with_jobs, extra=None):
         if crop.get("space_id") != space["id"] or crop.get("finished_on"):
             continue
         start, end = crop_starts(crop, jobs), crop_finishes(crop, jobs)
-        if start and end and crop.get("mixgrp") and not pot_capacity(space):
+        if start and end and crop.get("mixgrp") and not (crop.get("mix") or "").startswith("flower:") and not pot_capacity(space):
             # sown together: they share one patch - the biggest one's room, while any of them is growing
             g = groups.setdefault(crop["mixgrp"], [start, end, 0.0, crop.get("id")])
             g[0], g[1] = min(g[0], start), max(g[1], end)

@@ -490,3 +490,17 @@ COMBOS += [
      "why": "Tall towers at the back, roses in the middle and soft flowers in front - the classic English border.",
      "plants": ["hollyhock", "delphinium", "peony", "rose", "aquilegia", "geranium"]},
 ]
+COMBOS += [
+    {"id": "hot", "name": "Hot colours", "emoji": "🔥", "sun": ["sun"],
+     "why": "Oranges, reds and golds from midsummer until the frost - bright and cheerful.",
+     "plants": ["dahlia", "zinnia", "rudbeckia", "french_marigold", "nasturtium"]},
+    {"id": "cool", "name": "Cool blues", "emoji": "💙", "sun": ["sun", "mixed"],
+     "why": "Blues and purples that look calm together - and bees love every one of them.",
+     "plants": ["delphinium", "salvia", "lavender", "cornflower", "nigella"]},
+    {"id": "scent", "name": "Scented garden", "emoji": "👃", "sun": ["sun"],
+     "why": "Put it by a path or a bench, where you'll smell it as you go past.",
+     "plants": ["rose", "sweet_pea", "lavender", "sweet_william", "alyssum"]},
+    {"id": "easy", "name": "No-fuss border", "emoji": "😌", "sun": ["sun", "mixed"],
+     "why": "Tough plants that come back every year and need almost nothing from you.",
+     "plants": ["echinacea", "rudbeckia", "geranium", "salvia", "heuchera"]},
+]
