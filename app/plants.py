@@ -367,7 +367,7 @@ PLANTS = [
         "eat": "Roast with honey for Christmas dinner.",
     },
     {
-        "id": "basil", "name": "Basil", "emoji": "🌿", "level": 2, "where": ["pot"], "tender": True,
+        "id": "basil", "name": "Basil", "emoji": "🌿", "level": 2, "where": ["bed", "pot"], "pot_best": True, "tender": True,
         "sow_in": [["04-01", "06-15"]], "plant_out": [["06-01", "07-15"]], "harvest": [["07-01", "09-30"]],
         "weeks": 8, "grow_on": 6, "depth": "just covered", "spacing": "20cm",
         "blurb": "Loves sun and warmth - happiest on a sunny windowsill or patio.",

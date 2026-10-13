@@ -745,3 +745,8 @@ details.later .month-head:first-of-type { border-top: 0; padding-top: 0; margin-
 .adv-bad { color: var(--terra); font-weight: 600; }
 .adv-good { color: var(--forest); }
 .adv-box { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--bg-2); display: grid; gap: 2px; }
+
+.bedpick .changebed { display: none; justify-self: start; }
+.bedpick.picked .bedopt:not(.on) { display: none; }
+.bedpick.picked .changebed { display: inline-flex; }
+.bedpick { scroll-margin-top: 50px; }

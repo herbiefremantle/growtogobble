@@ -515,7 +515,7 @@ document.addEventListener("click", async (e) => {
   const rz = e.target.closest("[data-resizemix]");
   if (rz) {
     const g = activeCrops().filter((c) => c.mixgrp === Number(rz.dataset.resizemix));
-    const factor = Number(rz.dataset.area) / patchOf(g.map((c) => ({ plant_id: c.plant_id, qty: c.qty })));
+    const factor = Number(rz.dataset.area) / groupFoot(g);
     const sized = g.map((c) => ({ c, qty: Math.max(1, Math.round(c.qty * factor)) }));
     for (const x of sized.slice(0, -1)) await api("PATCH", `/api/crops/${x.c.id}`, { plant_id: x.c.plant_id, quantity: x.qty });
     const last = sized[sized.length - 1];
@@ -2084,7 +2084,7 @@ function drawSpace(id) {
       <span><b>About ${money(s.cost.total)} to plant</b><span class="small muted" style="display:block">${s.cost.to_buy < s.cost.total ? `${money(s.cost.to_buy)} still to buy · ` : ""}where each plant goes</span></span><span class="small" style="color:var(--forest-2);font-weight:700">Plan ›</span></button>` : ""}
     <div class="card"><h3>Growing here</h3>${here.length ? usageBar(s) : ""}
       ${plantings.map((g) => { const m = mixOf(g[0]), area = s.usage && s.usage.unit !== "pots" ? s.usage.area : 0;
-        const foot = sharesPatch(g[0]) ? patchOf(g.map((c) => ({ plant_id: c.plant_id, qty: c.qty }))) : 0;
+        const foot = groupFoot(g);
         return `<div class="mixbox"><div class="mixhead"><b>${m ? m.emoji + " " + esc(m.name) : "Sown together"}</b><span class="small muted">one planting</span></div>
         ${foot && area ? `<div class="small" style="margin-bottom:4px">Takes about <b>${m2(foot)}</b> - <b>${Math.round((100 * foot) / area)}%</b> of this bed</div>
           <div class="fillrow" style="margin-bottom:6px"><span class="small muted">Resize to:</span>${FILLS.map(([f, l]) => `<button class="btn small" data-resizemix="${g[0].mixgrp}" data-area="${f * area}">${l}</button>`).join("")}</div>` : ""}
@@ -2714,13 +2714,20 @@ function drawMyPlants() {
     cs.forEach((c) => {
       if (c.mixgrp && seen.has(c.mixgrp)) return;
       if (c.mixgrp) { seen.add(c.mixgrp); const m = mixOf(c), g = cs.filter((x) => x.mixgrp === c.mixgrp);
-        out.push(`<div class="mixbox"><div class="mixhead"><b>${m ? m.emoji + " " + esc(m.name) : "Grown together"}</b><span class="small muted">one planting</span></div>${g.map(line).join("")}</div>`); }
+        const beds = S.g.spaces.filter((sp) => g.some((x) => plant(x.plant_id).where.includes(sp.kind === "pot" ? "pot" : "bed")));
+        out.push(`<div class="mixbox"><div class="mixhead"><b>${m ? m.emoji + " " + esc(m.name) : "Grown together"}</b><span class="small muted">one planting</span></div>
+          ${!c.space_id && beds.length ? `<div class="row" style="margin-bottom:6px;flex-wrap:nowrap"><select data-groupbed="${c.id}" aria-label="Put this planting in a bed"><option value="">Put it in a bed…</option>${beds.map((b) => `<option value="${b.id}">${esc(b.name)}</option>`).join("")}</select></div>` : ""}
+          ${g.map(line).join("")}</div>`); }
       else out.push(line(c));
     });
     return out.join(""); };
   openSheet(`<h2>Your plants</h2><p class="small muted" style="margin-top:-6px">Changed your mind? Tap ✕ to take a plant off your plan - its jobs go too. Plants grown together are removed as one.</p>
     ${where.map((w) => `<div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">${esc(w.name)}</h3>
       ${w.loose && w.crops.length > 1 ? `<button class="btn small danger" id="drop-loose">Remove all ${w.crops.length}</button>` : ""}</div>${block(w.crops)}</div>`).join("")}`);
+  $("#sheet-card").onchange = (e) => {  // putting a whole planting in a bed: moving one moves them all
+    const sel = e.target.closest("[data-groupbed]");
+    if (sel && sel.value) { const c = crop(Number(sel.dataset.groupbed)); change("PATCH", `/api/crops/${c.id}`, { plant_id: c.plant_id, space_id: Number(sel.value) }, `Planted together in ${space(Number(sel.value)).name}`); }
+  };
   const dl = $("#drop-loose");
   if (dl) dl.onclick = async () => {
     const loose = crops.filter((c) => !c.space_id);
@@ -2783,7 +2790,9 @@ function bedAdvice(plantIds, sp) {
   });
   inBed.forEach((c) => look(c, "in this bed", 3));
   next.forEach((n) => n.crops.forEach((c) => look(c, `next door in ${n.sp.name}`, 1)));
-  const wrongKind = ps.some((p) => !p.where.includes(sp.kind === "pot" ? "pot" : "bed"));
+  const misfits = ps.filter((p) => !p.where.includes(sp.kind === "pot" ? "pot" : "bed"));
+  const wrongKind = misfits.length === ps.length;
+  if (misfits.length && !wrongKind) { score -= 1; fine.push(`${misfits.map((p) => p.name).join(" and ")} would rather be in ${sp.kind === "pot" ? "a bed" : "a pot"}`); }
   const u = sp.usage, full = u && u.area ? u.peak / u.area : 0;
   if (wrongKind) score -= 50;
   if (full > 0.9) score -= 4; else if (!inBed.length) score += 2;
@@ -2808,19 +2817,26 @@ function bedPicker(plantIds, chosen, inputId) {
     <div class="bedpick" data-for="${inputId}">${list.map((a, i) => `<button type="button" class="bedopt ${a.sp.id === pick ? "on" : ""}" data-pickbed="${a.sp.id}">
       <div class="row" style="justify-content:space-between;gap:6px"><b>${esc(a.sp.name)}</b>${i === 0 && a.score >= 0 ? `<span class="chip">Best choice</span>` : a.bad.length ? `<span class="chip l3">Bad neighbours</span>` : ""}</div>
       ${adviceLines(a)}</button>`).join("")}
-      <button type="button" class="bedopt ${pick ? "" : "on"}" data-pickbed=""><b>Decide later</b><div class="small muted">Keep it in your plan without a bed for now</div></button></div>`;
+      <button type="button" class="bedopt ${pick ? "" : "on"}" data-pickbed=""><b>Decide later</b><div class="small muted">Keep it in your plan without a bed for now</div></button>
+      <button type="button" class="btn small ghost changebed" data-changebed>Change bed</button></div>`;
 }
-// tapping a bed in a picker
+// tapping a bed in a picker: the list folds down to that bed (so what comes next is right there), "Change bed" opens it again
 document.addEventListener("click", (e) => {
+  const ch = e.target.closest("[data-changebed]");
+  if (ch) { ch.closest(".bedpick").classList.remove("picked"); return; }
   const b = e.target.closest("[data-pickbed]");
   if (!b) return;
   const wrap = b.closest(".bedpick");
   wrap.querySelectorAll(".bedopt").forEach((x) => x.classList.toggle("on", x === b));
   $("#" + wrap.dataset.for).value = b.dataset.pickbed;
+  wrap.classList.add("picked");
+  setTimeout(() => wrap.scrollIntoView({ behavior: "smooth", block: "start" }), 30);
 });
 
 // Veg grown together share one patch: as big as the roomiest plant's share (m2)
 const patchOf = (items) => Math.max(...items.map((x) => plant(x.plant_id).area_each * x.qty));
+const groupFoot = (cs) => { const items = cs.map((c) => ({ plant_id: c.plant_id, qty: c.qty }));
+  return sharesPatch(cs[0]) ? patchOf(items) : items.reduce((n, x) => n + plant(x.plant_id).area_each * x.qty, 0); };
 const m2 = (n) => `${Math.round(n * 100) / 100} m²`;
 const FILLS = [[0.25, "¼"], [0.5, "½"], [0.75, "¾"], [1, "Whole bed"]];
 const scaleItems = (items, factor) => items.map((x) => ({ ...x, qty: Math.max(1, Math.round(x.qty * factor)) }));
@@ -2904,16 +2920,20 @@ function companionPanel(p, spaceId) {
 }
 
 // The flower garden: flowers that go together, laid out to suit the bed's shape and sun
-async function openFlowerPlan(id, sun, focus) {
+async function openFlowerPlan(id, sun, focus, fill = 1) {
   const s = space(id);
   sun = sun || s.sun || "sun";
   let plan;
-  try { plan = await api("GET", `/api/spaces/${id}/flowers?sun=${sun}`); } catch (e) { toast(e.message); return; }
+  try { plan = await api("GET", `/api/spaces/${id}/flowers?sun=${sun}&fill=${fill}`); } catch (e) { toast(e.message); return; }
+  const area = s.usage && s.usage.unit !== "pots" ? s.usage.area : 0, used = area ? s.usage.peak : 0, free = area ? Math.max(0, area - used) / area : 0;
   S.sheet = null;
   openSheet(`<h2>🌸 Flower ideas for ${esc(s.name)}</h2>
     <label class="field">How sunny is it?</label>
     <div class="chips">${Object.entries(S.cat.sun_spots).map(([k, v]) => `<button class="btn small ${k === sun ? "primary" : ""}" data-fsun="${k}">${v.emoji} ${esc(v.name)}</button>`).join("")}</div>
     <p class="small muted" style="margin:6px 0 10px">${esc(S.cat.sun_spots[sun].text)}</p>
+    ${area ? `<div class="adv-box" style="margin-bottom:12px"><div class="small">${esc(s.name)} is <b>${m2(area)}</b>${s.width_m && s.length_m ? ` (${s.width_m} × ${s.length_m} m)` : ""}${used ? `, with ${m2(used)} already planned` : ""}. These ideas fill <b>${Math.round(fill * 100)}%</b> of it - about ${m2(area * fill)}.</div>
+      <div class="fillrow" style="margin-top:6px"><span class="small muted">Fill:</span>${FILLS.map(([f, l]) => `<button type="button" class="btn small ${Math.abs(f - fill) < 0.01 ? "primary" : ""}" data-ffill="${f}">${l}</button>`).join("")}
+      ${used && free > 0.05 ? `<button type="button" class="btn small ${Math.abs(free - fill) < 0.01 ? "primary" : ""}" data-ffill="${free.toFixed(3)}">The free space</button>` : ""}</div></div>` : ""}
     <div class="card tint-sky small" style="margin-bottom:12px">📐 ${esc(plan.tip)}</div>
     ${plan.combos.map((c) => `<div class="card combo"><h3>${c.emoji} ${esc(c.name)}</h3><p class="small" style="margin:0 0 8px">${esc(c.why)}</p>
       ${flowerDiagram(s, plan, c)}
@@ -2925,9 +2945,10 @@ async function openFlowerPlan(id, sun, focus) {
   const card = $("#sheet-card");
   card.querySelectorAll("[data-fsun]").forEach((b) => (b.onclick = async () => {
     if (b.dataset.fsun !== s.sun) await patchSpace(s, { sun: b.dataset.fsun });
-    openFlowerPlan(id, b.dataset.fsun);
+    openFlowerPlan(id, b.dataset.fsun, focus, fill);
   }));
   if (focus) { const f = card.querySelector(`[data-addcombo="${focus}"]`); if (f) f.closest(".combo").scrollIntoView({ block: "start" }); }
+  card.querySelectorAll("[data-ffill]").forEach((b) => (b.onclick = () => openFlowerPlan(id, sun, focus, Number(b.dataset.ffill))));
   card.querySelectorAll("[data-addcombo]").forEach((b) => (b.onclick = async () => {
     const c = plan.combos.find((x) => x.id === b.dataset.addcombo);
     const crops = c.zones.flatMap((z) => z.plants.map((x) => ({ plant_id: x.plant_id, quantity: x.qty })));

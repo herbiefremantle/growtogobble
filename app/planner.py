@@ -341,7 +341,7 @@ def _tier(plant):
     return 0 if h >= 80 else 1 if h >= 35 else 2  # tall, middle, short
 
 
-def flower_plan(space, sun):
+def flower_plan(space, sun, fill=1.0):
     """Groups of flowers that suit this spot, each laid out by height to suit the bed's shape: tall at the back of
     a border (or the middle of an island bed you walk round), short at the front or edge. How many of each fills it."""
     sun = sun if sun in catalogue.SUN_SPOTS else "sun"
@@ -351,7 +351,7 @@ def flower_plan(space, sun):
     zones = (("pot", "In the pot", 1.0),) if kind == "pot" else (
         (("centre", "In the middle", 0.25), ("ring", "Around them", 0.45), ("edge", "Round the edge", 0.3)) if island else
         (("back", "At the back", 0.35), ("middle", "In the middle", 0.35), ("front", "At the front", 0.3)))
-    area = space_area(space) or 0.3
+    area = (space_area(space) or 0.3) * max(0.05, min(fill, 1.0))  # fill: how much of the bed to plant (1 = all of it)
     need = {"sun": "sun", "shade": "shade", "mixed": None}[sun]
     combos = []
     for combo in catalogue.COMBOS:
@@ -756,7 +756,7 @@ def suggest_layout(spaces, crops_with_jobs, today, only_unplaced=False):
                     score -= 100 + 20 * (fill - 1)
                     note = "a bit full"
             if kind == "pot":
-                if plant["where"] == ["pot"]:
+                if plant["where"] == ["pot"] or plant.get("pot_best"):
                     score += 20  # herbs, blueberries, chillies... belong in pots
                 else:
                     # pots have no size to fill, so don't let them swallow everything: beds come first,

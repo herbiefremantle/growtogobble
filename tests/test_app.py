@@ -817,3 +817,14 @@ def test_flower_groups_stay_together_but_take_their_own_room(client):
     use = next(s for s in g["spaces"] if s["id"] == bed)["usage"]
     assert use["peak"] == round(5 * 0.16 + 8 * 0.0625, 2)
     assert client.post("/api/crops/bulk", json={"crops": ["radish", "salad"], "mix": "made-up"}).json()["crops"][-1]["mix"] is None
+
+
+def test_flower_plan_can_fill_part_of_a_bed(client):
+    _join(client)
+    bed = client.post("/api/spaces", json={"name": "Border", "kind": "bed", "width_m": 1, "length_m": 4}).json()["spaces"][0]["id"]
+    whole = client.get("/api/spaces/%d/flowers?sun=sun" % bed).json()
+    half = client.get("/api/spaces/%d/flowers?sun=sun&fill=0.5" % bed).json()
+    count = lambda plan: sum(x["qty"] for z in plan["combos"][0]["zones"] for x in z["plants"])
+    assert count(half) < count(whole) and half["area"] == whole["area"] / 2
+    # basil can go in a bed as well as a pot, so tomatoes, basil & marigolds can be planted in a bed
+    assert "bed" in next(p for p in client.get("/api/plants").json()["plants"] if p["id"] == "basil")["where"]

@@ -523,11 +523,12 @@ def rename_space(space_id: int, body: SpaceIn, user=Depends(auth.current_user)):
 
 
 @app.get("/api/spaces/{space_id}/flowers")
-def flower_ideas(space_id: int, sun: Optional[str] = None, user=Depends(auth.current_user)):
-    """Flowers that go together for this bed, laid out to suit its shape and how sunny it is."""
+def flower_ideas(space_id: int, sun: Optional[str] = None, fill: float = 1.0, user=Depends(auth.current_user)):
+    """Flowers that go together for this bed, laid out to suit its shape and how sunny it is - enough to fill
+    the whole bed, or a part of it (fill=0.5 for half)."""
     with db.connect() as conn:
         space = _own(conn, "spaces", space_id, user)
-    return planner.flower_plan(space, sun or space.get("sun"))
+    return planner.flower_plan(space, sun or space.get("sun"), fill)
 
 
 class Position(BaseModel):
