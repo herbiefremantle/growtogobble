@@ -754,3 +754,15 @@ details.later .month-head:first-of-type { border-top: 0; padding-top: 0; margin-
 /* groups on the garden plan */
 svg.plot .grp-outline { fill: none; stroke: #fff; stroke-dasharray: 0.08 0.05; pointer-events: none; opacity: .9; }
 svg.plot .grp-tag { fill: #fff; font-weight: 800; paint-order: stroke; stroke: rgba(30, 50, 30, .65); stroke-width: 0.035; pointer-events: none; }
+
+/* side view: what a bed will look like */
+.sideview { display: block; width: 100%; height: auto; border-radius: 12px; }
+.sideview .sv-sky { fill: #e9f3f8; } .sideview .sv-soil { fill: #8a6242; }
+.sideview .sv-rule { stroke: #6b7c70; stroke-width: 1; } .sideview .sv-rule-t { fill: #4d5d52; font: 600 8px "Figtree", sans-serif; }
+:root[data-theme="dark"] .sideview .sv-sky { fill: #1b2a33; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .sideview .sv-sky { fill: #1b2a33; } }
+:root[data-theme="dark"] .sideview .sv-rule-t { fill: #b9c6bc; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .sideview .sv-rule-t { fill: #b9c6bc; } }
+.scene-ctl { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.scene-ctl input { flex: 1; accent-color: var(--forest-2); }
+.scene-ctl span { min-width: 76px; text-align: right; font-weight: 700; }

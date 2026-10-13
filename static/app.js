@@ -2579,6 +2579,137 @@ function openPlant(id, spaceId, startMethod, after) {
   };
 }
 
+// ---- what it'll look like: a side view of a bed, drawn to scale, through the year --------------------------
+// Each plant gets a shape (stalk, spike, daisy, mound, climber...) and its flower or fruit colour.
+const LOOK = {
+  sweetcorn: ["stalk", "#e9c64a"], sunflower: ["stalk", "#f4c430"], lily: ["stalk", "#f6efe2"], broad_beans: ["stalk", "#f3f3f3"],
+  sprouts: ["stalk", null], tomatoes_big: ["stalk", "#d63b2f"],
+  hollyhock: ["spike", "#e889b5"], delphinium: ["spike", "#3d6fd6"], lupin: ["spike", "#8a5bd6"], gladiolus: ["spike", "#e8564a"],
+  snapdragon: ["spike", "#f08cb0"], salvia: ["spike", "#6a3fb5"], lavender: ["spike", "#9a7fd1"], astilbe: ["spike", "#f2a0c0"],
+  phacelia: ["spike", "#8f7fe0"], hyacinth: ["spike", "#6f7fe8"],
+  cosmos: ["daisy", "#e98ac0"], echinacea: ["daisy", "#d96aa0"], rudbeckia: ["daisy", "#f2b21b"], zinnia: ["daisy", "#f0643c"],
+  poppy: ["daisy", "#e2362f"], cornflower: ["daisy", "#3f6fe0"], nigella: ["daisy", "#7fa8e8"], verbena: ["daisy", "#9b59d0"],
+  aquilegia: ["daisy", "#a066d0"], anemone: ["daisy", "#f4d6e6"],
+  calendula: ["mound", "#f39a1e"], french_marigold: ["mound", "#f08a12"], nasturtium: ["mound", "#f26a1b"], borage: ["mound", "#4c7fe0"],
+  poached_egg: ["mound", "#f7e15a"], alyssum: ["mound", "#ffffff"], geranium: ["mound", "#7c6fe0"], viola: ["mound", "#f2c94c"],
+  petunia: ["mound", "#b04fd0"], bedding_geranium: ["mound", "#e53935"], lobelia: ["mound", "#3f5fe0"], begonia: ["mound", "#ef5350"],
+  busy_lizzie: ["mound", "#f06292"], primrose: ["mound", "#f5e17a"], forget_me_not: ["mound", "#8ab4f8"], heuchera: ["mound", "#b04a6a"],
+  hosta: ["mound", "#c8b6e2"], hellebore: ["mound", "#f0e2ee"], sweet_william: ["mound", "#d0315f"], thyme: ["mound", "#c9a0e0"],
+  sage: ["mound", "#9b7fd0"], oregano: ["mound", "#d0a0d8"], basil: ["mound", null], parsley: ["mound", null], mint: ["mound", null],
+  fern: ["fern", null],
+  snowdrop: ["bulb", "#ffffff"], crocus: ["bulb", "#9b6fe0"], daffodil: ["bulb", "#f7d33b"], tulip: ["bulb", "#e53935"], bluebell: ["bulb", "#5a6fe0"],
+  allium: ["ball", "#9a5fd0"],
+  peony: ["shrub", "#f2a0c0"], rose: ["shrub", "#d62f4f"], hydrangea: ["shrub", "#7fa6e8"], buddleja: ["shrub", "#9b59d0"],
+  fuchsia: ["shrub", "#d6337f"], dahlia: ["shrub", "#e8483a"], rosemary: ["shrub", "#8fa0e0"], raspberries: ["shrub", "#d62f4f"],
+  blueberries: ["shrub", "#3b4fa0"],
+  clematis: ["climber", "#8a5fd0"], honeysuckle: ["climber", "#f5d27a"], sweet_pea: ["climber", "#e98ac0"], french_beans: ["climber", "#7fb04a"],
+  runner_beans: ["climber", "#e2362f"], peas: ["climber", "#9fd06a"], cucumber: ["climber", "#4f9a3a"],
+  squash: ["sprawl", "#f29a1e"], pumpkin: ["sprawl", "#f07a12"], courgette: ["sprawl", "#3f7a2a"], summer_squash: ["sprawl", "#f2c21b"],
+  melon: ["sprawl", "#e8c26a"], strawberries: ["sprawl", "#e2362f"], sweet_potatoes: ["sprawl", null],
+  tomatoes: ["bush", "#e2362f"], chillies: ["bush", "#d62f2f"], peppers: ["bush", "#e53935"], aubergine: ["bush", "#5b2b6e"], potatoes: ["bush", "#f0f0f8"],
+  onions: ["strap", null], garlic: ["strap", null], leeks: ["strap", null], spring_onions: ["strap", null], chives: ["strap", "#c58ad8"],
+  carrots: ["feather", null], parsnips: ["feather", null], dill: ["feather", "#e8d44a"], coriander: ["feather", "#ffffff"],
+  beetroot: ["leafy", "#9b2d4f"], chard: ["leafy", "#e2362f"], radish: ["leafy", null], salad: ["leafy", null], kale: ["leafy", null],
+  broccoli: ["leafy", null], cauliflower: ["leafy", null], rhubarb: ["leafy", "#c8304a"],
+};
+// Is it in the ground in month m (1-12), and is it at its best (flowering or ready to pick)?
+function lifeState(p, m) {
+  if (p.months.harvest.includes(m)) return "show";
+  if (p.perennial) return "growing";
+  const starts = [...p.months.sow_out, ...p.months.plant_out];
+  if (!starts.length || !p.months.harvest.length) return "none";
+  const first = starts.sort((a, b) => a - b)[0], last = p.months.harvest[p.months.harvest.length - 1];
+  for (let k = first, n = 0; n < 12; n++, k = (k % 12) + 1) { if (k === m) return "growing"; if (k === last) break; }
+  return "none";
+}
+// one plant, standing on y, h pixels tall and about w wide
+function plantShape(p, x, y, h, w, state) {
+  const [kind, col] = LOOK[p.id] || ["mound", null], show = state === "show" && col, leaf = "#4f8f3a", leaf2 = "#6aa84f";
+  const dots = (n, cx, cy, rx, ry, r, c) => Array.from({ length: n }, (_, k) => { const a = k * 2.399, d = Math.sqrt((k + 0.5) / n);
+    return `<circle cx="${cx + Math.cos(a) * rx * d}" cy="${cy + Math.sin(a) * ry * d}" r="${r}" fill="${c}"/>`; }).join("");
+  switch (kind) {
+    case "stalk": return `<path d="M${x} ${y} V${y - h}" stroke="${leaf}" stroke-width="2.4"/>${[0.3, 0.5, 0.7].map((f, k) =>
+        `<path d="M${x} ${y - h * f} q${k % 2 ? -w / 2 : w / 2} ${-h * 0.08} ${k % 2 ? -w * 0.7 : w * 0.7} ${h * 0.05}" stroke="${leaf2}" stroke-width="2.2" fill="none"/>`).join("")}
+      ${show ? (p.id === "sweetcorn" ? `<ellipse cx="${x + 3}" cy="${y - h * 0.55}" rx="3" ry="${h * 0.08}" fill="${col}"/><path d="M${x} ${y - h} l-4 -8 M${x} ${y - h} l4 -8" stroke="#c9a94a" stroke-width="1.5"/>`
+        : `<circle cx="${x}" cy="${y - h}" r="${Math.max(4, w * 0.35)}" fill="${col}"/><circle cx="${x}" cy="${y - h}" r="${Math.max(2, w * 0.13)}" fill="#6b4a1e"/>`) : ""}`;
+    case "spike": return [-0.25, 0, 0.25].map((o, k) => { const xx = x + o * w, hh = h * (k === 1 ? 1 : 0.85);
+      return `<path d="M${xx} ${y} V${y - hh}" stroke="${leaf}" stroke-width="1.6"/><ellipse cx="${xx}" cy="${y - hh * 0.8}" rx="${Math.max(2, w * 0.09)}" ry="${hh * 0.22}" fill="${show ? col : leaf2}"/>`; }).join("")
+      + `<ellipse cx="${x}" cy="${y - h * 0.08}" rx="${w * 0.45}" ry="${h * 0.1}" fill="${leaf}"/>`;
+    case "daisy": return [-0.3, -0.1, 0.12, 0.32].map((o, k) => { const xx = x + o * w, hh = h * [0.8, 1, 0.9, 0.75][k];
+      return `<path d="M${x} ${y} Q${xx} ${y - hh * 0.5} ${xx} ${y - hh}" stroke="${leaf}" stroke-width="1.3" fill="none"/>${show ? `<circle cx="${xx}" cy="${y - hh}" r="${Math.max(3, w * 0.12)}" fill="${col}"/><circle cx="${xx}" cy="${y - hh}" r="${Math.max(1.2, w * 0.045)}" fill="#7a4a1a"/>` : `<circle cx="${xx}" cy="${y - hh}" r="1.8" fill="${leaf2}"/>`}`; }).join("")
+      + `<ellipse cx="${x}" cy="${y - h * 0.06}" rx="${w * 0.35}" ry="${h * 0.08}" fill="${leaf}"/>`;
+    case "shrub": return `<circle cx="${x - w * 0.22}" cy="${y - h * 0.4}" r="${h * 0.4}" fill="${leaf}"/><circle cx="${x + w * 0.22}" cy="${y - h * 0.42}" r="${h * 0.38}" fill="${leaf}"/>
+      <circle cx="${x}" cy="${y - h * 0.6}" r="${h * 0.4}" fill="${leaf2}"/>${show ? dots(12, x, y - h * 0.55, w * 0.45, h * 0.35, Math.max(2, h * 0.07), col) : ""}`;
+    case "climber": return `<path d="M${x - w * 0.4} ${y} L${x} ${y - h} L${x + w * 0.4} ${y}" stroke="#b08a5a" stroke-width="1.6" fill="none"/>
+      ${[0.2, 0.4, 0.6, 0.8].map((f) => `<ellipse cx="${x - w * 0.4 * (1 - f)}" cy="${y - h * f}" rx="${w * 0.18}" ry="${h * 0.07}" fill="${leaf}"/><ellipse cx="${x + w * 0.4 * (1 - f)}" cy="${y - h * f + 3}" rx="${w * 0.18}" ry="${h * 0.07}" fill="${leaf2}"/>`).join("")}
+      ${show ? dots(8, x, y - h * 0.55, w * 0.3, h * 0.35, Math.max(1.8, w * 0.06), col) : ""}`;
+    case "sprawl": return `${[-0.35, 0, 0.35].map((o, k) => `<ellipse cx="${x + o * w}" cy="${y - h * 0.45}" rx="${w * 0.28}" ry="${h * 0.5}" fill="${k === 1 ? leaf2 : leaf}"/>`).join("")}
+      ${show ? `<ellipse cx="${x + w * 0.15}" cy="${y - h * 0.15}" rx="${w * 0.14}" ry="${Math.max(3, h * 0.2)}" fill="${col}"/>` : ""}`;
+    case "bush": return `<path d="M${x} ${y} V${y - h}" stroke="#a88a5a" stroke-width="1.4"/><ellipse cx="${x}" cy="${y - h * 0.55}" rx="${w * 0.45}" ry="${h * 0.45}" fill="${leaf}"/>
+      ${show ? dots(6, x, y - h * 0.5, w * 0.35, h * 0.3, Math.max(2.2, w * 0.08), col) : ""}`;
+    case "strap": return [-0.3, -0.1, 0.1, 0.3].map((o) => `<path d="M${x} ${y} Q${x + o * w} ${y - h * 0.6} ${x + o * w * 1.6} ${y - h}" stroke="${leaf2}" stroke-width="2" fill="none"/>`).join("")
+      + (show ? `<circle cx="${x}" cy="${y - h}" r="${Math.max(3, w * 0.15)}" fill="${col}"/>` : "");
+    case "feather": return Array.from({ length: 7 }, (_, k) => { const o = (k - 3) / 3;
+      return `<path d="M${x} ${y} L${x + o * w * 0.45} ${y - h * (0.7 + 0.3 * (1 - Math.abs(o)))}" stroke="${leaf2}" stroke-width="1.2"/>`; }).join("")
+      + (show ? `<ellipse cx="${x}" cy="${y - h}" rx="${w * 0.3}" ry="3" fill="${col}"/>` : "");
+    case "leafy": return [-0.3, 0, 0.3].map((o, k) => `<path d="M${x} ${y} L${x + o * w * 0.6} ${y - h * 0.5}" stroke="${col || leaf}" stroke-width="1.6"/>
+      <ellipse cx="${x + o * w * 0.6}" cy="${y - h * (k === 1 ? 0.7 : 0.6)}" rx="${w * 0.2}" ry="${h * 0.3}" fill="${k === 1 ? leaf2 : leaf}"/>`).join("");
+    case "bulb": return [-0.2, 0, 0.2].map((o) => `<path d="M${x} ${y} L${x + o * w} ${y - h * 0.6}" stroke="${leaf2}" stroke-width="2.4"/>`).join("")
+      + `<path d="M${x} ${y} V${y - h}" stroke="${leaf}" stroke-width="1.4"/>${show ? `<path d="M${x - 4} ${y - h - 2} q4 10 8 0 q-4 -6 -8 0z" fill="${col}"/>` : ""}`;
+    case "ball": return [-0.2, 0.2].map((o) => `<path d="M${x} ${y} L${x + o * w} ${y - h * 0.3}" stroke="${leaf2}" stroke-width="2.4"/>`).join("")
+      + `<path d="M${x} ${y} V${y - h}" stroke="${leaf}" stroke-width="1.4"/>${show ? `<circle cx="${x}" cy="${y - h}" r="${Math.max(5, w * 0.3)}" fill="${col}"/>` : ""}`;
+    case "fern": return [-0.4, -0.15, 0.15, 0.4].map((o) => `<path d="M${x} ${y} Q${x + o * w * 0.6} ${y - h} ${x + o * w * 1.3} ${y - h * 0.55}" stroke="${leaf}" stroke-width="2.6" fill="none" stroke-dasharray="3 1.5"/>`).join("");
+    default: { const bh = h * 0.9; return `<ellipse cx="${x}" cy="${y - bh * 0.5}" rx="${w * 0.48}" ry="${bh * 0.5}" fill="${leaf}"/>${show ? dots(9, x, y - bh * 0.55, w * 0.38, bh * 0.35, Math.max(2, w * 0.07), col) : ""}`; }
+  }
+}
+// rows: [{ items: [{ p, count }] }] from the back to the front
+const SCENES = {};
+function sceneSvg(rows, m) {
+  const W = 360, H = 200, ground = 178, all = rows.flatMap((r) => r.items.map((it) => it.p));
+  const maxH = Math.max(120, ...all.map((p) => p.height_cm)), scale = 128 / maxH;
+  const n = rows.length, out = [];
+  rows.forEach((row, k) => {
+    const depth = n - 1 - k, y = ground - depth * 9, shrink = 1 - depth * 0.06;
+    const pool = row.items.flatMap((it) => Array(Math.max(1, Math.min(it.count, 6))).fill(it.p));
+    const slots = Math.max(3, Math.min(9, pool.length)), list = Array.from({ length: slots }, (_, i) => pool[Math.floor((i / slots) * pool.length)]);
+    list.forEach((p, i) => {
+      const state = lifeState(p, m);
+      if (state === "none") return;
+      const h = p.height_cm * scale * shrink * (state === "show" ? 1 : 0.7), w = Math.min(44, Math.max(14, (p.sp_cm || 30) * 0.5 * shrink));
+      const x = 24 + ((i + 0.5) / slots) * (W - 36) + ((i * 37) % 7) - 3;
+      out.push(`<g opacity="${1 - depth * 0.12}">${plantShape(p, x, y, h, w, state)}</g>`);
+    });
+  });
+  const ruler = [100, 200].filter((c) => c * scale < 150).map((c) => `<line x1="8" x2="14" y1="${ground - c * scale}" y2="${ground - c * scale}" class="sv-rule"/><text x="16" y="${ground - c * scale + 3}" class="sv-rule-t">${c / 100}m</text>`).join("");
+  return `<svg class="sideview" viewBox="0 0 ${W} ${H}" role="img" aria-label="What it looks like in ${MONTHS_LONG[m - 1]}">
+    <rect x="0" y="0" width="${W}" height="${H}" class="sv-sky"/><rect x="0" y="${ground - (n - 1) * 9 - 4}" width="${W}" height="${H}" class="sv-soil"/>
+    <line x1="11" x2="11" y1="${ground}" y2="${ground - Math.min(150, 200 * scale)}" class="sv-rule"/>${ruler}${out.join("")}</svg>`;
+}
+// the best month to show first: when most of it is at its best
+function bestMonth(rows) {
+  const ps = rows.flatMap((r) => r.items.map((it) => it.p));
+  let best = 7, top = -1;
+  for (let m = 1; m <= 12; m++) { const v = ps.filter((p) => lifeState(p, m) === "show").length * 2 + ps.filter((p) => lifeState(p, m) === "growing").length; if (v > top) { top = v; best = m; } }
+  return best;
+}
+function sceneBox(key, rows, m = bestMonth(rows)) {
+  SCENES[key] = rows;
+  return `<div class="scene-box"><div data-scene-pic="${key}">${sceneSvg(rows, m)}</div>
+    <div class="scene-ctl"><input type="range" min="1" max="12" value="${m}" data-scene="${key}" aria-label="Month"><span class="small" data-scene-label="${key}">${MONTHS_LONG[m - 1]}</span></div></div>`;
+}
+document.addEventListener("input", (e) => {
+  const r = e.target.closest("[data-scene]");
+  if (!r) return;
+  const k = r.dataset.scene, m = Number(r.value);
+  document.querySelectorAll(`[data-scene-pic="${k}"]`).forEach((el) => (el.innerHTML = sceneSvg(SCENES[k], m)));
+  document.querySelectorAll(`[data-scene-label="${k}"]`).forEach((el) => (el.textContent = MONTHS_LONG[m - 1]));
+});
+// rows from plants by height: tall at the back, medium, short at the front
+function rowsByHeight(items) {
+  const tier = (p) => (p.height_cm >= 80 ? 0 : p.height_cm >= 35 ? 1 : 2);
+  return [0, 1, 2].map((t) => ({ items: items.filter((it) => tier(it.p) === t) })).filter((r) => r.items.length);
+}
+
 // ---- a bed's planting plan: where each thing goes, how it's started, and roughly what it costs ----------------
 // Tallest at the back (the north side, so they don't shade the rest) - or in the middle of a round bed you walk
 // round. Companion plants are dotted round the edges. Each strip's size is the room its plants need.
@@ -2691,6 +2822,9 @@ function drawBedPlan(id) {
   };
   openSheet(`<h2>📐 ${esc(s.name)}: where to plant</h2>
     ${L.tiers.length || L.edge.length ? bedPlanSvg(L) : ""}
+    ${L.tiers.length ? `<div class="card"><h3>What it'll look like</h3><p class="small muted" style="margin:-4px 0 8px">From the front, to scale. Slide through the year.</p>
+      ${sceneBox("bed" + s.id, [...L.tiers.map((t) => ({ items: t.parts.flatMap((pt) => pt.plants.map((pid) => ({ p: plant(pid), count: pt.crops.filter((c) => c.plant_id === pid).reduce((n, c) => n + c.qty, 0) }))) })),
+        ...(L.edge.length ? [{ items: L.edge.map((c) => ({ p: plant(c.plant_id), count: c.qty })) }] : [])])}</div>` : ""}
     ${L.over ? `<div class="checkbox warn small">⚠️ There's more planned than fits - it's squeezed up here. Take something out, plant fewer, or use a bigger bed.</div>` : ""}
     ${L.spare > 0.1 && !L.over ? `<p class="small muted">🟫 About ${Math.round(L.spare * 100)}% of the bed is still free${L.island ? " round the outside" : " at the front"} - room for more.</p>` : ""}
     <div class="card"><h3>🌱 What goes where</h3>${[...cost.items].sort((x, y) => order(x) - order(y)).map(row).join("") || `<p class="small muted">Nothing in this bed yet.</p>`}
@@ -2882,6 +3016,7 @@ function openMix(id, spaceId) {
       <div id="mixfill"></div>
       <p class="small muted" style="margin:8px 0 0" id="mixqty"></p>
       <button class="btn primary wide" id="mixgo" style="margin-top:12px">Add the mix 🤝</button></div>
+    <div class="card"><h3>What it'll look like</h3>${sceneBox("mix" + m.id, rowsByHeight(m.plants.map((x) => ({ p: plant(x.plant_id), count: x.qty }))))}</div>
     <div class="card"><h3>⏱️ What happens when</h3>${order.map((x, i) => { const q = plant(x.plant_id);
       return `<div class="mix-step"><span class="e">${q.emoji}</span><div><b>${i + 1}. ${esc(q.name)}</b><div class="small">Comes up in ${esc(x.up)} · ready from about ${x.ready} weeks</div></div></div>`; }).join("")}</div>
     <div class="card"><h3>👣 How to do it</h3><ol class="steps">${m.steps.map((t) => `<li>${esc(t)}</li>`).join("")}</ol>
@@ -2950,6 +3085,7 @@ async function openFlowerPlan(id, sun, focus, fill = 1) {
     <div class="card tint-sky small" style="margin-bottom:12px">📐 ${esc(plan.tip)}</div>
     ${plan.combos.map((c) => `<div class="card combo"><h3>${c.emoji} ${esc(c.name)}</h3><p class="small" style="margin:0 0 8px">${esc(c.why)}</p>
       ${flowerDiagram(s, plan, c)}
+      ${sceneBox("fl" + c.id, c.zones.map((z) => ({ items: z.plants.map((x) => ({ p: plant(x.plant_id), count: x.qty })) })))}
       ${c.zones.map((z) => `<div class="zone"><b class="small">${esc(z.label)}</b><div class="chips">${z.plants.map((x) => { const q = plant(x.plant_id);
         return `<button class="btn small ghost" data-open-plant="${q.id}" data-space="${s.id}" title="${esc(x.cost.text)}">${q.emoji} ${x.qty} × ${esc(q.name)}${x.sunny_end ? " ☀️" : ""} <span class="muted">· ${{ sow_out: "seeds", sow_in: "seeds indoors", plants: q.buy_word === "bulbs" ? "bulbs" : "plants" }[x.method]} ${money(x.cost.total)}</span></button>`; }).join("")}</div></div>`).join("")}
       <div class="row" style="margin-top:10px;justify-content:space-between"><b>💷 About ${money(c.cost)} for the lot</b><button class="btn primary small" data-addcombo="${c.id}">➕ Add these to ${esc(s.name)}</button></div></div>`).join("")
@@ -3167,9 +3303,18 @@ function calendarPage() {
 // ---- shopping --------------------------------------------------------------------------------------
 
 function shopPage() {
-  const items = S.g.shopping;
-  view.innerHTML = `<h1>🛒 Shopping list</h1><p class="muted">Seeds and plants for what you're growing, soonest first. Tap a shop to buy it, then tick it off.</p>
-    <div class="card">${items.length ? items.map((s) => jobCard(s.job)).join("") : `<div class="empty"><div class="big">✅</div>You've got everything you need!</div>`}</div>
+  // in date order: when you need to buy it (then the last day it's still worth buying), split up by month
+  const items = [...S.g.shopping].sort((a, b) => a.job.start.localeCompare(b.job.start) || a.job.end.localeCompare(b.job.end));
+  const t = today(), months = [];
+  items.forEach((x) => {
+    const k = (x.job.start < S.g.today ? S.g.today : x.job.start).slice(0, 7), last = months[months.length - 1];  // anything due already goes under now
+    if (last && last.k === k) last.items.push(x); else months.push({ k, items: [x] });
+  });
+  view.innerHTML = `<h1>🛒 Shopping list</h1><p class="muted">Seeds and plants for what you're growing, in date order. Tap a shop to buy it, then tick it off.</p>
+    ${items.length ? months.map((g) => { const [y, mo] = g.k.split("-").map(Number);
+      return `<div class="section-title"><h2>${g.k === S.g.today.slice(0, 7) ? "Now" : MONTHS_LONG[mo - 1] + (y !== t.getFullYear() ? " " + y : "")}</h2><span class="small muted">${g.items.length} to buy</span></div>
+        <div class="card">${g.items.map((x) => jobCard(x.job)).join("")}</div>`; }).join("")
+      : `<div class="card"><div class="empty"><div class="big">✅</div>You've got everything you need!</div></div>`}
     <div class="card tint-soil"><h3>📦 For a no-dig bed you'll also need</h3>
       <ul style="margin:0;padding-left:20px"><li>Plain brown cardboard (free - ask a shop for boxes!)</li><li>Peat-free compost: about 15 bags (50 litres each) for a 1.2m × 2.4m bed</li><li>A watering can with a sprinkler head (a "rose")</li><li>Plant labels and a pencil</li></ul></div>`;
 }
