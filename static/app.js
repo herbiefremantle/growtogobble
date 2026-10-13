@@ -1133,6 +1133,7 @@ function plotSvg() {
     const growing = here.filter((c) => inGround(c, T)), later = here.length - growing.length;
     // sown together = one strip, as big as its biggest plant's room, with all of them in it
     const now = [];
+    growing.sort((a, b) => (a.mixgrp || a.id) - (b.mixgrp || b.id) || a.id - b.id);  // a group's plants side by side
     growing.forEach((c) => {
       const u = sharesPatch(c) && now.find((x) => x.mixgrp === c.mixgrp);
       if (!u) now.push({ ...c, emojis: [plant(c.plant_id).emoji] });
@@ -1153,11 +1154,13 @@ function plotSvg() {
       const across = w <= h, long = across ? h : w, short = across ? w : h;
       const need = now.reduce((n, c) => n + c.area / short, 0), scale = need > long ? long / need : 1;
       let at = 0;
+      const spans = {};  // where each group's strips start and end
       const clipped = shapeType(s) !== "rect";
       inner = shapeSvg(s, x, y, w, h, `class="bed ${s.built === 0 ? "unbuilt" : ""} ${need > long ? "over" : ""}"`)
         + (clipped ? `<clipPath id="bc${s.id}">${shapeSvg(s, x, y, w, h, "")}</clipPath><g clip-path="url(#bc${s.id})">` : "") + now.map((c) => {
         const p = plant(c.plant_id), depth = Math.max(0.14, (c.area / short) * scale), start = at;
         at += depth;
+        if (c.mixgrp) { const g = (spans[c.mixgrp] = spans[c.mixgrp] || { from: start, mix: mixOf(c) }); g.to = at; }
         const rx = across ? x + 0.04 : x + start + 0.02, ry = across ? y + start + 0.02 : y + 0.04;
         const rw = across ? w - 0.08 : depth - 0.04, rh = across ? depth - 0.04 : h - 0.08;
         const n = Math.max(1, Math.min(Math.floor(short / 0.3), c.qty, 8)), fs = Math.min(0.26, depth * 0.75, px(26));
@@ -1165,6 +1168,14 @@ function plotSvg() {
           ? `<text x="${x + (w / n) * (k + 0.5)}" y="${ry + rh / 2 + fs * 0.35}" font-size="${fs}" text-anchor="middle">${c.emojis[k % c.emojis.length]}</text>`
           : `<text x="${rx + rw / 2}" y="${y + (h / n) * (k + 0.5) + fs * 0.35}" font-size="${fs}" text-anchor="middle">${c.emojis[k % c.emojis.length]}</text>`).join("");
         return `<g class="crop" data-open-crop="${c.id}"><rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" rx="0.06" fill="${FAMILY_COLOUR[p.family] || "#9fd88f"}"/>${emojis}</g>`;
+      }).join("") + Object.values(spans).map((g) => {
+        // a dashed outline round the group, with its name on a little tag
+        const gx = across ? x + 0.01 : x + g.from, gy = across ? y + g.from : y + 0.01, gw = across ? w - 0.02 : g.to - g.from, gh = across ? g.to - g.from : h - 0.02;
+        const fs = Math.min(0.18, px(11)), name = g.mix ? g.mix.name.split(":")[0] : "Grown together";
+        // the tag sits on whichever edge of the group is at the top of the screen, and reads the right way up
+        const ty = Math.cos(rad(i.a || 0)) < 0 ? gy + gh - fs * 0.4 : gy + fs * 1.05;
+        return `<rect x="${gx}" y="${gy}" width="${gw}" height="${gh}" rx="0.08" class="grp-outline" style="stroke-width:${px(2)}"/>
+          <text x="${gx + gw / 2}" y="${ty}" font-size="${fs}" text-anchor="middle" class="grp-tag" transform="rotate(${-i.a} ${gx + gw / 2} ${ty - fs * 0.35})">${g.mix ? g.mix.emoji + " " : ""}${esc(name)}</text>`;
       }).join("") + (clipped ? "</g>" : "") + (need < long * 0.9 && !plotEdit ? `<text x="${across ? x + w / 2 : x + at + (w - at) / 2}" y="${across ? y + at + (h - at) / 2 + 0.1 : y + h / 2 + 0.1}" font-size="${Math.min(0.3, px(22))}" text-anchor="middle" class="plus">＋</text>` : "");
     }
     const lab = fitLabel(s.name + (later ? `  +${later}` : ""), w + 0.1, ppm), bb = box(i);
@@ -2093,7 +2104,7 @@ function drawSpace(id) {
       ${herbs.length ? `<h3 style="margin-top:14px">🌿 Herbs</h3>${herbs.map(inBedRow).join("")}` : ""}
       ${comps.length ? `<h3 style="margin-top:14px">🐞 Companion plants</h3>${comps.map(inBedRow).join("")}` : ""}
       ${flowers.length ? `<h3 style="margin-top:14px">🌸 Flowers</h3>${flowers.map(inBedRow).join("")}` : ""}
-      ${bedsNextTo(s.id).length ? `<p class="small muted" style="margin:10px 0 0">Next door: ${bedsNextTo(s.id).map((n) => { const cs = activeCrops().filter((c) => c.space_id === n.id); return `${esc(n.name)}${cs.length ? " " + emojiList(cs) : " (empty)"}`; }).join(" · ")}</p>` : ""}
+      ${bedsNextTo(s.id).length ? `<p class="small muted" style="margin:10px 0 0">Next door: ${bedsNextTo(s.id).map((n) => { const cs = activeCrops().filter((c) => c.space_id === n.id); return `${esc(n.name)} (${gapText(n.gap)})${cs.length ? " " + emojiList(cs) : " - empty"}`; }).join(" · ")}</p>` : ""}
       <div class="row" style="margin-top:10px"><a class="btn small" href="#/plants" data-close>Add plants</a>
       ${here.length ? `<button class="btn small ghost" data-empty="${s.id}">Take everything out</button>` : ""}</div></div>
     ${!here.length && !pot ? `<div class="card"><h3>Grow together</h3><p class="small muted" style="margin:0 0 8px">Fill the bed with plants that share the space - added as one planting.</p>
@@ -2758,11 +2769,19 @@ function bedsNextTo(spaceId) {
   const items = planItems().filter((i) => i.type === "space"), me = items.find((i) => i.id === spaceId);
   if (!me) return [];
   const a = box(me), reach = Math.max(1.2, (S.g.garden.path_w || 0.5) + 0.7);
-  return items.filter((i) => i.id !== spaceId).filter((i) => {
+  const mid = (i) => [i.x + i.w / 2, i.y + i.h / 2];
+  // only direct neighbours: if another bed sits between the two, it isn't "next door"
+  const between = (i) => items.some((k) => k.id !== spaceId && k.id !== i.id && (() => {
+    const [x1, y1] = mid(me), [x2, y2] = mid(i), kb = box(k);
+    for (let t = 0.15; t <= 0.85; t += 0.05) { const px = x1 + (x2 - x1) * t, py = y1 + (y2 - y1) * t; if (px > kb.x0 && px < kb.x1 && py > kb.y0 && py < kb.y1) return true; }
+    return false;
+  })());
+  return items.filter((i) => i.id !== spaceId).map((i) => {
     const b = box(i), dx = Math.max(0, b.x0 - a.x1, a.x0 - b.x1), dy = Math.max(0, b.y0 - a.y1, a.y0 - b.y1);
-    return Math.hypot(dx, dy) <= reach;
-  }).map((i) => i.s);
+    return { i, gap: Math.hypot(dx, dy) };
+  }).filter((n) => n.gap <= reach && !between(n.i)).sort((x, y) => x.gap - y.gap).map((n) => ({ ...n.i.s, gap: n.gap }));
 }
+const gapText = (g) => (g < 0.05 ? "touching" : g < 1 ? `${Math.round(g * 100)}cm away` : `${Math.round(g * 10) / 10}m away`);
 // roughly when a new plant would be in the ground, and when an existing one is
 function plannedSpan(p) {
   const w = p.next[p.methods[0]];
@@ -2778,7 +2797,7 @@ const together = (a, b) => !a || !b || (a[0] < b[1] && b[0] < a[1]);  // not sur
 function bedAdvice(plantIds, sp) {
   const ps = plantIds.map(plant), crops = activeCrops();
   const inBed = crops.filter((c) => c.space_id === sp.id && !plantIds.includes(c.plant_id));
-  const next = bedsNextTo(sp.id).map((n) => ({ sp: n, crops: crops.filter((c) => c.space_id === n.id) })).filter((n) => n.crops.length);
+  const next = bedsNextTo(sp.id).map((n) => ({ sp: n, gap: n.gap, crops: crops.filter((c) => c.space_id === n.id) })).filter((n) => n.crops.length);
   let score = 0;
   const bad = [], good = [], fine = [];
   const look = (c, where, weight) => ps.forEach((p) => {
@@ -2801,7 +2820,7 @@ function bedAdvice(plantIds, sp) {
 const emojiList = (cs) => [...new Set(cs.map((c) => plant(c.plant_id).emoji))].join("");
 function adviceLines(a) {
   return `${a.inBed.length ? `<div class="small">In it: ${emojiList(a.inBed)}</div>` : `<div class="small muted">Empty</div>`}
-    ${a.next.map((n) => `<div class="small muted">Next door, ${esc(n.sp.name)}: ${emojiList(n.crops)}</div>`).join("")}
+    ${a.next.map((n) => `<div class="small muted">Next door, ${esc(n.sp.name)} (${gapText(n.gap)}): ${emojiList(n.crops)}</div>`).join("")}
     ${a.wrongKind ? `<div class="small adv-bad">Not the right kind of space for these</div>` : ""}
     ${a.full > 0.9 ? `<div class="small adv-bad">Nearly full</div>` : ""}
     ${a.bad.map((t) => `<div class="small adv-bad">⚠️ ${esc(t)}</div>`).join("")}

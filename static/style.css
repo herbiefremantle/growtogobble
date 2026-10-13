@@ -750,3 +750,7 @@ details.later .month-head:first-of-type { border-top: 0; padding-top: 0; margin-
 .bedpick.picked .bedopt:not(.on) { display: none; }
 .bedpick.picked .changebed { display: inline-flex; }
 .bedpick { scroll-margin-top: 50px; }
+
+/* groups on the garden plan */
+svg.plot .grp-outline { fill: none; stroke: #fff; stroke-dasharray: 0.08 0.05; pointer-events: none; opacity: .9; }
+svg.plot .grp-tag { fill: #fff; font-weight: 800; paint-order: stroke; stroke: rgba(30, 50, 30, .65); stroke-width: 0.035; pointer-events: none; }
