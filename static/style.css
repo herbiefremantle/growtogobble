@@ -842,7 +842,7 @@ svg.plot .grp-tag { fill: #fff; font-weight: 800; paint-order: stroke; stroke: r
 
 .clip .clip-tree { fill: #2f6b2a; stroke: #1d4a1a; } .clip .clip-shed { fill: #8a6a4a; stroke: #5d4630; } .clip .clip-compost { fill: #4a3a28; stroke: #2e2418; }
 /* the front-page reel */
-.reel-wrap { max-width: 520px; margin: 28px auto 8px; } .reel-wrap h2 { text-align: center; }
+.reel-wrap { max-width: 520px; margin: 4px auto 16px; text-align: left; }
 .reel { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px; box-shadow: var(--shadow); }
 .reel-screen { aspect-ratio: 320 / 236; display: flex; flex-direction: column; justify-content: center; }
 .reel-title { font: 800 15px var(--display); text-align: center; margin: 0 0 6px; color: var(--forest); }
@@ -858,3 +858,4 @@ svg.plot .grp-tag { fill: #fff; font-weight: 800; paint-order: stroke; stroke: r
 .clip .clip-attr { font: 600 7px "Figtree", sans-serif; fill: #fff; opacity: .85; }
 .clip .clip-crop-garlic { fill: #efe3c2; } .clip .clip-crop-beans { fill: #8cc96f; }
 .outline-box summary { cursor: pointer; list-style: revert; } .outline-box[open] summary { margin-bottom: 4px; }
+.clip .clip-crop-corn { fill: #f3d36b; } .clip .clip-crop-squash { fill: #f0a14e; } .clip .clip-cost { fill: var(--sage); }
