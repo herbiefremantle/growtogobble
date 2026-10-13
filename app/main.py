@@ -3,6 +3,7 @@
 Run locally:  .venv/bin/python -m app     then open http://localhost:8000
 """
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -62,16 +63,41 @@ app = FastAPI(title="Grow to Gobble", lifespan=lifespan, docs_url=None, redoc_ur
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
+def _build_version():
+    """A fingerprint of the app's own files: it changes whenever a new version is deployed (and only then)."""
+    digest = hashlib.sha1()
+    for name in ("index.html", "app.js", "style.css"):
+        with open(os.path.join(STATIC, name), "rb") as fh:
+            digest.update(fh.read())
+    return digest.hexdigest()[:12]
+
+
+BUILD = _build_version()
+
+
+@app.middleware("http")
+async def version_header(request: Request, call_next):
+    """Every reply says which version is running, so an app left open on a phone knows when to refresh itself."""
+    response = await call_next(request)
+    response.headers["X-App-Version"] = BUILD
+    return response
+
+
 @app.get("/")
 def index():
-    """The app page, with ?v=<file date> on its script and styles - so phones always fetch the newest version
+    """The app page, with ?v=<version> on its script and styles - so phones always fetch the newest version
     after a deploy instead of running an old copy from their cache."""
     with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as f:
         page = f.read()
     for name in ("app.js", "style.css"):
-        version = int(os.path.getmtime(os.path.join(STATIC, name)))
-        page = page.replace("/static/%s\"" % name, "/static/%s?v=%d\"" % (name, version))
+        page = page.replace("/static/%s\"" % name, "/static/%s?v=%s\"" % (name, BUILD))
+    page = page.replace("<head>", '<head>\n<meta name="app-version" content="%s">' % BUILD, 1)
     return HTMLResponse(page, headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/api/version")
+def version():
+    return JSONResponse({"version": BUILD}, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/sw.js")

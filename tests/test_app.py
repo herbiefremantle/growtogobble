@@ -770,3 +770,11 @@ def test_every_kind_of_job_can_be_ticked(client):
             if j["action"] == "batch":
                 continue
             assert client.post("/api/done", json={"key": j["key"]}).status_code == 200, j["key"]
+
+
+def test_the_app_tells_phones_when_a_new_version_is_live(client):
+    page = client.get("/")
+    version = client.get("/api/version").json()["version"]
+    assert 'name="app-version" content="%s"' % version in page.text
+    assert "/static/app.js?v=%s" % version in page.text and page.headers["cache-control"] == "no-cache"
+    assert client.get("/health").headers["x-app-version"] == version

@@ -95,12 +95,34 @@ const STAGES = ["🌰", "🌱", "🌿", "🧺", "😋"];
 const stagesFor = (p) => (isFlower(p) ? ["🌰", "🌱", "🌿", "🌸"] : STAGES);  // flowers flower - nothing to eat
 const KIND_WORD = { sow_in: "Sow indoors", sow_out: "Sow outside", plant_out: "Plant out", harvest: "Pick" };
 
+// ---- staying up to date: the app reloads itself after a new version goes live -------------------------
+// Every reply says which version is running. If it's newer than this page, reload at a calm moment -
+// the next page change, or when a pop-up closes - never while you're typing.
+const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || "";
+let updateReady = false;
+function noteVersion(v) { if (v && APP_VERSION && v !== APP_VERSION) updateReady = true; }
+function updateIfReady() {
+  if (!updateReady || !$("#sheet").hidden) return false;
+  const a = document.activeElement;
+  if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return false;
+  location.reload();
+  return true;
+}
+async function checkForUpdate() {
+  try { const r = await fetch("/api/version", { cache: "no-store" }); noteVersion((await r.json()).version); } catch (e) { return; }
+  updateIfReady();
+}
+// coming back to the app (e.g. reopening it on a phone) is the usual moment a new version is waiting
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkForUpdate(); });
+setInterval(checkForUpdate, 30 * 60 * 1000);
+
 async function api(method, path, body) {
   const res = await fetch(path, {
     method, credentials: "same-origin",
     headers: body ? { "Content-Type": "application/json" } : {},
     body: body ? JSON.stringify(body) : undefined,
   });
+  noteVersion(res.headers.get("X-App-Version"));
   if (res.status === 401 && !path.startsWith("/api/login") && !path.startsWith("/api/register")) {
     S.me = null; S.g = null;
     const route = location.hash.replace(/^#\/?/, "").split("?")[0];
@@ -160,14 +182,14 @@ function openSheet(html) {
   $("#sheet").hidden = false; $("#sheet-card").scrollTop = 0;
   document.body.style.overflow = "hidden";
 }
-function closeSheet() { $("#sheet").hidden = true; document.body.style.overflow = ""; S.sheet = null; }
+function closeSheet() { $("#sheet").hidden = true; document.body.style.overflow = ""; S.sheet = null; updateIfReady(); }
 $("#sheet").addEventListener("click", (e) => { if (e.target.id === "sheet" || e.target.closest("[data-close]")) closeSheet(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheet(); });
 
 // ---- routing ---------------------------------------------------------------------------------------
 
 function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
-window.addEventListener("hashchange", render);
+window.addEventListener("hashchange", () => { if (!updateIfReady()) render(); });
 
 const PAGES = { "": home, garden: gardenPage, calendar: calendarPage, plants: plantsPage, me: mePage, shop: shopPage, start: onboarding, admin: adminPage };
 const PUBLIC = { welcome, login: loginPage, join: joinPage, reset: resetPage };
