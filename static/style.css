@@ -737,3 +737,11 @@ details.later[open] > summary::after { transform: rotate(-90deg); }
 .job-x.static { position: static; width: 32px; height: 32px; opacity: 1; flex: none; }
 details.later .month-head { margin: 16px 0 8px; padding-top: 12px; border-top: 1px solid var(--line); font: 800 14px var(--display); display: flex; justify-content: space-between; }
 details.later .month-head:first-of-type { border-top: 0; padding-top: 0; margin-top: 4px; }
+
+/* choosing a bed */
+.bedpick { display: grid; gap: 8px; }
+.bedopt { text-align: left; font: inherit; color: inherit; background: var(--card); border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px; cursor: pointer; display: grid; gap: 2px; }
+.bedopt.on { border-color: var(--forest-2); background: color-mix(in srgb, var(--sage) 55%, var(--card)); }
+.adv-bad { color: var(--terra); font-weight: 600; }
+.adv-good { color: var(--forest); }
+.adv-box { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--bg-2); display: grid; gap: 2px; }

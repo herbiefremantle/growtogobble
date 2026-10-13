@@ -2077,6 +2077,7 @@ function drawSpace(id) {
       ${herbs.length ? `<h3 style="margin-top:14px">🌿 Herbs</h3>${herbs.map(inBedRow).join("")}` : ""}
       ${comps.length ? `<h3 style="margin-top:14px">🐞 Companion plants</h3>${comps.map(inBedRow).join("")}` : ""}
       ${flowers.length ? `<h3 style="margin-top:14px">🌸 Flowers</h3>${flowers.map(inBedRow).join("")}` : ""}
+      ${bedsNextTo(s.id).length ? `<p class="small muted" style="margin:10px 0 0">Next door: ${bedsNextTo(s.id).map((n) => { const cs = activeCrops().filter((c) => c.space_id === n.id); return `${esc(n.name)}${cs.length ? " " + emojiList(cs) : " (empty)"}`; }).join(" · ")}</p>` : ""}
       <div class="row" style="margin-top:10px"><a class="btn small" href="#/plants" data-close>Add plants</a>
       ${here.length ? `<button class="btn small ghost" data-empty="${s.id}">Take everything out</button>` : ""}</div></div>
     ${!here.length && !pot ? `<div class="card"><h3>Grow together</h3><p class="small muted" style="margin:0 0 8px">Fill the bed with plants that share the space - added as one planting.</p>
@@ -2441,7 +2442,7 @@ function openPlant(id, spaceId, startMethod, after) {
       <label class="field" for="qty">How many ${esc(p.unit)}?</label>
       <div class="counter qty"><button class="btn small" data-q="-1" aria-label="Fewer">−</button><input id="qty" type="number" inputmode="numeric" min="1" max="5000" value="${qty}"><button class="btn small" data-q="1" aria-label="More">+</button></div>
       <div id="rows">${rowsHtml()}</div>
-      ${fits.length ? `<label class="field" for="sp">Where?</label><select id="sp"><option value="">📍 Decide later</option>${fits.map((s) => `<option value="${s.id}" ${s.id === spaceId ? "selected" : ""}>${SPACE_KINDS[s.kind].emoji} ${esc(s.name)}</option>`).join("")}</select><div id="fill"></div>`
+      ${fits.length ? `<label class="field" for="sp">Where?</label><select id="sp"><option value="">📍 Decide later</option>${fits.map((s) => `<option value="${s.id}" ${s.id === spaceId ? "selected" : ""}>${SPACE_KINDS[s.kind].emoji} ${esc(s.name)}</option>`).join("")}</select><div id="where-advice"></div><div id="fill"></div>`
         : `<p class="small muted">${p.where.includes("pot") ? "" : "This one needs a bed - it's too big for pots. "}Add a ${p.where.includes("pot") ? "bed or pot" : "bed"} in My garden to place it.</p>`}
       <div id="check" class="check-box" aria-live="polite"></div>
       <button class="btn primary wide" style="margin-top:14px" id="add">Add ${esc(p.name.toLowerCase())} 🌱</button></div>
@@ -2529,7 +2530,18 @@ function openPlant(id, spaceId, startMethod, after) {
       toast(`${b.textContent === "Whole bed" ? "The whole bed" : b.textContent + " of the bed"} = ${qty} ${p.unit}`);
     };
   };
-  if ($("#sp")) $("#sp").onchange = () => { drawFill(); runCheck(); };
+  const drawWhere = () => {
+    const sp = $("#sp"), el = $("#where-advice");
+    if (!sp || !el) return;
+    const bed = sp.value ? space(Number(sp.value)) : null;
+    const best = S.g.spaces.map((x) => bedAdvice([p.id], x)).filter((a) => !a.wrongKind).sort((x, y) => y.score - x.score)[0];
+    el.innerHTML = bed ? `<div class="adv-box">${adviceLines(bedAdvice([p.id], bed))}
+      ${best && best.sp.id !== bed.id && best.score > bedAdvice([p.id], bed).score ? `<button type="button" class="btn small" data-usebed="${best.sp.id}" style="margin-top:6px">Better: ${esc(best.sp.name)}</button>` : ""}</div>`
+      : best && best.score >= 0 ? `<button type="button" class="btn small ghost" data-usebed="${best.sp.id}" style="margin-top:6px">Suggested: ${esc(best.sp.name)}</button>` : "";
+    el.onclick = (e) => { const u = e.target.closest("[data-usebed]"); if (u) { sp.value = u.dataset.usebed; drawWhere(); drawFill(); runCheck(); } };
+  };
+  if ($("#sp")) $("#sp").onchange = () => { drawWhere(); drawFill(); runCheck(); };
+  drawWhere();
   drawFill();
   runCheck();
   $("#add").onclick = async () => {
@@ -2717,6 +2729,80 @@ function openCombo(id) {
   if (go2) go2.onclick = () => openFlowerPlan(Number($("#combobed").value), null, id);
 }
 
+// ---- choosing a bed: what's in it, what's in the beds next to it, and which suits best -----------------
+// Beds within a path's width or so of this one, going by where they sit on the plan
+function bedsNextTo(spaceId) {
+  const items = planItems().filter((i) => i.type === "space"), me = items.find((i) => i.id === spaceId);
+  if (!me) return [];
+  const a = box(me), reach = Math.max(1.2, (S.g.garden.path_w || 0.5) + 0.7);
+  return items.filter((i) => i.id !== spaceId).filter((i) => {
+    const b = box(i), dx = Math.max(0, b.x0 - a.x1, a.x0 - b.x1), dy = Math.max(0, b.y0 - a.y1, a.y0 - b.y1);
+    return Math.hypot(dx, dy) <= reach;
+  }).map((i) => i.s);
+}
+// roughly when a new plant would be in the ground, and when an existing one is
+function plannedSpan(p) {
+  const w = p.next[p.methods[0]];
+  if (!w) return null;
+  const s0 = d(w[0]), s1 = new Date(s0);
+  s1.setDate(s1.getDate() + (p.weeks + 10) * 7);
+  return [s0, s1];
+}
+const cropSpan = (c) => (c.starts && c.finishes ? [d(c.starts), d(c.finishes)] : null);
+const together = (a, b) => !a || !b || (a[0] < b[1] && b[0] < a[1]);  // not sure? assume they'd overlap
+// How well a bed suits these plants: bad neighbours in it or next door (while both are growing), good ones,
+// and whether there's room. Notes are written for people; score is for sorting.
+function bedAdvice(plantIds, sp) {
+  const ps = plantIds.map(plant), crops = activeCrops();
+  const inBed = crops.filter((c) => c.space_id === sp.id && !plantIds.includes(c.plant_id));
+  const next = bedsNextTo(sp.id).map((n) => ({ sp: n, crops: crops.filter((c) => c.space_id === n.id) })).filter((n) => n.crops.length);
+  let score = 0;
+  const bad = [], good = [], fine = [];
+  const look = (c, where, weight) => ps.forEach((p) => {
+    const q = plant(c.plant_id), b = p.bad_with.find((x) => x.plant_id === q.id), g = p.good_with.find((x) => x.plant_id === q.id);
+    if (!b && !g) return;
+    if (!together(plannedSpan(p), cropSpan(c))) { if (b) fine.push(`${q.emoji} ${q.name.toLowerCase()} ${where} will be out by ${fmt(c.finishes)} - fine`); return; }
+    if (b) { score -= weight * 3; bad.push(`${q.emoji} ${q.name} ${where}: ${b.why}`); }
+    else { score += weight; good.push(`${q.emoji} ${q.name} ${where}: ${g.why}`); }
+  });
+  inBed.forEach((c) => look(c, "in this bed", 3));
+  next.forEach((n) => n.crops.forEach((c) => look(c, `next door in ${n.sp.name}`, 1)));
+  const wrongKind = ps.some((p) => !p.where.includes(sp.kind === "pot" ? "pot" : "bed"));
+  const u = sp.usage, full = u && u.area ? u.peak / u.area : 0;
+  if (wrongKind) score -= 50;
+  if (full > 0.9) score -= 4; else if (!inBed.length) score += 2;
+  return { sp, score, inBed, next, bad: [...new Set(bad)], good: [...new Set(good)], fine: [...new Set(fine)], wrongKind, full };
+}
+const emojiList = (cs) => [...new Set(cs.map((c) => plant(c.plant_id).emoji))].join("");
+function adviceLines(a) {
+  return `${a.inBed.length ? `<div class="small">In it: ${emojiList(a.inBed)}</div>` : `<div class="small muted">Empty</div>`}
+    ${a.next.map((n) => `<div class="small muted">Next door, ${esc(n.sp.name)}: ${emojiList(n.crops)}</div>`).join("")}
+    ${a.wrongKind ? `<div class="small adv-bad">Not the right kind of space for these</div>` : ""}
+    ${a.full > 0.9 ? `<div class="small adv-bad">Nearly full</div>` : ""}
+    ${a.bad.map((t) => `<div class="small adv-bad">⚠️ ${esc(t)}</div>`).join("")}
+    ${a.good.map((t) => `<div class="small adv-good">✓ ${esc(t)}</div>`).join("")}
+    ${a.fine.map((t) => `<div class="small muted">${esc(t)}</div>`).join("")}`;
+}
+// A list of beds to choose from, the best suited first - tap one to choose it
+function bedPicker(plantIds, chosen, inputId) {
+  const list = S.g.spaces.map((sp) => bedAdvice(plantIds, sp)).filter((a) => !a.wrongKind).sort((x, y) => y.score - x.score);
+  if (!list.length) return `<input type="hidden" id="${inputId}" value="">`;
+  const pick = chosen && list.some((a) => a.sp.id === chosen) ? chosen : null;
+  return `<input type="hidden" id="${inputId}" value="${pick || ""}">
+    <div class="bedpick" data-for="${inputId}">${list.map((a, i) => `<button type="button" class="bedopt ${a.sp.id === pick ? "on" : ""}" data-pickbed="${a.sp.id}">
+      <div class="row" style="justify-content:space-between;gap:6px"><b>${esc(a.sp.name)}</b>${i === 0 && a.score >= 0 ? `<span class="chip">Best choice</span>` : a.bad.length ? `<span class="chip l3">Bad neighbours</span>` : ""}</div>
+      ${adviceLines(a)}</button>`).join("")}
+      <button type="button" class="bedopt ${pick ? "" : "on"}" data-pickbed=""><b>Decide later</b><div class="small muted">Keep it in your plan without a bed for now</div></button></div>`;
+}
+// tapping a bed in a picker
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-pickbed]");
+  if (!b) return;
+  const wrap = b.closest(".bedpick");
+  wrap.querySelectorAll(".bedopt").forEach((x) => x.classList.toggle("on", x === b));
+  $("#" + wrap.dataset.for).value = b.dataset.pickbed;
+});
+
 // Plantings sown together stay one planting: the crops in it, and its name
 const isFlowerMix = (c) => !!(c && c.mix && c.mix.startsWith("flower:"));
 const mixOf = (c) => (!c || !c.mix ? null : isFlowerMix(c) ? S.cat.combos.find((x) => "flower:" + x.id === c.mix) || null : S.cat.mixes.find((m) => m.id === c.mix) || null);
@@ -2740,6 +2826,10 @@ function openMix(id, spaceId) {
   const m = S.cat.mixes.find((x) => x.id === id), order = mixOrder(m), beds = S.g.spaces.filter((sp) => sp.kind !== "pot");
   S.sheet = null;
   openSheet(`<h2>${m.emoji} ${esc(m.name)}</h2><p>${esc(m.why)}</p>
+    <div class="card"><h3>🌱 Add it to my garden</h3>
+      ${beds.length ? `<label class="field">Which bed?</label><p class="small muted" style="margin:-2px 0 8px">Best suited first - we check what's in each bed and in the beds next to it.</p>${bedPicker(m.plants.map((x) => x.plant_id), spaceId, "mixbed")}` : ""}
+      <p class="small muted" style="margin:8px 0 0">Adds ${order.map((x) => `${x.qty} ${esc(plant(x.plant_id).name.toLowerCase())}`).join(", ")} as <b>one planting</b> - they share the space and stay together in the bed. Each still gets its own dates and jobs.</p>
+      <button class="btn primary wide" id="mixgo" style="margin-top:12px">Add the mix 🤝</button></div>
     <div class="card"><h3>⏱️ What happens when</h3>${order.map((x, i) => { const q = plant(x.plant_id);
       return `<div class="mix-step"><span class="e">${q.emoji}</span><div><b>${i + 1}. ${esc(q.name)}</b><div class="small">Comes up in ${esc(x.up)} · ready from about ${x.ready} weeks</div></div></div>`; }).join("")}</div>
     <div class="card"><h3>👣 How to do it</h3><ol class="steps">${m.steps.map((t) => `<li>${esc(t)}</li>`).join("")}</ol>
@@ -2747,10 +2837,7 @@ function openMix(id, spaceId) {
     <div class="card tint-sky"><h3>🌱 Is it a seedling or a weed?</h3>
       ${order.map((x) => { const q = plant(x.plant_id); return q.seedling ? `<p style="margin:0 0 8px"><b>${q.emoji} ${esc(q.name)}:</b> ${esc(q.seedling)}</p>` : ""; }).join("")}
       <ul class="small" style="margin:0;padding-left:18px">${S.cat.weed_tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></div>
-    <div class="card"><h3>🌱 Add it to my garden</h3>
-      ${beds.length ? `<label class="field" for="mixbed">Which bed?</label><select id="mixbed"><option value="">📍 Decide later</option>${beds.map((b) => `<option value="${b.id}" ${b.id === spaceId ? "selected" : ""}>${esc(b.name)}</option>`).join("")}</select>` : ""}
-      <p class="small muted" style="margin:8px 0 0">Adds ${order.map((x) => `${x.qty} ${esc(plant(x.plant_id).name.toLowerCase())}`).join(", ")} as <b>one planting</b> - they share the space and stay together in the bed. Each still gets its own dates and jobs.</p>
-      <button class="btn primary wide" id="mixgo" style="margin-top:12px">Add the mix 🤝</button></div>`);
+`);
   $("#mixgo").onclick = async () => {
     const sel = $("#mixbed");
     const where = sel && sel.value ? Number(sel.value) : null;
