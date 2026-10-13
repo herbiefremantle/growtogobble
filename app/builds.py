@@ -9,6 +9,20 @@ when a product sells out, and they go through shops.py, so affiliate codes are a
 """
 from . import shops
 
+# what a build does for a plant: holds it up, protects it, starts it off - or (bed, garden) isn't for any one plant
+ROLE = {"raised_bed": "bed", "bean_wigwam": "support", "sweet_pea_wigwam": "support", "bean_aframe": "support", "pea_frame": "support",
+        "broad_bean_string": "support", "tomato_stakes": "support", "tomato_strings": "support", "hoop_tunnel": "protect",
+        "bottle_cloche": "protect", "cold_frame": "start", "staging": "garden", "compost_bin": "garden", "water_butt": "garden"}
+# a word on particular plants, where the build only suits some of them
+NOTES = {
+    "bean_wigwam": {"french_beans": "climbing varieties only - dwarf ones don't need it"},
+    "bean_aframe": {"french_beans": "climbing varieties only - dwarf ones don't need it"},
+    "tomato_stakes": {"tomatoes": "tall cordon varieties only - bush and tumbling ones don't need it", "peppers": "a 1m cane is plenty", "chillies": "a 1m cane is plenty"},
+    "tomato_strings": {"tomatoes": "tall cordon varieties only - bush and tumbling ones don't need it", "cucumber": "climbing cucumbers grow up strings too"},
+    "pea_frame": {"sweet_pea": "a row of sweet peas can climb netting instead of a wigwam"},
+    "cold_frame": {"*": "if you start it off indoors - to harden the seedlings off"},
+}
+
 # which shops sell each kind of thing (ids from shops.BUILD_SHOPS)
 GARDEN = ["thompson_morgan", "suttons", "bq", "wickes", "amazon"]
 DIY = ["bq", "wickes", "amazon"]
@@ -17,8 +31,7 @@ BUILDS = [
     {"id": "raised_bed", "name": "Raised bed", "emoji": "🟫", "section": "beds", "level": "Medium", "time": "2-3 hours", "size": "1.2 x 2.4m, 30cm deep",
      "why": "A raised bed warms up quicker in spring, drains well, and keeps paths and beds apart, so you never tread on the "
             "soil you grow in. 1.2m wide means you can reach the middle from either side.",
-     "for": ["carrots", "salad", "onions", "garlic", "beetroot", "radish", "strawberries", "chard", "spring_onions", "potatoes", "courgette", "kale",
-             "leeks", "parsnips", "peas", "french_beans", "broad_beans"], "lead_weeks": 3, "needs_no_bed": True,
+     "for": [], "any_crop": True, "good_for": "any veg - start here if you haven't got a bed yet", "lead_weeks": 3, "needs_no_bed": True,
      "materials": [
          {"name": "Treated timber boards, 150 x 38mm x 2.4m", "qty": 6, "pack": "each", "packs": 6, "price": 10.0, "search": "treated timber board 150 x 38mm 2.4m", "shops": DIY,
           "note": "4 for the long sides, 2 cut in half for the ends"},
@@ -123,6 +136,24 @@ BUILDS = [
      "tips": ["Free alternative: twiggy sticks (hazel or birch prunings) pushed in along the row - the old way, and it works brilliantly.",
               "Keep the net pulled taut so birds don't get tangled in it."]},
 
+    {"id": "broad_bean_string", "name": "Broad bean string support", "emoji": "🫘", "section": "supports", "level": "Easy", "time": "15 minutes",
+     "why": "Broad beans don't climb, but they grow about 1m tall and flop over in wind and rain once they're heavy with pods. "
+            "A box of canes with string round it holds the whole block up.",
+     "for": ["broad_beans"], "lead_weeks": 1,
+     "materials": [
+         {"name": "Bamboo canes, 1.2m", "qty": 6, "pack": "pack of 10", "packs": 1, "price": 5.0, "search": "bamboo canes 1.2m", "shops": GARDEN,
+          "note": "one per corner, plus one every metre along long sides"},
+         {"name": "Garden twine", "qty": 1, "pack": "100m roll", "packs": 1, "price": 3.0, "search": "garden twine", "shops": GARDEN},
+     ],
+     "tools": ["Scissors"],
+     "steps": [
+         {"pic": 1, "text": "Push a cane in at each corner of your block of broad beans - and every metre along the sides for a long one - about 20cm deep."},
+         {"pic": 2, "text": "Tie string round the outside of all the canes at about 30cm high, pulled tight."},
+         {"pic": 3, "text": "Add a second string at 60cm, and a third at 90cm for tall varieties."},
+         {"pic": 4, "text": "The beans grow up inside the box and lean on the strings instead of flopping. When the first pods form, pinch the tops off - it keeps blackfly away."},
+     ],
+     "tips": ["Sow them in a block of double rows, about 20cm apart, so they help hold each other up.", "Put the canes in early - it's much harder once they've flopped."]},
+
     {"id": "tomato_stakes", "name": "Tomato stakes and ties", "emoji": "🍅", "section": "supports", "level": "Easy", "time": "15 minutes",
      "why": "Tall (cordon) tomatoes, peppers, chillies and aubergines get heavy with fruit. A cane and a few soft ties stop "
             "them snapping or flopping over.",
@@ -193,7 +224,7 @@ BUILDS = [
     {"id": "bottle_cloche", "name": "Bottle cloches", "emoji": "🧴", "section": "covers", "level": "Easy", "time": "5 minutes",
      "why": "A plastic bottle over a seedling is a mini greenhouse: it keeps it warm on cold nights and stops slugs getting "
             "at it while it's small. Free, and a good job for kids (with a grown-up for the cutting).",
-     "for": ["courgette", "squash", "summer_squash", "pumpkin", "cucumber", "melon", "sweetcorn", "salad", "sweet_potatoes"], "lead_weeks": 0,
+     "for": ["courgette", "squash", "summer_squash", "pumpkin", "cucumber", "melon", "salad", "sweet_potatoes"], "lead_weeks": 0,
      "materials": [
          {"name": "Clear plastic bottles, 2 litres", "qty": 1, "pack": "one per plant", "packs": 0, "price": 0.0, "free": True},
      ],
@@ -209,8 +240,7 @@ BUILDS = [
     {"id": "cold_frame", "name": "Cold frame", "emoji": "🪟", "section": "coldframe", "level": "Medium", "time": "2-3 hours",
      "why": "A low box with a clear lid - somewhere between indoors and out. Use it to harden off seedlings before they go "
             "in the ground, start sowings early in spring, and keep salad going into winter.",
-     "for": ["tomatoes", "tomatoes_big", "chillies", "peppers", "courgette", "squash", "summer_squash", "pumpkin", "sweetcorn", "cucumber",
-             "melon", "aubergine", "salad", "runner_beans", "french_beans"], "lead_weeks": 3, "size": "about 120 x 60cm",
+     "for": "sow_in", "lead_weeks": 3, "size": "about 120 x 60cm",
      "materials": [
          {"name": "Treated fence boards, 1.8m x 150 x 22mm", "qty": 6, "pack": "each", "packs": 6, "price": 4.5, "search": "treated fence board 1.8m 150mm", "shops": DIY},
          {"name": "Treated timber batten, 38 x 38mm x 1.8m", "qty": 2, "pack": "each", "packs": 2, "price": 4.5, "search": "treated timber batten 38 x 38mm", "shops": DIY,
@@ -307,6 +337,14 @@ SECTIONS = [("beds", "Raised beds"), ("supports", "Supports for climbers"), ("co
             ("coldframe", "Cold frame and greenhouse"), ("compost", "Compost and water")]
 
 
+def _for(b):
+    """The plants a build is linked to. The cold frame works it out: anything you can start indoors."""
+    if b["for"] == "sow_in":
+        from . import planner, plants as catalogue
+        return [p["id"] for p in catalogue.PLANTS if (p["group"] == "veg" or p["id"] == "sweet_pea") and "sow_in" in planner.methods_for(p)]
+    return b["for"]
+
+
 def _cost(m):
     if m.get("optional"):
         return 0.0
@@ -329,7 +367,8 @@ def payload():
             m["cost"] = _cost(m)
             m.pop("shops", None)
             mats.append(m)
-        b2 = dict(b, materials=mats, total=round(sum(m["cost"] for m in mats), 2))
+        b2 = dict(b, materials=mats, total=round(sum(m["cost"] for m in mats), 2), role=ROLE[b["id"]], notes=NOTES.get(b["id"], {}))
+        b2["for"] = _for(b)
         if b.get("ready_made"):
             b2["ready_made"] = dict(b["ready_made"], links=shops.build_links(b["ready_made"]["search"], GARDEN))
         out.append(b2)

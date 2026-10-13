@@ -1058,7 +1058,7 @@ def test_build_it_guides_have_everything(client):
     from app import builds, plants as catalogue
     data = client.get("/api/plants").json()["build"]
     ids = [b["id"] for b in data["builds"]]
-    assert ids == ["raised_bed", "bean_wigwam", "sweet_pea_wigwam", "bean_aframe", "pea_frame", "tomato_stakes", "tomato_strings", "hoop_tunnel", "bottle_cloche", "cold_frame", "staging", "compost_bin", "water_butt"]
+    assert ids == ["raised_bed", "bean_wigwam", "sweet_pea_wigwam", "bean_aframe", "pea_frame", "broad_bean_string", "tomato_stakes", "tomato_strings", "hoop_tunnel", "bottle_cloche", "cold_frame", "staging", "compost_bin", "water_butt"]
     for b in data["builds"]:
         assert b["steps"] and b["tools"] and b["materials"] and b["why"]
         assert all(p in catalogue.BY_ID for p in b["for"]) and (b["for"] or b.get("good_for"))
@@ -1071,3 +1071,26 @@ def test_build_it_guides_have_everything(client):
     shops_used = {l["shop"] for b in data["builds"] for m in b["materials"] for l in m.get("links", [])}
     assert {"B&Q", "Wickes", "Suttons", "Thompson & Morgan", "Amazon"} <= shops_used
     assert any("diy.com/search?term=" in l["url"] for l in by_id["cold_frame"]["materials"][0]["links"])
+
+
+def test_build_it_links_each_plant_to_the_right_structures(client):
+    """Supports only for plants that need holding up, covers only for ones with pests to keep off, the cold frame
+    only for things you start indoors, and nothing that isn't about one plant (a raised bed, a water butt) on a plant."""
+    from app import planner, plants as catalogue
+    builds = {b["id"]: b for b in client.get("/api/plants").json()["build"]["builds"]}
+    by_role = lambda role: [b for b in builds.values() if b["role"] == role]
+    for b in by_role("bed") + by_role("garden"):
+        assert b["for"] == [], b["id"]
+    # every plant that has a 'put in supports' job has a support guide, and every support guide's plant needs one
+    for pid, prep in catalogue.PREP.items():
+        assert any(pid in b["for"] for b in by_role("support")), pid
+    for b in by_role("support"):
+        for pid in b["for"]:
+            assert pid in catalogue.PREP or pid in b["notes"], (b["id"], pid)
+    assert [b["id"] for b in by_role("support") if "broad_beans" in b["for"]] == ["broad_bean_string"]
+    for b in by_role("protect"):
+        for pid in b["for"]:
+            assert catalogue.BY_ID[pid]["pests"]["cover"], (b["id"], pid)
+    for pid in builds["cold_frame"]["for"]:
+        assert "sow_in" in planner.methods_for(catalogue.BY_ID[pid]), pid
+    assert {"kale", "broccoli", "sweet_pea", "tomatoes"} <= set(builds["cold_frame"]["for"])

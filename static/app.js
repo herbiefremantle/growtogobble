@@ -2888,7 +2888,7 @@ function openPlant(id, spaceId, startMethod, after) {
       ${p.sun ? `<span class="chip grey">${p.sun.map((x) => SUN_EMOJI[x]).join("")} ${p.sun.includes("sun") ? (p.sun.length > 1 ? "Sun or part shade" : "Needs sun") : "Happy in shade"}</span><span class="chip grey">📏 ${p.height_cm}cm tall</span>` : ""}
       ${p.group !== "veg" ? `<span class="chip sky">${GROUPS[p.group].emoji} ${p.group === "flower" ? "Flower" : "Companion plant"}</span>` : ""}</div></div></div>
     <p><b>${esc(p.blurb)}</b></p>
-    ${S.cat.build.builds.some((b) => b.for.includes(p.id)) ? `<div class="build-strip"><span>🔨 Build it:</span>${S.cat.build.builds.filter((b) => b.for.includes(p.id)).map((b) => `<a href="#/build?${b.id}">${esc(b.name)} · ${buildCost(b)}</a>`).join("")}</div>` : ""}
+    ${buildsForPlant(p).length ? `<div class="build-strip"><span>🔨 Build it:</span>${buildsForPlant(p).flatMap((g) => g.list.map((b) => `<a href="#/build?${b.id}" title="${g.label}">${g.icon} ${esc(b.name)}</a>`)).join("")}</div>` : ""}
     <div class="seg sticky-tabs" role="tablist">
       <button role="tab" data-pane="grow" class="on">🌱 Grow it</button><button role="tab" data-pane="how">📖 How to</button>
       ${p.group === "veg" && companionsFor(p).length ? `<button role="tab" data-pane="comp">🐞 Companions</button>` : ""}
@@ -2913,8 +2913,9 @@ function openPlant(id, spaceId, startMethod, after) {
       <div id="check" class="check-box" aria-live="polite"></div>
       <button class="btn primary wide" style="margin-top:14px" id="add">Add ${esc(p.name.toLowerCase())} 🌱</button></div>
     <div class="card" id="buy">${buyHtml()}</div>
-    ${S.cat.build.builds.some((b) => b.for.includes(p.id)) ? `<div class="card tint-soil"><h3>🔨 Build it</h3><p class="small muted" style="margin:-4px 0 8px">${p.prep.length ? "It needs something to climb - here's how to build it:" : "Things that help it grow:"}</p>
-      <div class="build-links">${S.cat.build.builds.filter((b) => b.for.includes(p.id)).map((b) => `<a class="build-link" href="#/build?${b.id}"><span class="build-link-art">${buildArt(b.id, b.steps.length, true)}</span><span><b>${esc(b.name)}</b><small>${b.level} · ${buildCost(b)}</small></span></a>`).join("")}</div></div>` : ""}
+    ${buildsForPlant(p).length ? `<div class="card tint-soil"><h3>🔨 Build it</h3>
+      ${buildsForPlant(p).map((g) => `<p class="small build-role"><b>${g.icon} ${g.label}</b></p><div class="build-links">${g.list.map((b) => `<a class="build-link" href="#/build?${b.id}"><span class="build-link-art">${buildArt(b.id, b.steps.length, true)}</span>
+        <span><b>${esc(b.name)}</b><small>${b.level} · ${buildCost(b)}</small>${buildNote(b, p) ? `<small class="build-note">${esc(buildNote(b, p))}</small>` : ""}</span></a>`).join("")}</div>`).join("")}</div>` : ""}
     </div>
     <div data-panel="how" hidden>
     ${roomCard(p)}
@@ -3872,6 +3873,22 @@ function wigwamArt(s, { sweet }) {
       : P(5, plants(0.7))}`;
 }
 const BUILD_ART = {
+  broad_bean_string: (s) => {
+    const X = (x, y, z) => [64 + x * 1.5 + z * 0.8, 160 - y * 1.05 - z * 0.5];
+    const canes = [[0, 0], [60, 0], [120, 0], [0, 60], [60, 60], [120, 60]];
+    const ring = (y) => `<polyline points="${[[0, 0], [60, 0], [120, 0], [120, 60], [60, 60], [0, 60], [0, 0]].map(([x, z]) => X(x, y, z).join(",")).join(" ")}" class="ba-string"/>`;
+    const bean = (x, z) => { const [a, b] = X(x, 0, z), h = 86; const leaves = [0.3, 0.5, 0.7, 0.85].map((t) => `<ellipse cx="${a - 5}" cy="${b - h * t}" rx="6" ry="3" class="ba-leaf"/><ellipse cx="${a + 5}" cy="${b - h * t + 3}" rx="6" ry="3" class="ba-leaf"/>`).join("");
+      return `<line x1="${a}" y1="${b}" x2="${a}" y2="${b - h}" class="ba-stem"/>${leaves}<path d="M${a + 3} ${b - h * 0.45} q6 8 2 18" class="ba-pod"/>`; };
+    const P = (k, c) => (k > s ? "" : `<g class="${k === s ? "ba-new" : ""}">${c}</g>`);
+    const back = canes.filter(([, z]) => z === 60), front = canes.filter(([, z]) => z === 0);
+    const cane = ([x, z]) => BA.line(...X(x, -4, z), ...X(x, 104, z));
+    return `${BA.soil}<polygon points="${[[-6, 0, -6], [126, 0, -6], [126, 0, 66], [-6, 0, 66]].map((q) => X(...q).join(",")).join(" ")}" class="ba-bed"/>
+      <g class="${s === 1 ? "ba-new" : ""}">${back.map(cane).join("")}</g>
+      ${s >= 4 ? `<g class="ba-new">${[[20, 45], [45, 45], [75, 45], [100, 45], [20, 18], [45, 18], [75, 18], [100, 18]].map(([x, z]) => bean(x, z)).join("")}</g>` : ""}
+      <g class="${s === 1 ? "ba-new" : ""}">${front.map(cane).join("")}</g>
+      ${P(2, ring(30))}${P(3, ring(60) + ring(90))}
+      ${s === 1 ? BA.label(160, 20, "a cane at each corner, and every metre") : s === 2 ? BA.label(160, 20, "string round the outside, 30cm up") : s === 3 ? BA.label(160, 20, "then at 60cm and 90cm") : ""}`;
+  },
   water_butt: (s) => {
     const P = (k, c) => (k > s ? "" : `<g class="${k === s ? "ba-new" : ""}">${c}</g>`);
     const wall = `<rect x="0" y="0" width="150" height="150" class="ba-wall"/>${Array.from({ length: 15 }, (_, r) => `<line x1="0" x2="150" y1="${r * 10}" y2="${r * 10}" class="ba-brickline"/>`).join("")}`;
@@ -4055,7 +4072,7 @@ const buildCost = (b) => (b.total ? `about ${money(b.total)}` : "free");
 function buildsYouNeed() {
   const crops = activeCrops();
   return S.cat.build.builds.map((b) => {
-    const mine = crops.filter((c) => b.for.includes(c.plant_id));
+    const mine = b.any_crop ? crops.filter((c) => plant(c.plant_id).group === "veg") : crops.filter((c) => b.for.includes(c.plant_id));
     if (!mine.length || (b.needs_no_bed && S.g.spaces.some((sp) => sp.kind !== "pot"))) return null;
     // only plants still to go in - once they're planted, the moment's passed
     const starts = mine.flatMap((c) => c.jobs.filter((j) => (["plant_out", "sow_out"].includes(j.kind) || (b.id === "cold_frame" && j.kind === "sow_in")) && !["done", "missed"].includes(j.status)).map((j) => j.start));
@@ -4067,12 +4084,25 @@ function buildsYouNeed() {
 // the build that goes with a job, if there is one: supports before planting, covers when they go in, a cold frame to harden off
 function buildForJob(job) {
   const p = plant(job.plant_id), c = crop(job.crop_id);
-  if (job.kind === "prep") return ["bean_wigwam", "sweet_pea_wigwam", "pea_frame", "tomato_stakes", "tomato_strings"].map(buildById).find((b) => b && b.for.includes(p.id)) || null;
+  if (job.kind === "prep") return S.cat.build.builds.find((b) => b.role === "support" && b.for.includes(p.id)) || null;
   if (job.kind === "protect" && job.key.endsWith(":protect")) return buildById(p.pests.who.every((w) => w.name.startsWith("Slugs")) ? "bottle_cloche" : "hoop_tunnel");
   if (job.kind === "plant_out" && c && c.method === "sow_in") return buildById("cold_frame");
   return null;
 }
 const localIso = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+const BUILD_ROLES = [["support", "🪜", "Holds it up"], ["protect", "🛡️", "Protects it"], ["start", "🌱", "Starts it off"]];
+// the builds linked to one plant, by what they do for it, each with a note where it only suits some
+function buildsForPlant(p) {
+  return BUILD_ROLES.map(([role, icon, label]) => ({ role, icon, label, list: S.cat.build.builds.filter((b) => b.role === role && b.for.includes(p.id)) })).filter((g) => g.list.length);
+}
+// which hoop tunnel cover a plant needs, from what eats it
+function coverFor(p) {
+  const who = p.pests.who.map((w) => w.name.toLowerCase()).join(" ");
+  if (/carrot fly|leaf miner|flea/.test(who)) return "insect mesh";
+  if (/pigeon|caterpillar|blackbird/.test(who)) return "netting";
+  return "fleece";
+}
+const buildNote = (b, p) => (b.id === "hoop_tunnel" ? `cover it with ${coverFor(p)}` : b.notes[p.id] || b.notes["*"] || "");
 const buildChip = (b, label) => `<a class="btn small" href="#/build?${b.id}">🔨 ${esc(label || "How to build " + b.name.toLowerCase())}</a>`;
 
 function buildPage() {

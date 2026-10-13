@@ -944,3 +944,4 @@ svg.plot .grp-tag { fill: #fff; font-weight: 800; paint-order: stroke; stroke: r
 .build-link-art { flex: 0 0 84px; border-radius: 8px; overflow: hidden; background: var(--bg-2); } .build-link b { display: block; } .build-link small { color: var(--muted); }
 .build-strip { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: -4px 0 12px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .build-strip a { padding: 5px 11px; border-radius: 999px; background: var(--soil-soft, #f3ebe1); color: var(--ink); text-decoration: none; border: 1px solid var(--line); }
+.ba .ba-pod { fill: none; stroke: #4f8f3a; stroke-width: 3.5; stroke-linecap: round; } .build-role { margin: 10px 0 6px; } .build-note { display: block; color: var(--forest) !important; font-weight: 600; }
