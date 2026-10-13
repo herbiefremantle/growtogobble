@@ -637,9 +637,15 @@ def suggestions_for_space(space, crops_with_jobs, liked, today, shift, limit=4):
         return None
     kind = "pot" if space["kind"] == "pot" else "bed"
     families = {catalogue.BY_ID[c["plant_id"]]["family"] for c, _ in active}
-    plants = follow_ons(free_from, kind, liked, shift, not_families=families, limit=limit, today=today)
+    plants = follow_ons(free_from, kind, liked, shift, not_families=families, limit=limit * 2, today=today)
     if not active:  # an empty bed can take anything, perennials included
-        plants = follow_ons(free_from, kind, liked, shift, limit=limit, today=today)
+        plants = follow_ons(free_from, kind, liked, shift, limit=limit * 2, today=today)
+
+    def fits(x):  # never suggest something the bed has no room for
+        crop, jobs = trial_crop(catalogue.BY_ID[x["plant_id"]], x["method"], space["id"], 1, today, shift, after=free_from)
+        room = room_for(space, crops_with_jobs, crop, jobs) if crop else 0
+        return room is None or room >= 1
+    plants = [x for x in plants if fits(x)][:limit]
     return {"space_id": space["id"], "free_from": free_from.isoformat(), "empty_now": not active, "plants": plants}
 
 
@@ -763,6 +769,8 @@ def suggest_layout(spaces, crops_with_jobs, today, only_unplaced=False):
             score, note = 0.0, ""
             if use["area"]:
                 fill = use["peak"] / use["area"]
+                if fill > 1 + OVERFILL_TOLERANCE:
+                    continue  # never suggest a bed it would overflow - better left unplaced
                 score -= fill * 10
                 if fill > 1:
                     score -= 100 + 20 * (fill - 1)
@@ -798,3 +806,74 @@ def suggest_layout(spaces, crops_with_jobs, today, only_unplaced=False):
         out.append({"crop_id": crop["id"], "space_id": best[1] if best else None,
                     "from_space_id": crop["_from"], "note": best[2] if best else "no bed or pot suits it"})
     return out
+
+
+# ---- bed capacity: never let a bed overflow, and find somewhere that fits --------------------------------------
+# Time-aware: a planting takes its room from when it goes in (sown outside / planted out) until it's cleared, so a bed
+# full of crops that finish in 3 weeks has room for something starting in 4. Sown-together plantings share one patch.
+# Intercropping beyond the grow-together groups isn't modelled yet: each other planting uses its own footprint.
+OVERFILL_TOLERANCE = 0.10  # up to 10% over: allowed with a warning ("may be crowded"); more than that: blocked
+
+
+def capacity(space, crops_with_jobs):
+    """{'area', 'peak', 'on', 'pct', 'status': ok|tight|over, 'unit'}. tight = 100-110% full, over = more than 110%."""
+    use = usage(space, crops_with_jobs)
+    area = use.get("area")
+    if not area:
+        return dict(use, pct=0, status="ok")
+    pct = use["peak"] / area
+    return dict(use, pct=round(pct, 3), status="over" if pct > 1 + OVERFILL_TOLERANCE + 1e-9 else "tight" if pct > 1 + 1e-9 else "ok")
+
+
+def blocks(before, after):
+    """An add or edit is blocked if it leaves the bed more than 10% over - and makes it worse than it was
+    (so tidying up a bed that's already over is always allowed)."""
+    return after["status"] == "over" and after["pct"] > before["pct"] + 1e-6  # fuller than before (more plants, or a smaller bed)
+
+
+def footprint_one(space, plant):
+    """How much of the bed one plant takes: m2, or a share of a pot for pots with a size."""
+    if pot_capacity(space):
+        fits = pot_fits(plant, space["pot_size"])
+        return 1.0 / fits if fits else 99.0
+    return area_each(plant)
+
+
+def room_for(space, crops_with_jobs, trial, trial_jobs, tolerance=0.0):
+    """How many more of the trial crop's plant fit in this space while it would be growing (None: no size limit).
+    tolerance=OVERFILL_TOLERANCE gives the most that's allowed (up to 10% over)."""
+    plant = catalogue.BY_ID[trial["plant_id"]]
+    one = dict(trial, quantity=1, mixgrp=None)
+    use = usage(space, [(c, j) for c, j in crops_with_jobs if c.get("id") != trial.get("id")], extra=(one, trial_jobs))
+    if not use.get("area"):
+        return None
+    each = footprint_one(space, plant)
+    return max(0, int((use["area"] * (1 + tolerance) - (use["peak"] - each)) / each + 1e-9))
+
+
+def trial_crop(plant, method, space_id, qty, today, shift, after=None, crop_id=-1):
+    """A crop that isn't saved: for trying out where (and when) something would fit."""
+    win = plan_anchor(plant, method, today, shift, not_before=after)
+    if not win:
+        return None, None
+    crop = {"id": crop_id, "plant_id": plant["id"], "space_id": space_id, "method": method, "quantity": qty,
+            "anchor": win[0].isoformat(), "anchor_end": win[1].isoformat(), "bed_free_on": after.isoformat() if after else None}
+    return crop, crop_jobs(crop, shift, set(), today)
+
+
+def earliest_fit(space, crops_with_jobs, plant, method, qty, today, shift):
+    """The first time this many would fit: tried from each date a crop in the bed finishes. For sowing indoors, the
+    plants are ready to go out that day (a head start). Only dates still inside the plant's own season count."""
+    ends = sorted({crop_finishes(c, j) for c, j in crops_with_jobs
+                   if c.get("space_id") == space["id"] and not c.get("finished_on") and crop_finishes(c, j)})
+    for end in [e for e in ends if e > today][:12]:
+        crop, jobs = trial_crop(plant, method, space["id"], qty, today, shift, after=end)
+        if not crop:
+            continue
+        starts = crop_starts(crop, jobs)
+        if not starts or starts > end + 28 * DAY:  # its season has gone by then - not a sensible date
+            continue
+        room = room_for(space, crops_with_jobs, crop, jobs)
+        if room is None or room >= qty:
+            return {"after": end.isoformat(), "goes_in": starts.isoformat()}
+    return None

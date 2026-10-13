@@ -506,6 +506,8 @@ def add_space(body: SpaceIn, user=Depends(auth.current_user)):
 def rename_space(space_id: int, body: SpaceIn, user=Depends(auth.current_user)):
     with db.connect() as conn:
         _own(conn, "spaces", space_id, user)
+        state0 = garden.load(conn, user)
+        before = _capacities(state0, {space_id})
         conn.execute("UPDATE spaces SET name = ?, kind = ?, width_m = ?, length_m = ?, soil = ? WHERE id = ?",
                      (body.name.strip()[:40] or "My bed", body.kind, _size(body.width_m), _size(body.length_m),
                       _soil(body.soil), space_id))
@@ -519,6 +521,7 @@ def rename_space(space_id: int, body: SpaceIn, user=Depends(auth.current_user)):
             conn.execute("UPDATE spaces SET pot_size = ?, pot_count = ? WHERE id = ?", (_pot_size(body.pot_size), _pot_count(body.pot_count), space_id))
         if body.pos_x is not None and body.pos_y is not None:  # reshaping a bed can move its box
             conn.execute("UPDATE spaces SET pos_x = ?, pos_y = ? WHERE id = ?", (_metres(body.pos_x), _metres(body.pos_y), space_id))
+        _guard(conn, user, before, state0)  # making a bed smaller can't squeeze it past full
         return garden.payload(conn, user)
 
 
@@ -779,6 +782,56 @@ def _qty(n):
     return max(1, min(int(n), 5000)) if n else None
 
 
+# ---- bed capacity: one check for every way plants get added or changed ------------------------------------------
+def _capacities(state, space_ids=None):
+    return {sp["id"]: planner.capacity(sp, state["with_jobs"]) for sp in state["spaces"] if space_ids is None or sp["id"] in space_ids}
+
+
+def _alternatives(state, space, plant, method, qty, exclude_id=None):
+    """When something won't fit: other beds with room (most first), how many would fit here, starting it indoors to
+    go in when room frees up, or a later date."""
+    shift, today = state["shift"], state["today"]
+    others = [(c, j) for c, j in state["with_jobs"] if c.get("id") != exclude_id]
+    out = {"beds": [], "fewer": 0, "indoors": None, "later": None}
+    for sp in state["spaces"]:
+        if ("pot" if sp["kind"] == "pot" else "bed") not in plant["where"]:
+            continue
+        crop, jobs = planner.trial_crop(plant, method, sp["id"], qty, today, shift)
+        if not crop:
+            continue
+        room = planner.room_for(sp, others, crop, jobs)
+        if sp["id"] == space["id"]:
+            out["fewer"] = room or 0
+        elif room is None or room >= 1:
+            out["beds"].append({"id": sp["id"], "name": sp["name"], "fits": room})
+    out["beds"].sort(key=lambda b: -(b["fits"] if b["fits"] is not None else 10 ** 6))
+    if "sow_in" in planner.methods_for(plant):
+        out["indoors"] = planner.earliest_fit(space, others, plant, "sow_in", qty, today, shift)
+    if method != "sow_in":
+        out["later"] = planner.earliest_fit(space, others, plant, method, qty, today, shift)
+    return out
+
+
+def _no_room(state_before, space, after, plant=None, method=None, qty=None, exclude_id=None):
+    msg = "No room in %s: that would make it %d%% full%s." % (
+        space["name"], round(after["pct"] * 100), " around %s" % date.fromisoformat(after["on"]).strftime("%-d %b") if after.get("on") else "")
+    detail = {"message": msg, "space_id": space["id"], "space": space["name"], "pct": after["pct"]}
+    if plant:
+        detail.update(plant_id=plant["id"], quantity=qty, method=method,
+                      options=_alternatives(state_before, space, plant, method, qty, exclude_id))
+    return detail
+
+
+def _guard(conn, user, before, state_before, plant=None, method=None, qty=None, exclude_id=None):
+    """After a change (still unsaved): if any bed it touched is now more than 10% over - and worse than before - undo
+    it (the 409 rolls the change back) and say what would fit instead."""
+    state = garden.load(conn, user)
+    after = _capacities(state, set(before))
+    for sp in state["spaces"]:
+        if sp["id"] in after and planner.blocks(before[sp["id"]], after[sp["id"]]):
+            raise HTTPException(409, _no_room(state_before, sp, after[sp["id"]], plant, method, qty, exclude_id))
+
+
 def _own(conn, table, row_id, user):
     row = conn.execute("SELECT * FROM %s WHERE id = ? AND user_id = ?" % table, (row_id, user["id"])).fetchone()
     if not row:
@@ -819,6 +872,8 @@ def add_crop(body: CropIn, user=Depends(auth.current_user)):
     batches = max(1, min(body.batches or 1, 8))
     every = max(1, min(body.every_weeks or 2, 8))
     with db.connect() as conn:
+        state0 = garden.load(conn, user) if body.space_id is not None else None
+        before = _capacities(state0, {body.space_id}) if state0 else {}
         first = _new_crop(conn, user, body.plant_id, body.space_id, body.method, quantity=body.quantity, after=_after(body.after),
                           variety=body.variety)
         start = date.fromisoformat(conn.execute("SELECT anchor FROM crops WHERE id = ?", (first,)).fetchone()["anchor"])
@@ -830,6 +885,8 @@ def add_crop(body: CropIn, user=Depends(auth.current_user)):
             if not win or win[0] > when + planner.WEEK:  # past the end of this sowing season
                 break
             _new_crop(conn, user, body.plant_id, body.space_id, method, quantity=body.quantity, after=when, variety=body.variety)
+        if before:
+            _guard(conn, user, before, state0, plant, method, _qty(body.quantity) or planner.default_quantity(plant))
         return garden.payload(conn, user)
 
 
@@ -846,6 +903,8 @@ def add_crops(body: CropsIn, user=Depends(auth.current_user)):
     with db.connect() as conn:
         if body.space_id is not None:
             _own(conn, "spaces", body.space_id, user)
+        state0 = garden.load(conn, user) if body.space_id is not None else None
+        before = _capacities(state0, {body.space_id}) if state0 else {}
         # a veg grow-together (MIXES), or a group of flowers that go together ("flower:<combo id>")
         known = {m["id"] for m in catalogue.MIXES} | {"flower:" + c["id"] for c in catalogue.COMBOS}
         mix = body.mix if body.mix in known else None
@@ -857,6 +916,8 @@ def add_crops(body: CropsIn, user=Depends(auth.current_user)):
                 made.append(_new_crop(conn, user, plant["id"], body.space_id, None, quantity=qty))
         if mix and len(made) > 1:  # one planting: the group is known by its first crop's id
             conn.execute("UPDATE crops SET mix = ?, mixgrp = ? WHERE id IN (%s)" % ",".join("?" * len(made)), [mix, made[0]] + made)
+        if before:
+            _guard(conn, user, before, state0)
         return garden.payload(conn, user)
 
 
@@ -880,12 +941,15 @@ class Layout(BaseModel):
 @app.post("/api/layout")
 def layout_apply(body: Layout, user=Depends(auth.current_user)):
     with db.connect() as conn:
+        state0 = garden.load(conn, user)
+        before = _capacities(state0)
         for raw in body.moves[:200]:
             move = Move(**raw)
             _own(conn, "crops", move.crop_id, user)
             if move.space_id is not None:
                 _own(conn, "spaces", move.space_id, user)
             conn.execute("UPDATE crops SET space_id = ? WHERE id = ?", (move.space_id, move.crop_id))
+        _guard(conn, user, before, state0)
         return garden.payload(conn, user)
 
 
@@ -917,6 +981,14 @@ def space_check(plant_id: str, space_id: Optional[int] = None, method: Optional[
         use = planner.usage(space, state["with_jobs"], extra=(trial, jobs))
         out["space"] = dict(use, name=space["name"], kind=space["kind"],
                             fits=use["area"] is None or use["peak"] <= use["area"])
+        # the same check that adding uses: room for how many more, and whether this many would be blocked
+        before = planner.capacity(space, state["with_jobs"])
+        after = planner.capacity(space, state["with_jobs"] + [(dict(trial, id=-1), jobs)])
+        room = planner.room_for(space, state["with_jobs"], trial, jobs)
+        most = planner.room_for(space, state["with_jobs"], trial, jobs, planner.OVERFILL_TOLERANCE)
+        out["capacity"] = {"room": room, "limit": most, "status": after["status"], "blocked": planner.blocks(before, after)}
+        if out["capacity"]["blocked"]:
+            out["capacity"]["options"] = _alternatives(state, space, plant, method, qty)
         t0, t1 = planner.crop_starts(trial, jobs), planner.crop_finishes(trial, jobs)
         neighbours = {c["plant_id"] for c, j in state["with_jobs"] if c["space_id"] == space_id and not c.get("finished_on")
                       and planner.overlap(t0, t1, planner.crop_starts(c, j), planner.crop_finishes(c, j))}
@@ -937,6 +1009,8 @@ def space_check(plant_id: str, space_id: Optional[int] = None, method: Optional[
 def edit_crop(crop_id: int, body: CropIn, user=Depends(auth.current_user)):
     with db.connect() as conn:
         crop = _own(conn, "crops", crop_id, user)
+        state0 = garden.load(conn, user)
+        before = _capacities(state0, {crop["space_id"], body.space_id} - {None})
         # plants sown together move together: a bed change applies to the whole planting
         members = _group_ids(conn, crop, user)
         where = "id IN (%s)" % ",".join("?" * len(members))
@@ -965,6 +1039,25 @@ def edit_crop(crop_id: int, body: CropIn, user=Depends(auth.current_user)):
             start, end = planner.plan_anchor(plant, body.method, clock.today(), garden.shift_for(user))
             conn.execute("UPDATE crops SET method = ?, anchor = ?, anchor_end = ? WHERE id = ?",
                          (body.method, start.isoformat(), end.isoformat(), crop_id))
+        new = conn.execute("SELECT * FROM crops WHERE id = ?", (crop_id,)).fetchone()
+        _guard(conn, user, before, state0, catalogue.BY_ID[crop["plant_id"]], new["method"], planner.quantity(dict(new)), crop_id)
+        return garden.payload(conn, user)
+
+
+class Quantities(BaseModel):
+    items: list  # [{"id", "quantity"}]
+
+
+@app.post("/api/crops/quantities")
+def set_quantities(body: Quantities, user=Depends(auth.current_user)):
+    """Change several crops' numbers together (e.g. resizing a planting grown together) - checked as one change."""
+    with db.connect() as conn:
+        state0 = garden.load(conn, user)
+        crops = [_own(conn, "crops", int(i["id"]), user) for i in body.items[:40]]
+        before = _capacities(state0, {c["space_id"] for c in crops} - {None})
+        for c, i in zip(crops, body.items):
+            conn.execute("UPDATE crops SET quantity = ? WHERE id = ?", (_qty(i.get("quantity")), c["id"]))
+        _guard(conn, user, before, state0)
         return garden.payload(conn, user)
 
 
@@ -973,10 +1066,13 @@ def replan_crop(crop_id: int, user=Depends(auth.current_user)):
     """Missed the window? Aim for the next one."""
     with db.connect() as conn:
         crop = _own(conn, "crops", crop_id, user)
+        state0 = garden.load(conn, user)
+        before = _capacities(state0, {crop["space_id"]} - {None})
         plant = catalogue.BY_ID[crop["plant_id"]]
         start, end = planner.plan_anchor(plant, crop["method"], clock.today() + planner.DAY, garden.shift_for(user))
         conn.execute("UPDATE crops SET anchor = ?, anchor_end = ?, sown_on = NULL, planted_on = NULL WHERE id = ?",
                      (start.isoformat(), end.isoformat(), crop_id))
+        _guard(conn, user, before, state0, plant, crop["method"], planner.quantity(crop), crop_id)
         return garden.payload(conn, user)
 
 
@@ -1037,7 +1133,10 @@ def mark_done(body: DoneIn, user=Depends(auth.current_user)):
             if what == "batch" and not body.undo:
                 if conn.execute("SELECT 1 FROM done WHERE user_id = ? AND key = ?", (user["id"], body.key)).fetchone():
                     return garden.payload(conn, user)
+                state0 = garden.load(conn, user)
+                before = _capacities(state0, {crop["space_id"]} - {None})
                 _new_crop(conn, user, crop["plant_id"], crop["space_id"], crop["method"])
+                _guard(conn, user, before, state0, catalogue.BY_ID[crop["plant_id"]], crop["method"], planner.default_quantity(catalogue.BY_ID[crop["plant_id"]]))
         else:
             _own(conn, "spaces", int(space_key.group(1)), user)
         if body.undo:

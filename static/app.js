@@ -130,7 +130,11 @@ async function api(method, path, body) {
     throw new Error("Please log in");
   }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail || "Something went wrong. Try again?");
+  if (!res.ok) {
+    const d = data.detail, err = new Error((typeof d === "string" ? d : d && d.message) || "Something went wrong. Try again?");
+    if (d && typeof d === "object") err.info = d;
+    throw err;
+  }
   return data;
 }
 
@@ -517,11 +521,13 @@ document.addEventListener("click", async (e) => {
     const g = activeCrops().filter((c) => c.mixgrp === Number(rz.dataset.resizemix));
     const factor = Number(rz.dataset.area) / groupFoot(g);
     const sized = g.map((c) => ({ c, qty: Math.max(1, Math.round(c.qty * factor)) }));
-    for (const x of sized.slice(0, -1)) await api("PATCH", `/api/crops/${x.c.id}`, { plant_id: x.c.plant_id, quantity: x.qty });
-    const last = sized[sized.length - 1];
-    await change("PATCH", `/api/crops/${last.c.id}`, { plant_id: last.c.plant_id, quantity: last.qty }, `Resized: ${sized.map((x) => `${x.qty} ${plant(x.c.plant_id).name.toLowerCase()}`).join(", ")}`);
+    await change("POST", "/api/crops/quantities", { items: sized.map((x) => ({ id: x.c.id, quantity: x.qty })) }, `Resized: ${sized.map((x) => `${x.qty} ${plant(x.c.plant_id).name.toLowerCase()}`).join(", ")}`);
     return;
   }
+  const fm = e.target.closest("[data-fixmove]");
+  if (fm) { const c = crop(Number(fm.dataset.fixmove)); await change("PATCH", `/api/crops/${c.id}`, { plant_id: c.plant_id, space_id: Number(fm.dataset.to) }, `${plant(c.plant_id).name} moved to ${space(Number(fm.dataset.to)).name}`); return; }
+  const fq = e.target.closest("[data-fixqty]");
+  if (fq) { const c = crop(Number(fq.dataset.fixqty)); await change("PATCH", `/api/crops/${c.id}`, { plant_id: c.plant_id, quantity: Number(fq.dataset.qty) }, `Now ${fq.dataset.qty} ${plant(c.plant_id).name.toLowerCase()}`); return; }
   const fp = e.target.closest("[data-flowers]");
   if (fp) { openFlowerPlan(Number(fp.dataset.flowers)); return; }
   const pl = e.target.closest("[data-open-plant]");
@@ -571,6 +577,11 @@ function home() {
   else if (unbuilt.length) nudge = `<div class="card tint-soil row" style="justify-content:space-between" data-open-space="${unbuilt[0].id}">
       <div><b>📦 Build ${esc(unbuilt[0].name)}</b><div class="small muted">${unbuilt[0].nodig_done.length} of ${S.cat.nodig_steps.length} steps done</div></div><span class="btn small">Let's build 👉</span></div>`;
   else nudge = pushBanner();
+  const overBeds = S.g.spaces.filter(overFull), seenKey = "gtg-overfull-" + overBeds.map((x) => x.id).join("-");
+  let seen = false;
+  try { seen = localStorage.getItem(seenKey) === "1"; } catch (e) { /* private mode */ }
+  if (overBeds.length && !seen) nudge = `<div class="card noroom"><b>${esc(overBeds[0].name)} is over capacity.</b> Move some plants?
+    <div class="row" style="margin-top:8px"><button class="btn small primary" data-open-space="${overBeds[0].id}">Fix this bed</button><button class="btn small ghost" id="overfull-ok" data-key="${seenKey}">Not now</button></div></div>` + nudge;
 
   // this week: anything you can do in the next 7 days; then what's coming in the 30 days after that
   const open = (j) => j.kind !== "buy" && j.status !== "done" && j.status !== "waiting";
@@ -608,6 +619,8 @@ function home() {
       ${byMonth.map((g) => { const [y, mo] = g.k.split("-").map(Number);
         return `<h4 class="month-head">${MONTHS_LONG[mo - 1]}${y !== t.getFullYear() ? " " + y : ""} <span class="small muted">${g.jobs.length}</span></h4>${g.jobs.map((j) => jobCard(j, { showSpace: true })).join("")}`; }).join("")}</details>` : ""}
     ${buyNow.length ? `<a href="#/shop" class="link-row">🛒 <b>${buyNow.length} thing${buyNow.length === 1 ? "" : "s"} to buy soon</b> <span>${buyNow.slice(0, 5).map((x) => plant(x.plant_id).emoji).join(" ")} 👉</span></a>` : ""}`;
+  const ofk = $("#overfull-ok");
+  if (ofk) ofk.onclick = () => { try { localStorage.setItem(ofk.dataset.key, "1"); } catch (e) { /* private mode */ } home(); };
   const later = $("#later");
   if (later) later.ontoggle = () => { homeAll = later.open; };  // stays open after ticking something
   const aheadEl = $("#ahead");
@@ -1952,13 +1965,13 @@ function usageBar(s) {
   if (!u || !u.area) return "";
   if (u.unit === "pots") {
     const used = Math.round(u.peak * 10) / 10, pctp = Math.round((100 * u.peak) / u.area);
-    return `<div class="use ${pctp > 100 ? "over" : pctp > 85 ? "tight" : ""}"><div class="row" style="justify-content:space-between;gap:4px"><span class="small"><b>${pctp > 100 ? "⚠️ Too full" : pctp > 85 ? "Nearly full" : pctp ? "Room to spare" : "Empty"}</b>${u.on && pctp ? ` at the busiest (${fmt(u.on)})` : ""}</span>
+    return `<div class="use ${pctp > 110 ? "over" : pctp >= 90 ? "tight" : ""}"><div class="row" style="justify-content:space-between;gap:4px"><span class="small"><b>${pctp > 110 ? "⚠️ Over capacity" : pctp > 100 ? "Slightly over - crowded" : pctp >= 90 ? "Nearly full" : pctp ? "Room to spare" : "Empty"}</b>${u.on && pctp ? ` at the busiest (${fmt(u.on)})` : ""}</span>
       <span class="small muted">${used} of ${u.area} pot${u.area > 1 ? "s" : ""} used</span></div><div class="progress"><i style="width:${Math.min(100, pctp)}%"></i></div></div>`;
   }
   const pct = Math.round((100 * u.peak) / u.area);
   const size = s.width_m && s.length_m ? `${u.area} m² (${s.width_m} × ${s.length_m} m)` : `${u.area} m² (standard bed)`;
-  const cls = pct > 100 ? "over" : pct > 85 ? "tight" : "";
-  return `<div class="use ${cls}"><div class="row" style="justify-content:space-between;gap:4px"><span class="small"><b>${pct > 100 ? "⚠️ Too full" : pct > 85 ? "Nearly full" : pct ? "Room to spare" : "Empty"}</b>${u.on && pct ? ` at its busiest (${fmt(u.on)})` : ""}</span>
+  const cls = pct > 110 ? "over" : pct >= 90 ? "tight" : "";
+  return `<div class="use ${cls}"><div class="row" style="justify-content:space-between;gap:4px"><span class="small"><b>${pct > 110 ? "⚠️ Over capacity" : pct > 100 ? "Slightly over - crowded" : pct >= 90 ? "Nearly full" : pct ? "Room to spare" : "Empty"}</b>${u.on && pct ? ` at its busiest (${fmt(u.on)})` : ""}</span>
     <span class="small muted">${u.peak} m² used of ${size}</span></div>
     <div class="progress"><i style="width:${Math.min(100, pct)}%"></i></div></div>`;
 }
@@ -2093,6 +2106,7 @@ function drawSpace(id) {
     <div data-panel="plants">
     ${here.length ? `<button class="card row costcard" data-bedplan="${s.id}" style="justify-content:space-between;width:100%">
       <span><b>About ${money(s.cost.total)} to plant</b><span class="small muted" style="display:block">${s.cost.to_buy < s.cost.total ? `${money(s.cost.to_buy)} still to buy · ` : ""}where each plant goes</span></span><span class="small" style="color:var(--forest-2);font-weight:700">Plan ›</span></button>` : ""}
+    ${fixBedCard(s)}
     <div class="card"><h3>Growing here</h3>${here.length ? usageBar(s) : ""}
       ${plantings.map((g) => { const m = mixOf(g[0]), area = s.usage && s.usage.unit !== "pots" ? s.usage.area : 0;
         const foot = groupFoot(g);
@@ -2512,9 +2526,22 @@ function openPlant(id, spaceId, startMethod, after) {
       if (after) params.set("after", after);
       try {
         const r = await api("GET", "/api/check?" + params);
-        if (n === asked && $("#check")) $("#check").innerHTML = checkHtml(p, r);
+        if (n === asked && $("#check")) {
+          $("#check").innerHTML = checkHtml(p, r);
+          const blocked = !!(r.capacity && r.capacity.blocked);  // never add more than the bed can take
+          $("#add").disabled = blocked;
+          $("#add").textContent = blocked ? "Too many for this bed - see above" : `Add ${p.name.toLowerCase()} 🌱`;
+        }
       } catch (e) { /* the check is a nicety; adding still works */ }
     }, 250);
+  };
+  // the ways round "no room": a different bed, fewer, start indoors and plant out later, or a later date
+  $("#check").onclick = (e) => {
+    const b = e.target.closest("[data-alt-bed]"), q = e.target.closest("[data-alt-qty]"), ind = e.target.closest("[data-alt-indoors]"), lat = e.target.closest("[data-alt-later]");
+    if (b && $("#sp")) { $("#sp").value = b.dataset.altBed; $("#sp").dispatchEvent(new Event("change")); return; }
+    if (q) { qty = Number(q.dataset.altQty); $("#qty").value = qty; runCheck(); return; }
+    if (ind) { method = "sow_in"; after = ind.dataset.altIndoors; $("#methods").innerHTML = methodOpts(); $("#rows").innerHTML = rowsHtml(); runCheck(); toast("Sow indoors - it goes out the day there's room 🏠"); return; }
+    if (lat) { after = lat.dataset.altLater; runCheck(); toast("Planned for when there's room 📅"); }
   };
   const vars = $("#vars");
   vars.onclick = (e) => {
@@ -2932,7 +2959,7 @@ const cropSpan = (c) => (c.starts && c.finishes ? [d(c.starts), d(c.finishes)] :
 const together = (a, b) => !a || !b || (a[0] < b[1] && b[0] < a[1]);  // not sure? assume they'd overlap
 // How well a bed suits these plants: bad neighbours in it or next door (while both are growing), good ones,
 // and whether there's room. Notes are written for people; score is for sorting.
-function bedAdvice(plantIds, sp) {
+function bedAdvice(plantIds, sp, needs) {  // needs: m2 the planting takes (optional) - beds without that much room are marked
   const ps = plantIds.map(plant), crops = activeCrops();
   const inBed = crops.filter((c) => c.space_id === sp.id && !plantIds.includes(c.plant_id));
   const next = bedsNextTo(sp.id).map((n) => ({ sp: n, gap: n.gap, crops: crops.filter((c) => c.space_id === n.id) })).filter((n) => n.crops.length);
@@ -2952,27 +2979,29 @@ function bedAdvice(plantIds, sp) {
   if (misfits.length && !wrongKind) { score -= 1; fine.push(`${misfits.map((p) => p.name).join(" and ")} would rather be in ${sp.kind === "pot" ? "a bed" : "a pot"}`); }
   const u = sp.usage, full = u && u.area ? u.peak / u.area : 0;
   if (wrongKind) score -= 50;
+  const noRoom = !!(needs && sp.usage && sp.usage.area && sp.usage.unit !== "pots" && needs > sp.usage.area * 1.1 - sp.usage.peak + 1e-9);
+  if (noRoom) score -= 30;
   if (full > 0.9) score -= 4; else if (!inBed.length) score += 2;
-  return { sp, score, inBed, next, bad: [...new Set(bad)], good: [...new Set(good)], fine: [...new Set(fine)], wrongKind, full };
+  return { sp, score, inBed, next, bad: [...new Set(bad)], good: [...new Set(good)], fine: [...new Set(fine)], wrongKind, full, noRoom };
 }
 const emojiList = (cs) => [...new Set(cs.map((c) => plant(c.plant_id).emoji))].join("");
 function adviceLines(a) {
   return `${a.inBed.length ? `<div class="small">In it: ${emojiList(a.inBed)}</div>` : `<div class="small muted">Empty</div>`}
     ${a.next.map((n) => `<div class="small muted">Nearby, ${esc(n.sp.name)} (${gapText(n.gap)}): ${emojiList(n.crops)}</div>`).join("")}
     ${a.wrongKind ? `<div class="small adv-bad">Not the right kind of space for these</div>` : ""}
-    ${a.full > 0.9 ? `<div class="small adv-bad">Nearly full</div>` : ""}
+    ${a.noRoom ? `<div class="small adv-bad">Not enough room for this</div>` : a.full > 0.9 ? `<div class="small adv-bad">Nearly full</div>` : ""}
     ${a.bad.map((t) => `<div class="small adv-bad">⚠️ ${esc(t)}</div>`).join("")}
     ${a.good.map((t) => `<div class="small adv-good">✓ ${esc(t)}</div>`).join("")}
     ${a.fine.map((t) => `<div class="small muted">${esc(t)}</div>`).join("")}`;
 }
 // A list of beds to choose from, the best suited first - tap one to choose it
-function bedPicker(plantIds, chosen, inputId) {
-  const list = S.g.spaces.map((sp) => bedAdvice(plantIds, sp)).filter((a) => !a.wrongKind).sort((x, y) => y.score - x.score);
+function bedPicker(plantIds, chosen, inputId, needs) {
+  const list = S.g.spaces.map((sp) => bedAdvice(plantIds, sp, needs)).filter((a) => !a.wrongKind).sort((x, y) => y.score - x.score);
   if (!list.length) return `<input type="hidden" id="${inputId}" value="">`;
   const pick = chosen && list.some((a) => a.sp.id === chosen) ? chosen : null;
   return `<input type="hidden" id="${inputId}" value="${pick || ""}">
     <div class="bedpick" data-for="${inputId}">${list.map((a, i) => `<button type="button" class="bedopt ${a.sp.id === pick ? "on" : ""}" data-pickbed="${a.sp.id}">
-      <div class="row" style="justify-content:space-between;gap:6px"><b>${esc(a.sp.name)}</b>${i === 0 && a.score >= 0 ? `<span class="chip">Best choice</span>` : a.bad.length ? `<span class="chip l3">Bad neighbours</span>` : ""}</div>
+      <div class="row" style="justify-content:space-between;gap:6px"><b>${esc(a.sp.name)}</b>${i === 0 && a.score >= 0 && !a.noRoom ? `<span class="chip">Best choice</span>` : a.noRoom ? `<span class="chip l3">No room</span>` : a.bad.length ? `<span class="chip l3">Bad neighbours</span>` : ""}</div>
       ${adviceLines(a)}</button>`).join("")}
       <button type="button" class="bedopt ${pick ? "" : "on"}" data-pickbed=""><b>Decide later</b><div class="small muted">Keep it in your plan without a bed for now</div></button>
       <button type="button" class="btn small ghost changebed" data-changebed>Change bed</button></div>`;
@@ -3022,7 +3051,7 @@ function openMix(id, spaceId) {
   S.sheet = null;
   openSheet(`<h2>${m.emoji} ${esc(m.name)}</h2><p>${esc(m.why)}</p>
     <div class="card" id="mixcard"><h3>🌱 Add it to my garden</h3>
-      ${beds.length ? `<label class="field">Which bed?</label><p class="small muted" style="margin:-2px 0 8px">Best suited first - we check what's in each bed and in beds within about a metre of it.</p>${bedPicker(m.plants.map((x) => x.plant_id), spaceId, "mixbed")}` : ""}
+      ${beds.length ? `<label class="field">Which bed?</label><p class="small muted" style="margin:-2px 0 8px">Best suited first - we check what's in each bed and in beds within about a metre of it.</p>${bedPicker(m.plants.map((x) => x.plant_id), spaceId, "mixbed", patchOf(m.plants))}` : ""}
       <div id="mixfill"></div>
       <p class="small muted" style="margin:8px 0 0" id="mixqty"></p>
       <button class="btn primary wide" id="mixgo" style="margin-top:12px">Add the mix 🤝</button></div>
@@ -3115,6 +3144,24 @@ async function openFlowerPlan(id, sun, focus, fill = 1) {
   }));
 }
 
+// A bed that's already more than 10% over: say so, and offer to move or trim plants (nothing changes until you tap)
+const overFull = (sp) => !!(sp.usage && sp.usage.area && sp.usage.peak / sp.usage.area > 1.1 + 1e-9);
+function fixBedCard(s) {
+  if (!overFull(s)) return "";
+  const u = s.usage, over = u.peak - u.area, unit = u.unit === "pots" ? "pots" : "m²";
+  const crops = activeCrops().filter((c) => c.space_id === s.id && (u.crops || []).includes(c.id)).sort((a, b) => b.area - a.area).slice(0, 4);
+  const roomIn = (sp) => (sp.usage && sp.usage.area && sp.usage.unit !== "pots" ? sp.usage.area * 1.1 - sp.usage.peak : 0);
+  const lines = crops.map((c) => {
+    const p = plant(c.plant_id), dest = S.g.spaces.filter((sp) => sp.id !== s.id && p.where.includes(sp.kind === "pot" ? "pot" : "bed") && roomIn(sp) >= c.area).sort((a, b) => roomIn(b) - roomIn(a))[0];
+    const fewer = u.unit === "pots" ? 0 : Math.max(1, c.qty - Math.ceil(over / p.area_each));
+    return `<div class="myrow"><span class="e">${p.emoji}</span><span class="n">${c.qty} ${esc(p.name.toLowerCase())}</span>
+      ${dest ? `<button class="btn small" data-fixmove="${c.id}" data-to="${dest.id}">Move to ${esc(dest.name)}</button>` : ""}
+      ${fewer && fewer < c.qty ? `<button class="btn small ghost" data-fixqty="${c.id}" data-qty="${fewer}">Plant ${fewer}</button>` : ""}</div>`;
+  }).join("");
+  return `<div class="card noroom"><b>This bed is over capacity</b> - about ${Math.round(over * 100) / 100} ${unit} too much${u.on ? ` around ${fmt(u.on)}` : ""}. Nothing's been changed - move some plants?
+    ${lines}</div>`;
+}
+
 // "What fits in your pots" - or, until we know the size, a quick way to tell us
 function potCard(s) {
   if (!s.pot_size) return `<div class="card tint-sky"><h3>🪴 How big are your pots?</h3><p class="small" style="margin:0 0 8px">Tap the nearest size and we'll show what you can grow in them.</p>
@@ -3184,6 +3231,20 @@ function wirePanes(key) {
 function dict(a, b) { return Object.assign({}, a, b); }
 
 // The live "will it fit?" box under the Add form
+// "No room in Bed 2" - and the ways round it: a bed with room, fewer, start indoors and move it in later, or a later date
+function noRoomHtml(p, r) {
+  const o = r.capacity.options || {}, name = p.name.toLowerCase(), bed = esc(r.space.name);
+  const btns = [
+    ...(o.beds || []).slice(0, 3).map((b) => `<button type="button" class="btn small" data-alt-bed="${b.id}">Use ${esc(b.name)}${b.fits != null ? ` - fits ${b.fits}` : ""}</button>`),
+    o.fewer ? `<button type="button" class="btn small" data-alt-qty="${o.fewer}">Only ${o.fewer} fit - add ${o.fewer}</button>` : "",
+    o.indoors ? `<button type="button" class="btn small" data-alt-indoors="${o.indoors.after}">Start indoors now, plant out ${fmt(o.indoors.goes_in)}</button>` : "",
+    o.later ? `<button type="button" class="btn small" data-alt-later="${o.later.after}">${bed} has room from ${fmt(o.later.goes_in)}</button>` : "",
+  ].filter(Boolean);
+  return `<div class="noroom"><b>No room in ${bed}</b> for ${r.qty} ${esc(name)} at that time${r.capacity.room ? ` - it has room for ${r.capacity.room}` : ""}.
+    ${btns.length ? `<div class="small" style="margin:6px 0 4px">Try one of these:</div><div class="noroom-opts">${btns.join("")}</div>`
+      : `<div class="small" style="margin-top:6px">No bed has room for these at the moment. Add another bed, or choose something smaller.</div>`}</div>`;
+}
+
 function checkHtml(p, r) {
   const icon = { sow_in: "🏠", sow_out: "🌱", plant_out: "🌿", harvest: "🧺" };
   const word = { sow_in: "Sow indoors", sow_out: "Sow", plant_out: "Plant out", harvest: "Pick" };
@@ -3192,25 +3253,25 @@ function checkHtml(p, r) {
     r.buy ? `🛒 <b>${esc(r.buy.text)}</b>${r.buy.seeds ? ` - enough to sow ${r.buy.seeds}` : ""}${r.buy.note ? ` <span class="muted">(${esc(r.buy.note)})</span>` : ""}` : "",
     r.cost ? `💷 About <b>${money(r.cost.total)}</b> - ${esc(r.cost.how)}. That's about <b>${pence(r.cost.per_plant)} a plant</b>.` : ""].filter(Boolean);
   let cls = "ok";
+  const cap = r.capacity, bedName = r.space ? esc(r.space.name) : "";
+  const roomLine = () => {
+    if (!cap || cap.room == null) return;
+    if (cap.blocked) { cls = "warn"; lines.push(noRoomHtml(p, r)); return; }
+    if (cap.status === "tight") { cls = "warn"; lines.push(`⚠️ <b>Slightly over capacity</b> - plants may be crowded. ${bedName} has room for ${cap.room} without crowding.`); return; }
+    lines.push(`✅ Room for <b>${cap.room} ${esc(p.name.toLowerCase())}</b> in ${bedName} at that time${cap.room > r.qty ? ` - you're adding ${r.qty}` : ""}.`);
+  };
   if (r.space && r.space.unit === "pots") {
     const u = r.space, sp = space(Number(($("#sp") || {}).value)), per = sp && p.pot_fits ? p.pot_fits[sp.pot_size] : 0;
     if (!per) { cls = "warn"; lines.push(`⚠️ Too big for these pots - ${esc(p.pot_advice.toLowerCase())}.`); }
     else {
       lines.push(`🪴 ${per} fit in each pot, so that's about <b>${Math.ceil(Math.round((r.qty || 1) / per * 10) / 10)} pot${Math.ceil((r.qty || 1) / per) > 1 ? "s" : ""}</b>.`);
-      if (u.fits) lines.push(`✅ Fits! At the busiest${u.on ? " (" + fmt(u.on) + ")" : ""}, ${Math.round(u.peak * 10) / 10} of your ${u.area} pots are used.`);
-      else { cls = "warn"; lines.push(`⚠️ That needs ${Math.round(u.peak * 10) / 10} pots${u.on ? " around " + fmt(u.on) : ""} - you have ${u.area}. Plant fewer, or add more pots.`); }
+      roomLine();
     }
   } else if (r.space && r.space.area) {
     const u = r.space;
     const pct = Math.min(100, Math.round((100 * u.peak) / u.area));
-    lines.push(`📏 Needs about <b>${r.area} m²</b>. ${esc(u.name)} is ${u.area} m².`);
-    if (u.fits) lines.push(`✅ Fits! At its busiest${u.on ? " (" + fmt(u.on) + ")" : ""}, ${esc(u.name)} will be ${pct}% full.`);
-    else {
-      cls = "warn";
-      const spare = Math.max(0, u.area - (u.peak - r.area));
-      const could = Math.floor(spare / p.area_each);
-      lines.push(`⚠️ Too many for ${esc(u.name)}: it would need ${u.peak} m² ${u.on ? "around " + fmt(u.on) : ""}. ${could > 0 ? `About <b>${could}</b> will fit - or put the rest in another bed.` : "Try another bed, or plant these after something else is picked."}`);
-    }
+    lines.push(`📏 Needs about <b>${r.area} m²</b>. ${esc(u.name)} is ${u.area} m²${!cap || !cap.blocked ? `, and will be ${pct}% full at its busiest${u.on ? " (" + fmt(u.on) + ")" : ""}` : ""}.`);
+    roomLine();
   } else if (r.space) {
     lines.push(`🪴 ${esc(p.pot_advice)}.`);
   } else {

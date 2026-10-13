@@ -743,8 +743,10 @@ def test_pot_sizes_and_overwintering(client):
     assert any(j["kind"] == "overwinter" for j in chilli["jobs"])
     check = client.get("/api/check", params={"plant_id": "courgette", "space_id": pots["id"], "quantity": 1}).json()
     assert check["space"]["fits"] is False  # a courgette needs a much bigger pot
-    g = client.patch("/api/spaces/%d" % pots["id"], json={"name": "Patio pots", "kind": "pot", "pot_size": "p50", "pot_count": 1}).json()
-    assert g["spaces"][0]["pot_size"] == "p50" and g["spaces"][0]["usage"]["area"] == 1
+    # two chillies won't fit in one big tub (one each) - so that's blocked; two tubs are fine
+    assert client.patch("/api/spaces/%d" % pots["id"], json={"name": "Patio pots", "kind": "pot", "pot_size": "p50", "pot_count": 1}).status_code == 409
+    g = client.patch("/api/spaces/%d" % pots["id"], json={"name": "Patio pots", "kind": "pot", "pot_size": "p50", "pot_count": 2}).json()
+    assert g["spaces"][0]["pot_size"] == "p50" and g["spaces"][0]["usage"]["area"] == 2
 
 
 def test_spring_wake_up_after_overwintering(client):
@@ -854,3 +856,104 @@ def test_next_weeding_is_four_weeks_after_you_did_it(client, monkeypatch):
     client.post("/api/done", json={"key": first["key"]})
     jobs = [j for j in client.get("/api/garden").json()["crops"][0]["jobs"] if j["title"].startswith("Pull out weeds")]
     assert jobs[1]["start"] == (late + __import__("datetime").timedelta(weeks=4)).isoformat()
+
+
+# ---- bed capacity ----------------------------------------------------------------------------------------
+def _bed(client, w=1.0, l=1.0, name="Bed 1"):
+    return [s for s in client.post("/api/spaces", json={"name": name, "kind": "bed", "width_m": w, "length_m": l}).json()["spaces"] if s["name"] == name][0]["id"]
+
+
+def test_capacity_maths_and_the_ten_percent_boundary():
+    from datetime import date
+    from app import planner, plants as cat
+    bed = {"id": 1, "kind": "bed", "width_m": 1.0, "length_m": 1.0}
+    lettuce = cat.BY_ID["salad"]  # 10 x 20cm = 0.02 m2 each: 50 fill a square metre
+    crop, jobs = planner.trial_crop(lettuce, "sow_out", 1, 50, date(2027, 3, 1), 0)
+    assert planner.room_for(bed, [], crop, jobs) == 50
+    assert planner.room_for(bed, [], crop, jobs, planner.OVERFILL_TOLERANCE) == 55
+    full = lambda n: planner.capacity(bed, [(dict(crop, quantity=n), jobs)])
+    assert full(50)["status"] == "ok"              # exactly 100%
+    assert full(55)["status"] == "tight"           # 110%: allowed, with a warning
+    assert full(56)["status"] == "over"            # 112%: blocked
+    empty = planner.capacity(bed, [])
+    assert not planner.blocks(empty, full(55)) and planner.blocks(empty, full(56))
+    # tidying a bed that's already over is never blocked
+    assert not planner.blocks(full(80), full(70))
+
+
+def test_capacity_is_time_aware():
+    from datetime import date
+    from app import planner, plants as cat
+    bed = {"id": 1, "kind": "bed", "width_m": 1.0, "length_m": 1.0}
+    radish, garlic = cat.BY_ID["radish"], cat.BY_ID["garlic"]
+    early, ej = planner.trial_crop(radish, "sow_out", 1, 220, date(2027, 3, 20), 0)   # fills the bed in spring
+    late, lj = planner.trial_crop(garlic, "sow_out", 1, 20, date(2027, 3, 20), 0)     # goes in the autumn
+    assert planner.capacity(bed, [(early, ej)])["pct"] >= 0.99
+    assert planner.room_for(bed, [(early, ej)], late, lj) >= 20  # no overlap: the radishes are long gone
+
+
+def test_every_way_of_adding_is_checked(client):
+    _join(client)
+    bed = _bed(client)                                   # 1 m2
+    ok = client.post("/api/crops", json={"plant_id": "salad", "space_id": bed, "quantity": 30, "method": "sow_out"})
+    assert ok.status_code == 200
+    too_many = client.post("/api/crops", json={"plant_id": "salad", "space_id": bed, "quantity": 40, "method": "sow_out"})
+    assert too_many.status_code == 409
+    d = too_many.json()["detail"]
+    assert "No room" in d["message"] and d["options"]["fewer"] == 20
+    # a group added in one go
+    assert client.post("/api/crops/bulk", json={"crops": [{"plant_id": "courgette", "quantity": 3}], "space_id": bed}).status_code == 409
+    # more of what's there
+    c = client.get("/api/garden").json()["crops"][0]
+    assert client.patch("/api/crops/%d" % c["id"], json={"plant_id": "salad", "quantity": 80}).status_code == 409
+    assert client.post("/api/crops/quantities", json={"items": [{"id": c["id"], "quantity": 80}]}).status_code == 409
+    # moving something big into it
+    other = _bed(client, 3, 3, "Big bed")
+    g = client.post("/api/crops", json={"plant_id": "courgette", "space_id": other, "quantity": 3}).json()
+    courgettes = next(x for x in g["crops"] if x["plant_id"] == "courgette")
+    assert client.patch("/api/crops/%d" % courgettes["id"], json={"plant_id": "courgette", "space_id": bed}).status_code == 409
+    # agreeing to a layout that would overflow it
+    assert client.post("/api/layout", json={"moves": [{"crop_id": courgettes["id"], "space_id": bed}]}).status_code == 409
+    # making the bed smaller
+    assert client.patch("/api/spaces/%d" % bed, json={"name": "Bed 1", "kind": "bed", "width_m": 0.5, "length_m": 0.5}).status_code == 409
+    # nothing changed by the blocked attempts
+    g = client.get("/api/garden").json()
+    assert [x["quantity"] for x in g["crops"] if x["space_id"] == bed] == [30]
+    assert next(s for s in g["spaces"] if s["id"] == bed)["width_m"] == 1.0
+
+
+def test_a_little_over_is_allowed_with_a_warning(client):
+    _join(client)
+    bed = _bed(client)
+    check = client.get("/api/check", params={"plant_id": "salad", "space_id": bed, "quantity": 54, "method": "sow_out"}).json()
+    assert check["capacity"]["status"] == "tight" and not check["capacity"]["blocked"]
+    assert check["capacity"]["room"] == 50 and check["capacity"]["limit"] == 55
+    assert client.post("/api/crops", json={"plant_id": "salad", "space_id": bed, "quantity": 54, "method": "sow_out"}).status_code == 200
+
+
+def test_no_room_offers_other_beds_and_a_later_start(client):
+    _join(client)
+    small = _bed(client, 1, 1, "Small")
+    big = _bed(client, 2, 2, "Roomy")
+    client.post("/api/crops", json={"plant_id": "radish", "space_id": small, "quantity": 220, "method": "sow_out"})
+    check = client.get("/api/check", params={"plant_id": "salad", "space_id": small, "quantity": 20, "method": "sow_out"}).json()
+    opts = check["capacity"]["options"]
+    assert check["capacity"]["blocked"] and opts["beds"][0]["name"] == "Roomy" and opts["beds"][0]["fits"] >= 20
+    # or sow it later, once the radishes are cleared - still inside the lettuce's own season
+    assert opts["later"] and opts["later"]["goes_in"] >= opts["later"]["after"]
+
+
+
+def test_start_indoors_goes_in_when_the_bed_frees_up():
+    from datetime import date
+    from app import planner, plants as cat
+    bed = {"id": 1, "kind": "bed", "width_m": 1.0, "length_m": 1.0}
+    today = date(2026, 10, 13)
+    radish, jobs = planner.trial_crop(cat.BY_ID["radish"], "sow_out", 1, 220, today, 0)
+    radish.update(id=5, sown_on="2027-04-20", harvested_on="2027-05-20")   # fills the bed until 10 June
+    jobs = planner.crop_jobs(radish, 0, set(), today)
+    fit = planner.earliest_fit(bed, [(radish, jobs)], cat.BY_ID["courgette"], "sow_in", 1, today, 0)
+    assert fit == {"after": "2027-06-10", "goes_in": "2027-06-10"}   # sown indoors in May, out the day there's room
+    # lettuce's indoor season (to 10 April) is over by then, so that isn't offered - sowing later outside is
+    assert planner.earliest_fit(bed, [(radish, jobs)], cat.BY_ID["salad"], "sow_in", 20, today, 0) is None
+    assert planner.earliest_fit(bed, [(radish, jobs)], cat.BY_ID["salad"], "sow_out", 20, today, 0)["goes_in"] == "2027-06-10"

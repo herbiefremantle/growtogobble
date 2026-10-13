@@ -766,3 +766,9 @@ svg.plot .grp-tag { fill: #fff; font-weight: 800; paint-order: stroke; stroke: r
 .scene-ctl { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
 .scene-ctl input { flex: 1; accent-color: var(--forest-2); }
 .scene-ctl span { min-width: 76px; text-align: right; font-weight: 700; }
+
+/* no room in a bed */
+.noroom { border: 1.5px solid color-mix(in srgb, var(--terra) 45%, var(--line)); background: color-mix(in srgb, var(--terra-soft) 60%, var(--card)); border-radius: 12px; padding: 10px 12px; }
+.noroom-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.use.tight .progress i { background: var(--marigold); }
+.use.over .progress i { background: var(--terra); }
