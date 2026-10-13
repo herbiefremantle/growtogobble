@@ -828,3 +828,16 @@ def test_flower_plan_can_fill_part_of_a_bed(client):
     assert count(half) < count(whole) and half["area"] == whole["area"] / 2
     # basil can go in a bed as well as a pot, so tomatoes, basil & marigolds can be planted in a bed
     assert "bed" in next(p for p in client.get("/api/plants").json()["plants"] if p["id"] == "basil")["where"]
+
+
+def test_ongoing_jobs_come_back_each_month(client):
+    _join(client)
+    g = client.post("/api/crops", json={"plant_id": "garlic"}).json()
+    weeding = [j for j in g["crops"][0]["jobs"] if j["title"].startswith("Pull out weeds")]
+    assert len(weeding) == 4  # 16 weeks of weeding = a reminder every 4 weeks
+    assert all(a["end"] <= b["start"] for a, b in zip(weeding, weeding[1:]))
+    # ticking one leaves the next one waiting
+    assert client.post("/api/done", json={"key": weeding[0]["key"]}).status_code == 200
+    jobs = client.get("/api/garden").json()["crops"][0]["jobs"]
+    status = {j["key"]: j["status"] for j in jobs}
+    assert status[weeding[0]["key"]] == "done" and status[weeding[1]["key"]] != "done"

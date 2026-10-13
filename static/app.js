@@ -2104,7 +2104,7 @@ function drawSpace(id) {
       ${herbs.length ? `<h3 style="margin-top:14px">🌿 Herbs</h3>${herbs.map(inBedRow).join("")}` : ""}
       ${comps.length ? `<h3 style="margin-top:14px">🐞 Companion plants</h3>${comps.map(inBedRow).join("")}` : ""}
       ${flowers.length ? `<h3 style="margin-top:14px">🌸 Flowers</h3>${flowers.map(inBedRow).join("")}` : ""}
-      ${bedsNextTo(s.id).length ? `<p class="small muted" style="margin:10px 0 0">Next door: ${bedsNextTo(s.id).map((n) => { const cs = activeCrops().filter((c) => c.space_id === n.id); return `${esc(n.name)} (${gapText(n.gap)})${cs.length ? " " + emojiList(cs) : " - empty"}`; }).join(" · ")}</p>` : ""}
+      ${bedsNextTo(s.id).length ? `<p class="small muted" style="margin:10px 0 0">Nearby: ${bedsNextTo(s.id).map((n) => { const cs = activeCrops().filter((c) => c.space_id === n.id); return `${esc(n.name)} (${gapText(n.gap)})${cs.length ? " " + emojiList(cs) : " - empty"}`; }).join(" · ")}</p>` : ""}
       <div class="row" style="margin-top:10px"><a class="btn small" href="#/plants" data-close>Add plants</a>
       ${here.length ? `<button class="btn small ghost" data-empty="${s.id}">Take everything out</button>` : ""}</div></div>
     ${!here.length && !pot ? `<div class="card"><h3>Grow together</h3><p class="small muted" style="margin:0 0 8px">Fill the bed with plants that share the space - added as one planting.</p>
@@ -2764,22 +2764,16 @@ function openCombo(id) {
 }
 
 // ---- choosing a bed: what's in it, what's in the beds next to it, and which suits best -----------------
-// Beds within a path's width or so of this one, going by where they sit on the plan
+// Beds close enough to matter: within a path's width or so of this one, edge to edge, going by where they sit
+// on the plan - whatever's in between (pests and roots don't care)
 function bedsNextTo(spaceId) {
   const items = planItems().filter((i) => i.type === "space"), me = items.find((i) => i.id === spaceId);
   if (!me) return [];
   const a = box(me), reach = Math.max(1.2, (S.g.garden.path_w || 0.5) + 0.7);
-  const mid = (i) => [i.x + i.w / 2, i.y + i.h / 2];
-  // only direct neighbours: if another bed sits between the two, it isn't "next door"
-  const between = (i) => items.some((k) => k.id !== spaceId && k.id !== i.id && (() => {
-    const [x1, y1] = mid(me), [x2, y2] = mid(i), kb = box(k);
-    for (let t = 0.15; t <= 0.85; t += 0.05) { const px = x1 + (x2 - x1) * t, py = y1 + (y2 - y1) * t; if (px > kb.x0 && px < kb.x1 && py > kb.y0 && py < kb.y1) return true; }
-    return false;
-  })());
   return items.filter((i) => i.id !== spaceId).map((i) => {
     const b = box(i), dx = Math.max(0, b.x0 - a.x1, a.x0 - b.x1), dy = Math.max(0, b.y0 - a.y1, a.y0 - b.y1);
     return { i, gap: Math.hypot(dx, dy) };
-  }).filter((n) => n.gap <= reach && !between(n.i)).sort((x, y) => x.gap - y.gap).map((n) => ({ ...n.i.s, gap: n.gap }));
+  }).filter((n) => n.gap <= reach).sort((x, y) => x.gap - y.gap).map((n) => ({ ...n.i.s, gap: n.gap }));  // distance is what counts, not what's in between
 }
 const gapText = (g) => (g < 0.05 ? "touching" : g < 1 ? `${Math.round(g * 100)}cm away` : `${Math.round(g * 10) / 10}m away`);
 // roughly when a new plant would be in the ground, and when an existing one is
@@ -2808,7 +2802,7 @@ function bedAdvice(plantIds, sp) {
     else { score += weight; good.push(`${q.emoji} ${q.name} ${where}: ${g.why}`); }
   });
   inBed.forEach((c) => look(c, "in this bed", 3));
-  next.forEach((n) => n.crops.forEach((c) => look(c, `next door in ${n.sp.name}`, 1)));
+  next.forEach((n) => n.crops.forEach((c) => look(c, `nearby in ${n.sp.name} (${gapText(n.gap)})`, 1)));
   const misfits = ps.filter((p) => !p.where.includes(sp.kind === "pot" ? "pot" : "bed"));
   const wrongKind = misfits.length === ps.length;
   if (misfits.length && !wrongKind) { score -= 1; fine.push(`${misfits.map((p) => p.name).join(" and ")} would rather be in ${sp.kind === "pot" ? "a bed" : "a pot"}`); }
@@ -2820,7 +2814,7 @@ function bedAdvice(plantIds, sp) {
 const emojiList = (cs) => [...new Set(cs.map((c) => plant(c.plant_id).emoji))].join("");
 function adviceLines(a) {
   return `${a.inBed.length ? `<div class="small">In it: ${emojiList(a.inBed)}</div>` : `<div class="small muted">Empty</div>`}
-    ${a.next.map((n) => `<div class="small muted">Next door, ${esc(n.sp.name)} (${gapText(n.gap)}): ${emojiList(n.crops)}</div>`).join("")}
+    ${a.next.map((n) => `<div class="small muted">Nearby, ${esc(n.sp.name)} (${gapText(n.gap)}): ${emojiList(n.crops)}</div>`).join("")}
     ${a.wrongKind ? `<div class="small adv-bad">Not the right kind of space for these</div>` : ""}
     ${a.full > 0.9 ? `<div class="small adv-bad">Nearly full</div>` : ""}
     ${a.bad.map((t) => `<div class="small adv-bad">⚠️ ${esc(t)}</div>`).join("")}
@@ -2884,7 +2878,7 @@ function openMix(id, spaceId) {
   S.sheet = null;
   openSheet(`<h2>${m.emoji} ${esc(m.name)}</h2><p>${esc(m.why)}</p>
     <div class="card" id="mixcard"><h3>🌱 Add it to my garden</h3>
-      ${beds.length ? `<label class="field">Which bed?</label><p class="small muted" style="margin:-2px 0 8px">Best suited first - we check what's in each bed and in the beds next to it.</p>${bedPicker(m.plants.map((x) => x.plant_id), spaceId, "mixbed")}` : ""}
+      ${beds.length ? `<label class="field">Which bed?</label><p class="small muted" style="margin:-2px 0 8px">Best suited first - we check what's in each bed and in beds within about a metre of it.</p>${bedPicker(m.plants.map((x) => x.plant_id), spaceId, "mixbed")}` : ""}
       <div id="mixfill"></div>
       <p class="small muted" style="margin:8px 0 0" id="mixqty"></p>
       <button class="btn primary wide" id="mixgo" style="margin-top:12px">Add the mix 🤝</button></div>

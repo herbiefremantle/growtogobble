@@ -177,9 +177,19 @@ def crop_jobs(crop, shift, done_keys, today):
                 steps=[pests["uncover"]], waiting=not in_ground)
 
     # 2. looking after it
+    # Short jobs come once. Ongoing ones (weeding, deadheading, feeding...) come back every 4 weeks, each ticked off
+    # on its own - ticking November's weeding doesn't make December's disappear.
     for i, (after_weeks, for_weeks, text) in enumerate(plant.get("care", [])):
-        start = growing_from + after_weeks * WEEK
-        add("care%d" % i, "care", "🧤", text, start, start + max(for_weeks, 1) * WEEK, waiting=not in_ground)
+        start, end = growing_from + after_weeks * WEEK, growing_from + (after_weeks + max(for_weeks, 1)) * WEEK
+        if for_weeks <= 6:
+            add("care%d" % i, "care", "🧤", text, start, end, waiting=not in_ground)
+            continue
+        n = 0
+        while start + n * 4 * WEEK < end:
+            s0 = start + n * 4 * WEEK
+            # the first keeps the old key, so anything already ticked stays ticked
+            add("care%d" % i if n == 0 else "care%d_%d" % (i, n), "care", "🧤", text, s0, min(end, s0 + 4 * WEEK), waiting=not in_ground)
+            n += 1
 
     # 3. picking and eating
     started = sown or planted or anchor

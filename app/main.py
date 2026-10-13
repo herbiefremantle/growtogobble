@@ -1023,7 +1023,7 @@ _DATE_FOR = {"sow": "sown_on", "plant": "planted_on", "harvest": "harvested_on"}
 def mark_done(body: DoneIn, user=Depends(auth.current_user)):
     """Tick off (or un-tick) a job. Sowing, planting and picking also record the date on the crop."""
     today = clock.today().isoformat()
-    crop_key = re.match(r"^c(\d+):(buy|sow|plant|harvest|eat|store|cure|batch|protect|uncover|seeds|winter|wake|care\d+|prep\d+)$", body.key)
+    crop_key = re.match(r"^c(\d+):(buy|sow|plant|harvest|eat|store|cure|batch|protect|uncover|seeds|winter|wake|care\d+(?:_\d+)?|prep\d+)$", body.key)
     space_key = re.match(r"^s(\d+):nodig(\d+)$", body.key)
     if not (crop_key or space_key):
         raise HTTPException(400, "Unknown job")
