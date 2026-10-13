@@ -208,8 +208,57 @@ BUILDS = [
      "tips": ["Hardening off: lid open by day, closed at night, for 1-2 weeks before planting out.",
               "Prop the lid open with a stick on sunny days - it gets hot inside fast."],
      "ready_made": {"text": "Rather buy one? Ready-made cold frames cost about £35-80.", "search": "cold frame"}},
+
+    {"id": "staging", "name": "Greenhouse staging", "emoji": "🪴", "section": "coldframe", "level": "Medium", "time": "2-3 hours", "size": "120 x 50cm, 75cm high",
+     "why": "A slatted bench for a greenhouse or shed: seed trays and young plants up at a comfy height, close to the light, "
+            "with a shelf underneath for pots, compost and overwintering chillies.",
+     "for": [], "good_for": "seed trays, pots and young plants in a greenhouse", "lead_weeks": 0,
+     "materials": [
+         {"name": "Treated timber, 47 x 50mm x 1.8m", "qty": 6, "pack": "each", "packs": 6, "price": 6.0, "search": "treated timber 47 x 50mm 1.8m", "shops": DIY,
+          "note": "for the legs and rails"},
+         {"name": "Treated timber batten, 25 x 50mm x 2.4m", "qty": 9, "pack": "each", "packs": 9, "price": 3.5, "search": "treated timber batten 25 x 50mm 2.4m", "shops": DIY,
+          "note": "cut into about 34 slats"},
+         {"name": "Exterior wood screws, 4 x 60mm", "qty": 1, "pack": "box of 100", "packs": 1, "price": 7.0, "search": "exterior wood screws 4 x 60mm", "shops": DIY},
+     ],
+     "tools": ["Saw", "Drill or screwdriver", "Tape measure and pencil", "Set square", "Spirit level"],
+     "steps": [
+         {"pic": 1, "text": "Cut the thick timber into 4 legs of 75cm, 4 long rails of 120cm and 4 short rails of 46cm. Cut the battens into slats 50cm long - about 34."},
+         {"pic": 2, "text": "Make the two ends: screw a short rail across two legs at the top, and another 25cm off the ground. Check the corners are square."},
+         {"pic": 3, "text": "Stand the ends up and join them with the long rails, front and back, at the top and at shelf height."},
+         {"pic": 4, "text": "Screw slats across the top, leaving a finger-width gap (about 2cm) between each so water drains and air gets round."},
+         {"pic": 5, "text": "Slat the bottom shelf the same way. Stand it in the greenhouse, check it's level, and fill it up."},
+     ],
+     "tips": ["Slats, not solid boards - air flowing round the pots stops mould and damping off.",
+              "Put it along the sunniest side, but shade the glass in high summer."],
+     "ready_made": {"text": "Rather buy it? Aluminium staging costs about £30-60.", "search": "greenhouse staging"}},
+
+    {"id": "compost_bin", "name": "Pallet compost bin", "emoji": "♻️", "section": "compost", "level": "Easy", "time": "1 hour", "size": "about 1m square",
+     "why": "Turn peelings, grass and old plants into free compost for your beds. Four pallets tied together make a big, "
+            "airy bin that costs next to nothing.",
+     "for": [], "good_for": "every bed - it's free compost", "lead_weeks": 0,
+     "materials": [
+         {"name": "Wooden pallets", "qty": 4, "pack": "free or about £5 each", "packs": 0, "price": 0.0, "free": True,
+          "note": "ask builders' merchants and garden centres - they often give them away"},
+         {"name": "Heavy-duty cable ties", "qty": 1, "pack": "pack of 100", "packs": 1, "price": 5.0, "search": "heavy duty cable ties", "shops": DIY},
+         {"name": "Treated wooden stakes, 1.2m", "qty": 2, "pack": "each", "packs": 2, "price": 4.0, "search": "treated wooden stake 1.2m", "shops": DIY,
+          "note": "to hold the front corners"},
+         {"name": "Old carpet or thick cardboard", "qty": 1, "pack": "for a lid", "packs": 0, "price": 0.0, "free": True},
+     ],
+     "tools": ["Mallet or hammer", "Scissors"],
+     "steps": [
+         {"pic": 1, "text": "Pick a spot on bare soil (so worms can get in), in part shade, and easy to reach with a wheelbarrow. Level it roughly."},
+         {"pic": 2, "text": "Stand one pallet up for the back. Stand another at right angles for a side, and tie the corner with 3 cable ties - top, middle and bottom."},
+         {"pic": 3, "text": "Add the other side the same way, to make a U. Hammer a stake in inside each front corner and tie the sides to them."},
+         {"pic": 4, "text": "Tie the front pallet on one side only, with string, so it opens like a gate - easy to get the compost out."},
+         {"pic": 5, "text": "Fill it about half green (peelings, grass, old plants) and half brown (cardboard, dry leaves, straw), in layers. Cover with old carpet or cardboard."},
+     ],
+     "tips": ["No meat, fish, dairy or cooked food - they bring rats.",
+              "Turn it with a fork every month or two and it's ready in about 6 months instead of 12.",
+              "Two bins side by side: one filling up, one rotting down."],
+     "ready_made": {"text": "Rather buy one? A plastic compost bin costs about £25-40 - many councils sell them cheaper.", "search": "compost bin"}},
 ]
-SECTIONS = [("beds", "Raised beds"), ("supports", "Supports for climbers"), ("covers", "Covers to protect your veg"), ("coldframe", "Cold frame")]
+SECTIONS = [("beds", "Raised beds"), ("supports", "Supports for climbers"), ("covers", "Covers to protect your veg"),
+            ("coldframe", "Cold frame and greenhouse"), ("compost", "Compost")]
 
 
 def _cost(m):

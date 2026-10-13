@@ -1058,10 +1058,10 @@ def test_build_it_guides_have_everything(client):
     from app import builds, plants as catalogue
     data = client.get("/api/plants").json()["build"]
     ids = [b["id"] for b in data["builds"]]
-    assert ids == ["raised_bed", "bean_wigwam", "bean_aframe", "pea_frame", "tomato_stakes", "tomato_strings", "hoop_tunnel", "bottle_cloche", "cold_frame"]
+    assert ids == ["raised_bed", "bean_wigwam", "bean_aframe", "pea_frame", "tomato_stakes", "tomato_strings", "hoop_tunnel", "bottle_cloche", "cold_frame", "staging", "compost_bin"]
     for b in data["builds"]:
         assert b["steps"] and b["tools"] and b["materials"] and b["why"]
-        assert all(p in catalogue.BY_ID for p in b["for"])
+        assert all(p in catalogue.BY_ID for p in b["for"]) and (b["for"] or b.get("good_for"))
         assert [s["pic"] for s in b["steps"]] == list(range(1, len(b["steps"]) + 1))  # a picture for every step
         for m in b["materials"]:
             for item in m.get("choose") or [m]:

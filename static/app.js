@@ -232,7 +232,12 @@ function render() {
   if (!sb.hidden) sb.innerHTML = `<span><b>Sample garden</b> - explore and change anything</span><button class="btn small" data-clear-sample>Clear sample and start mine</button>`;
   const tab = route === "shop" ? "" : route;
   document.querySelectorAll(".tabs a").forEach((a) => a.classList.toggle("on", (a.dataset.tab === "home" ? "" : a.dataset.tab) === tab));
-  (PAGES[route] || home)();
+  try { (PAGES[route] || home)(); }
+  catch (err) {  // never leave the old page up looking like the tap did nothing
+    console.error(err);
+    view.innerHTML = `<div class="card"><h3>Sorry - this page didn't load</h3><p class="small muted">Something went wrong on our side. Try again, or go back.</p>
+      <div class="row"><button class="btn small primary" onclick="location.reload()">Try again</button><button class="btn small" onclick="history.back()">‹ Back</button></div></div>`;
+  }
   // keep any open crop/bed sheet up to date after a change
   if (S.sheet) S.sheet();
 }
@@ -3841,6 +3846,52 @@ const BA = (() => {
   return { soil, line, label, vine, tomato, seedling };
 })();
 const BUILD_ART = {
+  staging: (s) => {
+    const X = (x, y, z) => [60 + x * 1.5 + z * 0.9, 162 - y * 1.5 - z * 0.6];
+    const poly = (pts, cls) => `<polygon points="${pts.map((p) => X(...p).join(",")).join(" ")}" class="${cls}"/>`;
+    const post = (x, z, h) => poly([[x, 0, z], [x + 4, 0, z], [x + 4, h, z], [x, h, z]], "ba-wood");
+    const rail = (x0, x1, y, z) => poly([[x0, y - 4, z], [x1, y - 4, z], [x1, y, z], [x0, y, z]], "ba-wood");
+    const srail = (x, y) => poly([[x, y - 4, 0], [x, y - 4, 50], [x, y, 50], [x, y, 0]], "ba-wood-side");
+    const slats = (y) => Array.from({ length: 17 }, (_, i) => poly([[2 + i * 7, y, 0], [7 + i * 7, y, 0], [7 + i * 7, y, 50], [2 + i * 7, y, 50]], "ba-slat")).join("");
+    if (s === 1) return `${BA.soil}<g class="ba-new">${[0, 1, 2, 3].map((i) => `<rect x="${20 + i * 22}" y="40" width="10" height="90" class="ba-wood"/>`).join("")}${BA.label(54, 30, "4 legs, 75cm")}
+      ${[0, 1, 2, 3].map((i) => `<rect x="120" y="${40 + i * 14}" width="140" height="9" class="ba-wood"/>`).join("")}${BA.label(190, 32, "4 rails, 120cm")}
+      ${[0, 1, 2, 3].map((i) => `<rect x="${120 + i * 36}" y="104" width="30" height="8" class="ba-wood"/>`).join("")}${BA.label(184, 124, "4 rails, 46cm")}
+      ${Array.from({ length: 8 }, (_, i) => `<rect x="${272 + (i % 2) * 18}" y="${40 + Math.floor(i / 2) * 22}" width="12" height="18" class="ba-slat"/>`).join("")}${BA.label(290, 32, "slats")}</g>`;
+    const ends = [0, 116].map((x) => `${post(x, 50, 75)}${srail(x, 75)}${srail(x, 25)}${post(x, 0, 75)}`).join("");
+    const back = `${rail(0, 120, 75, 50)}${rail(0, 120, 25, 50)}`, front = `${rail(0, 120, 75, 0)}${rail(0, 120, 25, 0)}`;
+    return `${BA.soil}<g class="${s === 2 ? "ba-new" : ""}">${[0, 116].map((x) => `${post(x, 50, 75)}`).join("")}</g>
+      ${P2(s, 3, back)}
+      ${s >= 5 ? `<g class="${s === 5 ? "ba-new" : ""}">${slats(25)}</g>` : ""}
+      <g class="${s === 2 ? "ba-new" : ""}">${[0, 116].map((x) => `${srail(x, 75)}${srail(x, 25)}${post(x, 0, 75)}`).join("")}</g>
+      ${P2(s, 3, front)}
+      ${s >= 4 ? `<g class="${s === 4 ? "ba-new" : ""}">${slats(75)}</g>` : ""}
+      ${s >= 5 ? `<g class="ba-new">${[[20, 30], [60, 20]].map(([x, z]) => { const [a, b] = X(x, 75, z); return `<rect x="${a}" y="${b - 8}" width="42" height="9" rx="1" class="ba-tray"/>${[0, 1, 2, 3].map((k) => BA.seedling(a + 6 + k * 10, b - 7)).join("")}`; }).join("")}
+        ${[[30, 25], [80, 25]].map(([x, z]) => { const [a, b] = X(x, 25, z); return `<path d="M${a - 9} ${b - 14} h18 l-3 14 h-12 z" class="ba-potclay"/>`; }).join("")}</g>` : ""}
+      ${s === 2 ? BA.label(160, 16, "two end frames") : s === 4 ? BA.label(160, 16, "a finger-width gap between slats") : ""}`;
+  },
+  compost_bin: (s) => {
+    const X = (x, y, z) => [96 + x * 1.2 + z * 0.55, 162 - y * 1.05 - z * 0.36];
+    const poly = (pts, cls) => `<polygon points="${pts.map((p) => X(...p).join(",")).join(" ")}" class="${cls}"/>`;
+    // a pallet in a plane: boards with gaps. along: "x" (back/front) or "z" (sides)
+    const pallet = (along, at, cls = "ba-pallet") => Array.from({ length: 6 }, (_, i) => {
+      const a = i * 15 + 1, b = a + 11;
+      return along === "x" ? poly([[a, 0, at], [b, 0, at], [b, 90, at], [a, 90, at]], cls) : poly([[at, 0, a], [at, 0, b], [at, 90, b], [at, 90, a]], cls);
+    }).join("") + (along === "x" ? [12, 45, 78].map((y) => poly([[0, y, at], [90, y, at], [90, y + 7, at], [0, y + 7, at]], "ba-pallet-bar")).join("")
+      : [12, 45, 78].map((y) => poly([[at, y, 0], [at, y, 90], [at, y + 7, 90], [at, y + 7, 0]], "ba-pallet-bar")).join(""));
+    const ties = (x, z) => [15, 48, 82].map((y) => { const [a, b] = X(x, y, z); return `<rect x="${a - 3}" y="${b - 2}" width="6" height="4" rx="1" class="ba-tieblk"/>`; }).join("");
+    const ground = `<polygon points="0,150 320,150 320,180 0,180" class="ba-soil"/>${poly([[-10, 0, -10], [100, 0, -10], [100, 0, 100], [-10, 0, 100]], "ba-bare")}`;
+    if (s === 1) return `${ground}<g class="ba-new">${poly([[0, 0, 0], [90, 0, 0], [90, 0, 90], [0, 0, 90]], "ba-mark")}</g>${BA.label(160, 30, "bare soil, part shade")}`;
+    // the heap: layers of green and brown, seen through the front slats, with a carpet lid on top
+    const fill = s >= 5 ? `<g class="ba-new">${[0, 1, 2, 3, 4].map((k) => poly([[2, k * 16, 3], [88, k * 16, 3], [88, k * 16 + 16, 3], [2, k * 16 + 16, 3]], k % 2 ? "ba-brown" : "ba-green")).join("")}
+      ${poly([[0, 80, 0], [90, 80, 0], [90, 84, 90], [0, 84, 90]], "ba-carpet")}</g>` : "";
+    return `${ground}
+      <g class="${s === 2 ? "ba-new" : ""}">${pallet("x", 90)}${pallet("z", 0)}${ties(0, 90)}</g>
+      ${s >= 3 ? `<g class="${s === 3 ? "ba-new" : ""}">${pallet("z", 90)}${ties(90, 90)}</g>` : ""}
+      ${fill}
+      ${s >= 3 ? `<g class="${s === 3 ? "ba-new" : ""}">${[0, 90].map((x) => { const [a, b] = X(x, 0, 2); return `<rect x="${a - 2}" y="${b - 100}" width="4" height="104" class="ba-wood"/>`; }).join("")}</g>` : ""}
+      ${s >= 4 ? `<g class="${s === 4 ? "ba-new" : ""}" opacity="${s >= 5 ? 0.92 : 1}">${pallet("x", 0, "ba-pallet ba-gate")}${[20, 70].map((y) => { const [a, b] = X(0, y, 0); return `<circle cx="${a}" cy="${b}" r="3" class="ba-tieblk"/>`; }).join("")}</g>` : ""}
+      ${s === 2 ? BA.label(48, 30, "3 ties per corner", "start") : s === 4 ? BA.label(30, 30, "string on one side - it opens like a gate", "start") : s === 5 ? BA.label(30, 22, "half green, half brown - then a lid", "start") : ""}`;
+  },
   raised_bed: (s) => {
     const X = (x, y, z) => [20 + x * 0.85 + z * 0.6, 150 - y * 1.6 - z * 0.45];
     const poly = (pts, cls) => `<polygon points="${pts.map((p) => X(...p).join(",")).join(" ")}" class="${cls}"/>`;
@@ -3965,6 +4016,7 @@ const BUILD_ART = {
   },
 };
 // plain: the finished thing, for thumbnails - no gold "this is the new bit", no labels
+const P2 = (s, n, c) => (n > s ? "" : `<g class="${n === s ? "ba-new" : ""}">${c}</g>`);
 const buildArt = (id, stage, plain) => `<svg class="ba ${plain ? "ba-plain" : ""}" viewBox="0 0 320 180" role="img" aria-label="${esc(buildById(id).name)}${plain ? "" : ", step " + stage}">${plain ? BUILD_ART[id](stage).replace(/ba-new/g, "") : BUILD_ART[id](stage)}</svg>`;
 const buildById = (id) => S.cat.build.builds.find((b) => b.id === id);
 const buildCost = (b) => (b.total ? `about ${money(b.total)}` : "free");
@@ -4002,7 +4054,7 @@ function buildPage() {
     ${need.length ? `<div class="section-title"><h2>For what you're growing</h2></div><div class="build-grid">${need.map(({ b, mine, by }) => card(b,
       `<span class="small build-for">${[...new Set(mine.map((c) => plant(c.plant_id).emoji))].join(" ")} ${by ? (by <= today() ? "· build it now" : "· build by " + fmt(localIso(by))) : ""}</span>`)).join("")}</div>` : ""}
     ${S.cat.build.sections.map((sec) => `<div class="section-title"><h2>${esc(sec.name)}</h2></div>
-      <div class="build-grid">${S.cat.build.builds.filter((b) => b.section === sec.id).map((b) => card(b, `<span class="small muted build-for">For ${b.for.slice(0, 5).map((x) => plant(x).emoji).join(" ")}</span>`)).join("")}</div>`).join("")}
+      <div class="build-grid">${S.cat.build.builds.filter((b) => b.section === sec.id).map((b) => card(b, `<span class="small muted build-for">${b.for.length ? "For " + b.for.slice(0, 5).map((x) => plant(x).emoji).join(" ") : esc(b.good_for.charAt(0).toUpperCase() + b.good_for.slice(1))}</span>`)).join("")}</div>`).join("")}
     <p class="small muted" style="margin-top:14px">Prices are rough, to help you budget - shops change them.</p>`;
 }
 
@@ -4019,8 +4071,8 @@ function buildDetail(b) {
     <div class="build-hero">${buildArt(b.id, b.steps.length, true)}</div>
     <div class="row" style="gap:6px;margin:10px 0"><span class="chip">${b.level}</span><span class="chip grey">⏱ ${esc(b.time)}</span><span class="chip grey">💷 ${buildCost(b)}</span>${b.size ? `<span class="chip grey">📐 ${esc(b.size)}</span>` : ""}</div>
     <p>${esc(b.why)}</p>
-    ${need ? `<div class="card tint-leaf small"><b>You'll want this for your ${[...new Set(need.mine.map((c) => plant(c.plant_id).name.toLowerCase()))].join(", ")}</b>${need.by ? ` - ${need.by <= today() ? "build it now" : "build it by " + fmt(need.localIso(by))}` : ""}.</div>`
-      : `<p class="small muted">Good for: ${b.for.slice(0, 6).map((x) => plant(x).emoji + " " + esc(plant(x).name)).join(", ")}${b.for.length > 6 ? ` and ${b.for.length - 6} more` : ""}</p>`}
+    ${need ? `<div class="card tint-leaf small"><b>You'll want this for your ${[...new Set(need.mine.map((c) => plant(c.plant_id).name.toLowerCase()))].join(", ")}</b>${need.by ? ` - ${need.by <= today() ? "build it now" : "build it by " + fmt(localIso(need.by))}` : ""}.</div>`
+      : !b.for.length ? `<p class="small muted">Good for ${esc(b.good_for)}.</p>` : `<p class="small muted">Good for: ${b.for.slice(0, 6).map((x) => plant(x).emoji + " " + esc(plant(x).name)).join(", ")}${b.for.length > 6 ? ` and ${b.for.length - 6} more` : ""}</p>`}
     <div class="section-title"><h2>What you need</h2><span class="small muted">${b.total ? "about " + money(b.total) : "free"}</span></div>
     <div class="card mats">${mats}
       <div class="mat-row mat-total"><b>Total</b><b>${b.total ? "about " + money(b.total) : "Free"}</b></div>

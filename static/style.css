@@ -931,3 +931,7 @@ svg.plot .grp-tag { fill: #fff; font-weight: 800; paint-order: stroke; stroke: r
 @media (prefers-reduced-motion: reduce) { .ba .ba-new { animation: none; } }
 .ba-plain .ba-label { display: none; }
 .ba .ba-grass { fill: #7fae5a; } .ba .ba-compost { fill: #3d2a1c; } .ba .ba-card { fill: #c9a77a; } .ba .ba-level { fill: #f2b01e; stroke: #8e6a10; } .ba .ba-bubble { fill: #9be07a; }
+.ba .ba-slat { fill: #d8b27c; stroke: #8e6838; stroke-width: .8; } .ba .ba-tray { fill: #333; } .ba .ba-potclay { fill: #c0714a; stroke: #8e4f30; }
+.ba .ba-pallet { fill: #d2b07c; stroke: #9a7442; stroke-width: .8; } .ba .ba-pallet-bar { fill: #b8915a; stroke: #9a7442; stroke-width: .8; }
+.ba .ba-tieblk { fill: #222; } .ba .ba-bare { fill: #5e4130; } .ba .ba-green { fill: #6fae4a; } .ba .ba-brown { fill: #a77b4d; } .ba .ba-carpet { fill: #8a3b3b; }
+.ba .ba-new .ba-pallet, .ba .ba-new .ba-slat { stroke: #f2a516; stroke-width: 1.4; }
