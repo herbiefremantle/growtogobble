@@ -859,3 +859,12 @@ svg.plot .grp-tag { fill: #fff; font-weight: 800; paint-order: stroke; stroke: r
 .clip .clip-crop-garlic { fill: #efe3c2; } .clip .clip-crop-beans { fill: #8cc96f; }
 .outline-box summary { cursor: pointer; list-style: revert; } .outline-box[open] summary { margin-bottom: 4px; }
 .clip .clip-crop-corn { fill: #f3d36b; } .clip .clip-crop-squash { fill: #f0a14e; } .clip .clip-cost { fill: var(--sage); }
+
+/* the welcome title, in the same style as the header's brand */
+.hero { padding-top: 26px; }
+.hero-mark { display: flex; justify-content: center; margin-bottom: 10px; }
+.hero-mark svg { width: 52px; height: 52px; filter: drop-shadow(0 6px 14px rgba(20, 63, 40, .25)); }
+.hero h1.hero-title { font-family: var(--display); font-weight: 800; font-size: clamp(38px, 11vw, 56px); line-height: 1; letter-spacing: -.035em; color: var(--ink); margin: 0 0 12px; }
+.hero-title .g { color: var(--forest-2); }
+.hero p.hero-sub { font-size: 16.5px; line-height: 1.5; max-width: 25em; margin: 0 auto 18px; }
+.hero-sub b { color: var(--ink); font-weight: 800; }
