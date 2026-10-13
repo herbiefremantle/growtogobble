@@ -841,3 +841,16 @@ def test_ongoing_jobs_come_back_each_month(client):
     jobs = client.get("/api/garden").json()["crops"][0]["jobs"]
     status = {j["key"]: j["status"] for j in jobs}
     assert status[weeding[0]["key"]] == "done" and status[weeding[1]["key"]] != "done"
+
+
+def test_next_weeding_is_four_weeks_after_you_did_it(client, monkeypatch):
+    from datetime import date as _d
+    from app import clock
+    _join(client)
+    g = client.post("/api/crops", json={"plant_id": "garlic"}).json()
+    first = [j for j in g["crops"][0]["jobs"] if j["title"].startswith("Pull out weeds")][0]
+    late = _d.fromisoformat(first["start"]) + __import__("datetime").timedelta(days=10)  # weeded 10 days late
+    monkeypatch.setattr(clock, "today", lambda: late)
+    client.post("/api/done", json={"key": first["key"]})
+    jobs = [j for j in client.get("/api/garden").json()["crops"][0]["jobs"] if j["title"].startswith("Pull out weeds")]
+    assert jobs[1]["start"] == (late + __import__("datetime").timedelta(weeks=4)).isoformat()

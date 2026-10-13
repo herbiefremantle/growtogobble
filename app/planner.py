@@ -184,11 +184,13 @@ def crop_jobs(crop, shift, done_keys, today):
         if for_weeks <= 6:
             add("care%d" % i, "care", "🧤", text, start, end, waiting=not in_ground)
             continue
-        n = 0
-        while start + n * 4 * WEEK < end:
-            s0 = start + n * 4 * WEEK
-            # the first keeps the old key, so anything already ticked stays ticked
-            add("care%d" % i if n == 0 else "care%d_%d" % (i, n), "care", "🧤", text, s0, min(end, s0 + 4 * WEEK), waiting=not in_ground)
+        # the next one is due 4 weeks after you actually did the last one (or 4 weeks after it was due, if not done yet)
+        n, s0 = 0, start
+        while s0 < end:
+            key = "care%d" % i if n == 0 else "care%d_%d" % (i, n)  # the first keeps the old key, so a tick stays ticked
+            add(key, "care", "🧤", text, s0, min(end, s0 + 4 * WEEK), waiting=not in_ground)
+            ticked = done_keys.get("c%d:%s" % (cid, key)) if isinstance(done_keys, dict) else None
+            s0 = (date.fromisoformat(ticked[:10]) if ticked else s0) + 4 * WEEK
             n += 1
 
     # 3. picking and eating
