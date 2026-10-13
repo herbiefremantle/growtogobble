@@ -935,3 +935,12 @@ svg.plot .grp-tag { fill: #fff; font-weight: 800; paint-order: stroke; stroke: r
 .ba .ba-pallet { fill: #d2b07c; stroke: #9a7442; stroke-width: .8; } .ba .ba-pallet-bar { fill: #b8915a; stroke: #9a7442; stroke-width: .8; }
 .ba .ba-tieblk { fill: #222; } .ba .ba-bare { fill: #5e4130; } .ba .ba-green { fill: #6fae4a; } .ba .ba-brown { fill: #a77b4d; } .ba .ba-carpet { fill: #8a3b3b; }
 .ba .ba-new .ba-pallet, .ba .ba-new .ba-slat { stroke: #f2a516; stroke-width: 1.4; }
+.ba .ba-flower-sweet { fill: #ec6fa8; } .ba .ba-flower-purple { fill: #8a5cc9; } .ba .ba-potrim { fill: #b5653f; } 
+.ba .ba-wall { fill: #d9c2a8; } .ba .ba-brickline { stroke: #c4a98b; stroke-width: 1; } .ba .ba-downpipe { fill: #555; } .ba .ba-block { fill: #a9a9a3; stroke: #85857f; }
+.ba .ba-butt { fill: #2f6b3a; } .ba .ba-butt-top { fill: #3b8048; } .ba .ba-lid-top { fill: #23552d; } .ba .ba-tap { fill: #222; } .ba .ba-diverter { fill: #333; }
+.ba .ba-hose { fill: none; stroke: #222; stroke-width: 3; } .ba .ba-can { fill: #2f7fd0; } .ba .ba-can-spout { stroke: #2f7fd0; stroke-width: 3; } .ba .ba-rain { stroke: #6aa0c8; stroke-width: 1.6; }
+.ba .ba-new .ba-diverter, .ba .ba-new .ba-block { stroke: #f2a516; stroke-width: 2; }
+.build-links { display: grid; gap: 8px; } .build-link { display: flex; gap: 10px; align-items: center; text-decoration: none; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 6px; }
+.build-link-art { flex: 0 0 84px; border-radius: 8px; overflow: hidden; background: var(--bg-2); } .build-link b { display: block; } .build-link small { color: var(--muted); }
+.build-strip { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: -4px 0 12px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.build-strip a { padding: 5px 11px; border-radius: 999px; background: var(--soil-soft, #f3ebe1); color: var(--ink); text-decoration: none; border: 1px solid var(--line); }

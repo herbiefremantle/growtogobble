@@ -47,7 +47,7 @@ BUILDS = [
     {"id": "bean_wigwam", "name": "Bean wigwam", "emoji": "⛺", "section": "supports", "level": "Easy", "time": "20 minutes",
      "why": "Climbing beans grow 2m tall and need something to wind round. A wigwam of canes is quick, strong, "
             "takes up little room and looks great.",
-     "for": ["runner_beans", "french_beans", "sweet_pea"], "lead_weeks": 1,
+     "for": ["runner_beans", "french_beans"], "lead_weeks": 1,
      "materials": [
          {"name": "Bamboo canes, 2.4m", "qty": 8, "pack": "pack of 10", "packs": 1, "price": 8.0, "search": "bamboo canes 2.4m", "shops": GARDEN},
          {"name": "Garden twine", "qty": 1, "pack": "100m roll", "packs": 1, "price": 3.0, "search": "garden twine", "shops": GARDEN},
@@ -62,10 +62,33 @@ BUILDS = [
      ],
      "tips": ["Build it before planting, so you don't spear the roots.", "In windy spots, push the canes in deeper - a full wigwam of beans catches a lot of wind."]},
 
+    {"id": "sweet_pea_wigwam", "name": "Sweet pea wigwam", "emoji": "🌸", "section": "supports", "level": "Easy", "time": "30 minutes",
+     "why": "Sweet peas climb with curly tendrils and smell wonderful. On a wigwam they make a tower of flowers - in a big "
+            "pot on the patio or in a border - and the more you pick, the more they flower.",
+     "for": ["sweet_pea"], "lead_weeks": 1,
+     "materials": [
+         {"name": "Bamboo canes, 1.8m", "qty": 6, "pack": "pack of 10", "packs": 1, "price": 6.0, "search": "bamboo canes 1.8m", "shops": GARDEN},
+         {"name": "Garden twine", "qty": 1, "pack": "100m roll", "packs": 1, "price": 3.0, "search": "garden twine", "shops": GARDEN},
+         {"name": "Large pot, 40cm or wider", "qty": 1, "pack": "each", "packs": 1, "price": 12.0, "search": "large plant pot 40cm", "shops": GARDEN, "optional": True,
+          "note": "only for a patio - skip it in a border"},
+         {"name": "Peat-free compost, 50 litres", "qty": 1, "pack": "bag", "packs": 1, "price": 6.0, "search": "peat free compost 50 litre", "shops": GARDEN, "optional": True,
+          "note": "to fill the pot"},
+     ],
+     "tools": ["Scissors"],
+     "steps": [
+         {"pic": 1, "text": "Fill a big pot (40cm or wider) with compost, or pick a sunny spot in a border and mark a circle about 60cm across."},
+         {"pic": 2, "text": "Push 6 canes in round the edge, about 20cm deep, leaning in towards the middle."},
+         {"pic": 3, "text": "Pull the tops together and tie them tightly where they cross."},
+         {"pic": 4, "text": "Wind string round the wigwam in a spiral from bottom to top. Sweet peas hold on with tendrils, and the string gives them more to grab."},
+         {"pic": 5, "text": "Plant two sweet peas at the foot of each cane and tie them in loosely. When they have 3-4 pairs of leaves, pinch the tip off each one so it bushes out."},
+         {"pic": 6, "text": "Pick the flowers every few days and put them in a vase. If they're left to make seed pods, they stop flowering."},
+     ],
+     "tips": ["Water pots every day in summer - sweet peas hate drying out.", "Pick in the morning when the scent is strongest."]},
+
     {"id": "bean_aframe", "name": "A-frame bean row", "emoji": "🔺", "section": "supports", "level": "Medium", "time": "1 hour",
      "why": "For a longer row of climbing beans. Two lines of canes lean in and cross at the top, with a cane along the ridge "
             "holding it all together. Picking is easy from both sides.",
-     "for": ["runner_beans", "french_beans", "sweet_pea"], "lead_weeks": 1,
+     "for": ["runner_beans", "french_beans"], "lead_weeks": 1,
      "materials": [
          {"name": "Bamboo canes, 2.4m", "qty": 18, "pack": "pack of 10", "packs": 2, "price": 8.0, "search": "bamboo canes 2.4m", "shops": GARDEN,
           "note": "16 for a 3m row, plus 2 along the top"},
@@ -256,12 +279,37 @@ BUILDS = [
               "Turn it with a fork every month or two and it's ready in about 6 months instead of 12.",
               "Two bins side by side: one filling up, one rotting down."],
      "ready_made": {"text": "Rather buy one? A plastic compost bin costs about £25-40 - many councils sell them cheaper.", "search": "compost bin"}},
+
+    {"id": "water_butt", "name": "Water butt", "emoji": "💧", "section": "compost", "level": "Easy", "time": "1 hour", "size": "200 litres",
+     "why": "Catch free rainwater from a roof. It saves on the water bill, it's there when there's a hosepipe ban, and plants "
+            "like it better than tap water - blueberries most of all.",
+     "for": [], "good_for": "watering everything - and blueberries love rainwater", "lead_weeks": 0,
+     "materials": [
+         {"name": "Water butt, 200 litres, with tap and lid", "qty": 1, "pack": "each", "packs": 1, "price": 40.0, "search": "water butt 200 litre", "shops": GARDEN},
+         {"name": "Downpipe diverter kit", "qty": 1, "pack": "kit", "packs": 1, "price": 12.0, "search": "water butt downpipe diverter kit", "shops": GARDEN},
+         {"name": "Stand - pick one:", "choose": [
+             {"name": "4 concrete blocks", "for": "the cheapest way", "price": 10.0, "search": "concrete block"},
+             {"name": "Water butt stand", "for": "a neat, ready-made one", "price": 20.0, "search": "water butt stand"},
+         ], "shops": GARDEN},
+     ],
+     "tools": ["Hacksaw", "Drill with a hole saw (the kit says what size)", "Tape measure and pencil", "Spirit level"],
+     "steps": [
+         {"pic": 1, "text": "Pick a downpipe near your beds. Clear a spot right next to it and make it flat and level."},
+         {"pic": 2, "text": "Build a stand from concrete blocks (or use a ready-made stand) so a watering can fits under the tap. Check it's level - a full butt weighs 200kg."},
+         {"pic": 3, "text": "Stand the butt on it and mark the downpipe level with the top of the butt."},
+         {"pic": 4, "text": "Following the kit's instructions, cut a short section out of the downpipe at the mark with a hacksaw, and fit the diverter in the gap."},
+         {"pic": 5, "text": "Drill the butt where the kit says, push in the connector and join it to the diverter with the hose. Lid on. When the butt's full, the rain carries on down the pipe."},
+     ],
+     "tips": ["Always keep the lid on - it's safer for children and keeps mosquitoes and leaves out.",
+              "Link two butts with a connector kit to store twice as much.", "Clean it out once a year, in winter."]},
 ]
 SECTIONS = [("beds", "Raised beds"), ("supports", "Supports for climbers"), ("covers", "Covers to protect your veg"),
-            ("coldframe", "Cold frame and greenhouse"), ("compost", "Compost")]
+            ("coldframe", "Cold frame and greenhouse"), ("compost", "Compost and water")]
 
 
 def _cost(m):
+    if m.get("optional"):
+        return 0.0
     if m.get("choose"):
         return m["choose"][0]["price"]
     return m["packs"] * m["price"]

@@ -847,6 +847,9 @@ PREP = {
         "Push 6-8 long canes (2.4m) into the ground in a circle, about 20cm deep 🪜",
         "Tie them together at the top with string, like a tipi ⛺", "One bean plant goes at the bottom of each cane",
         "Build it before planting - beans grow fast!"])],
+    "sweet_pea": [(1, "Build a sweet pea wigwam", [
+        "Push 6 canes (1.8m) in round a big pot or a circle in the border, leaning in 🪜", "Tie them together at the top ⛺",
+        "Wind string round in a spiral so the tendrils have plenty to grab", "Build it before planting so you don't spear the roots"])],
     "peas": [(1, "Put in pea supports", [
         "Push twiggy sticks or a strip of netting along the row, about 1m tall 🪜",
         "Peas hold on with little curly tendrils - they just need something to grab"])],

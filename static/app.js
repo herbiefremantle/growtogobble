@@ -2888,6 +2888,7 @@ function openPlant(id, spaceId, startMethod, after) {
       ${p.sun ? `<span class="chip grey">${p.sun.map((x) => SUN_EMOJI[x]).join("")} ${p.sun.includes("sun") ? (p.sun.length > 1 ? "Sun or part shade" : "Needs sun") : "Happy in shade"}</span><span class="chip grey">📏 ${p.height_cm}cm tall</span>` : ""}
       ${p.group !== "veg" ? `<span class="chip sky">${GROUPS[p.group].emoji} ${p.group === "flower" ? "Flower" : "Companion plant"}</span>` : ""}</div></div></div>
     <p><b>${esc(p.blurb)}</b></p>
+    ${S.cat.build.builds.some((b) => b.for.includes(p.id)) ? `<div class="build-strip"><span>🔨 Build it:</span>${S.cat.build.builds.filter((b) => b.for.includes(p.id)).map((b) => `<a href="#/build?${b.id}">${esc(b.name)} · ${buildCost(b)}</a>`).join("")}</div>` : ""}
     <div class="seg sticky-tabs" role="tablist">
       <button role="tab" data-pane="grow" class="on">🌱 Grow it</button><button role="tab" data-pane="how">📖 How to</button>
       ${p.group === "veg" && companionsFor(p).length ? `<button role="tab" data-pane="comp">🐞 Companions</button>` : ""}
@@ -2912,12 +2913,13 @@ function openPlant(id, spaceId, startMethod, after) {
       <div id="check" class="check-box" aria-live="polite"></div>
       <button class="btn primary wide" style="margin-top:14px" id="add">Add ${esc(p.name.toLowerCase())} 🌱</button></div>
     <div class="card" id="buy">${buyHtml()}</div>
+    ${S.cat.build.builds.some((b) => b.for.includes(p.id)) ? `<div class="card tint-soil"><h3>🔨 Build it</h3><p class="small muted" style="margin:-4px 0 8px">${p.prep.length ? "It needs something to climb - here's how to build it:" : "Things that help it grow:"}</p>
+      <div class="build-links">${S.cat.build.builds.filter((b) => b.for.includes(p.id)).map((b) => `<a class="build-link" href="#/build?${b.id}"><span class="build-link-art">${buildArt(b.id, b.steps.length, true)}</span><span><b>${esc(b.name)}</b><small>${b.level} · ${buildCost(b)}</small></span></a>`).join("")}</div></div>` : ""}
     </div>
     <div data-panel="how" hidden>
     ${roomCard(p)}
     ${p.mixes.length ? `<div class="card"><h3>Sow it together - save space</h3><div class="nbs">${p.mixes.map(mixButton).join("")}</div></div>` : ""}
     ${p.tips.length ? `<div class="card tint-sun pip">${PIP}<div><h3 style="margin-bottom:4px">Pip's top tips</h3><ul>${p.tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></div></div>` : ""}
-    ${S.cat.build.builds.some((b) => b.for.includes(p.id)) ? `<div class="card"><h3>🔨 Build it</h3><div class="row" style="gap:6px">${S.cat.build.builds.filter((b) => b.for.includes(p.id)).map((b) => buildChip(b, b.name + " · " + buildCost(b))).join("")}</div></div>` : ""}
     ${p.prep.map((x) => `<div class="card tint-soil"><h3>🪜 Before you plant: ${esc(x.title.charAt(0).toLowerCase() + x.title.slice(1))}</h3><ol class="steps">${x.steps.map((st) => `<li>${esc(st)}</li>`).join("")}</ol></div>`).join("")}
     ${p.seedling ? `<div class="card tint-sky"><h3>🌱 Is it a seedling or a weed?</h3><p style="margin:0 0 8px"><b>${p.emoji} ${esc(p.name)}:</b> ${esc(p.seedling)}</p>
       <ul class="small" style="margin:0;padding-left:18px">${S.cat.weed_tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></div>` : ""}
@@ -3845,7 +3847,47 @@ const BA = (() => {
   const seedling = (x, y) => `<path d="M${x} ${y} v-10" class="ba-stem"/><ellipse cx="${x - 5}" cy="${y - 11}" rx="5" ry="2.6" class="ba-leaf"/><ellipse cx="${x + 5}" cy="${y - 11}" rx="5" ry="2.6" class="ba-leaf"/>`;
   return { soil, line, label, vine, tomato, seedling };
 })();
+// a wigwam of canes: beans (8 canes in the ground, a ring of string) or sweet peas (6 canes in a big pot, a spiral of
+// string, and a sixth step where it's in flower)
+function wigwamArt(s, { sweet }) {
+  const n = sweet ? 6 : 8, rx = sweet ? 44 : 70, ry = sweet ? 9 : 14, by = sweet ? 122 : 150, top = sweet ? 30 : 18;
+  const base = Array.from({ length: n }, (_, i) => { const a = (i / n) * Math.PI * 2 + 0.2; return [160 + rx * Math.cos(a), by + ry * Math.sin(a), Math.sin(a)]; })
+    .sort((p, q) => p[2] - q[2]);  // back ones first
+  const P = (k, c) => (k > s ? "" : `<g class="${k === s ? "ba-new" : ""}">${c}</g>`);
+  const apex = (x) => [160 + (160 - x) * 0.14, top];
+  const canes = base.map(([x, y]) => (s >= 3 ? BA.line(x, y, ...apex(x)) : BA.line(x, y, 160 + (x - 160) * 0.45, top + 8)));
+  const pot = sweet ? `<path d="M110 120 h100 l-10 32 h-80 z" class="ba-potclay"/><ellipse cx="160" cy="121" rx="50" ry="9" class="ba-potrim"/><ellipse cx="160" cy="122" rx="45" ry="7" class="ba-compost"/>` : "";
+  // sweet peas: a spiral of string; beans: one ring at knee height
+  const spiral = () => { const pts = []; for (let t = 0; t <= 1; t += 0.02) { const y = by - 6 - t * (by - top - 30), r = rx * (1 - t * 0.8); pts.push([160 + r * Math.cos(t * 26), y + ry * (1 - t) * Math.sin(t * 26) * 0.6]); }
+    return `<polyline points="${pts.map((q) => q.map((v) => v.toFixed(1)).join(",")).join(" ")}" class="ba-string"/>`; };
+  const front = base.filter((q) => q[2] > -0.3);
+  const plants = (f, flower) => front.map(([x, y]) => BA.vine(x, y, ...apex(x), f, flower)).join("");
+  return `${sweet ? `<rect x="0" y="150" width="320" height="30" class="ba-soil"/>` : BA.soil}
+    ${sweet ? P(1, pot + (s === 1 ? BA.label(160, 104, "a pot 40cm or wider") : "")) : P(1, `<ellipse cx="160" cy="150" rx="70" ry="14" class="ba-mark"/>${s === 1 ? BA.label(160, 120, "about 1m across") : ""}`)}
+    ${s >= 2 ? `<g class="${s === 2 ? "ba-new" : ""}">${canes.join("")}</g>` : ""}
+    ${P(3, `<circle cx="160" cy="${top + 24}" r="5" class="ba-tie"/>${s === 3 ? BA.label(196, top + 22, "tie tight here", "start") : ""}`)}
+    ${P(4, sweet ? spiral() : `<ellipse cx="160" cy="118" rx="52" ry="10" class="ba-string"/>`)}
+    ${sweet ? (s === 5 ? `<g class="ba-new">${plants(0.25)}</g>${BA.label(306, 100, "2 plants per cane", "end")}` : s >= 6 ? `<g class="ba-new">${plants(0.85, "ba-flower-sweet")}${front.flatMap(([x, y], i) => [0.2, 0.35, 0.5, 0.65, 0.8].map((t, k) => { const [ax, ay] = apex(x), fx = x + (ax - x) * t + (k % 2 ? 5 : -5), fy = y + (ay - y) * t;
+        return `<circle cx="${fx.toFixed(1)}" cy="${fy.toFixed(1)}" r="3.6" class="${["ba-flower-sweet", "ba-flower-purple", "ba-flower-white", "ba-flower-red"][(i + k) % 4]}"/>`; })).join("")}</g>` : "")
+      : P(5, plants(0.7))}`;
+}
 const BUILD_ART = {
+  water_butt: (s) => {
+    const P = (k, c) => (k > s ? "" : `<g class="${k === s ? "ba-new" : ""}">${c}</g>`);
+    const wall = `<rect x="0" y="0" width="150" height="150" class="ba-wall"/>${Array.from({ length: 15 }, (_, r) => `<line x1="0" x2="150" y1="${r * 10}" y2="${r * 10}" class="ba-brickline"/>`).join("")}`;
+    const pipeTop = `<rect x="150" y="0" width="12" height="${s >= 4 ? 52 : 150}" class="ba-downpipe"/>`;
+    const pipeLow = s >= 4 ? `<rect x="150" y="66" width="12" height="84" class="ba-downpipe"/>` : "";
+    const blocks = `<rect x="178" y="134" width="40" height="16" class="ba-block"/><rect x="222" y="134" width="40" height="16" class="ba-block"/><rect x="178" y="118" width="40" height="16" class="ba-block"/><rect x="222" y="118" width="40" height="16" class="ba-block"/>`;
+    const butt = `<rect x="182" y="40" width="76" height="78" rx="6" class="ba-butt"/><ellipse cx="220" cy="40" rx="38" ry="7" class="ba-butt-top"/><rect x="196" y="104" width="10" height="6" class="ba-tap"/>`;
+    return `${BA.soil}${wall}${pipeTop}${pipeLow}
+      ${s === 1 ? `<g class="ba-new"><rect x="170" y="138" width="100" height="12" class="ba-mark"/></g>${BA.label(230, 128, "a level spot by the pipe")}` : ""}
+      ${P(2, blocks + (s === 2 ? BA.label(230, 108, "high enough for a can under the tap") : ""))}
+      ${P(3, butt + (s === 3 ? `<line x1="140" y1="40" x2="172" y2="40" class="ba-cutline"/>${BA.label(100, 30, "mark the top of the butt")}` : ""))}
+      ${P(4, `<rect x="146" y="50" width="20" height="18" rx="3" class="ba-diverter"/>${s === 4 ? BA.label(100, 92, "cut out a section, fit the diverter") : ""}`)}
+      ${P(5, `<path d="M166 58 C176 58 178 48 186 48" class="ba-hose"/><ellipse cx="220" cy="40" rx="38" ry="7" class="ba-lid-top"/>
+        <path d="M190 128 h22 l-3 18 h-16 z" class="ba-can"/><path d="M212 132 l14 -8" class="ba-can-spout"/>
+        ${[[30, 20], [70, 40], [110, 14], [250, 14], [290, 30]].map(([x, y]) => `<path d="M${x} ${y} l-3 8" class="ba-rain"/>`).join("")}${BA.label(100, 92, "when it's full, rain carries on down the pipe")}`)}`;
+  },
   staging: (s) => {
     const X = (x, y, z) => [60 + x * 1.5 + z * 0.9, 162 - y * 1.5 - z * 0.6];
     const poly = (pts, cls) => `<polygon points="${pts.map((p) => X(...p).join(",")).join(" ")}" class="${cls}"/>`;
@@ -3916,19 +3958,8 @@ const BUILD_ART = {
       ${s === 5 ? `<g class="ba-new"><rect x="${X(80, 30, 0)[0]}" y="${X(80, 30, 0)[1] - 8}" width="70" height="8" rx="2" class="ba-level"/><circle cx="${X(80, 30, 0)[0] + 35}" cy="${X(80, 30, 0)[1] - 4}" r="2.5" class="ba-bubble"/></g>${BA.label(160, 20, "check it's level")}` : ""}
       ${s === 6 ? BA.label(160, 20, "cardboard, then compost to the top") : ""}`;
   },
-  bean_wigwam: (s) => {
-    const base = Array.from({ length: 8 }, (_, i) => { const a = (i / 8) * Math.PI * 2 + 0.2; return [160 + 70 * Math.cos(a), 150 + 14 * Math.sin(a), Math.sin(a)]; })
-      .sort((a, b) => a[2] - b[2]);  // back ones first
-    const tied = s >= 3;
-    const canes = base.map(([x, y]) => tied ? BA.line(x, y, 160 + (160 - x) * 0.14, 18) : BA.line(x, y, 160 + (x - 160) * 0.45, 26));
-    const P = (n, c) => (n > s ? "" : `<g class="${n === s ? "ba-new" : ""}">${c}</g>`);
-    return `${BA.soil}
-      ${P(1, `<ellipse cx="160" cy="150" rx="70" ry="14" class="ba-mark"/>${s === 1 ? BA.label(160, 120, "about 1m across") : ""}`)}
-      ${s >= 2 ? `<g class="${s === 2 ? "ba-new" : ""}">${canes.join("")}</g>` : ""}
-      ${P(3, `<circle cx="160" cy="42" r="5" class="ba-tie"/>${s === 3 ? BA.label(196, 40, "tie tight here", "start") : ""}`)}
-      ${P(4, `<ellipse cx="160" cy="118" rx="52" ry="10" class="ba-string"/>`)}
-      ${P(5, base.filter((b) => b[2] > -0.3).map(([x, y]) => BA.vine(x, y, 160 + (160 - x) * 0.14, 18, 0.7)).join(""))}`;
-  },
+  bean_wigwam: (s) => wigwamArt(s, {}),
+  sweet_pea_wigwam: (s) => wigwamArt(s, { sweet: true }),
   bean_aframe: (s) => {
     const xs = [40, 92, 144, 196, 248];
     const P = (n, c) => (n > s ? "" : `<g class="${n === s ? "ba-new" : ""}">${c}</g>`);
@@ -4036,7 +4067,7 @@ function buildsYouNeed() {
 // the build that goes with a job, if there is one: supports before planting, covers when they go in, a cold frame to harden off
 function buildForJob(job) {
   const p = plant(job.plant_id), c = crop(job.crop_id);
-  if (job.kind === "prep") return ["bean_wigwam", "pea_frame", "tomato_stakes", "tomato_strings"].map(buildById).find((b) => b && b.for.includes(p.id)) || null;
+  if (job.kind === "prep") return ["bean_wigwam", "sweet_pea_wigwam", "pea_frame", "tomato_stakes", "tomato_strings"].map(buildById).find((b) => b && b.for.includes(p.id)) || null;
   if (job.kind === "protect" && job.key.endsWith(":protect")) return buildById(p.pests.who.every((w) => w.name.startsWith("Slugs")) ? "bottle_cloche" : "hoop_tunnel");
   if (job.kind === "plant_out" && c && c.method === "sow_in") return buildById("cold_frame");
   return null;
@@ -4065,7 +4096,7 @@ function buildDetail(b) {
     ? `<div class="mat"><div class="mat-row"><b>${esc(m.name)}</b><span>${money(m.cost)}+</span></div>
         ${m.choose.map((c) => `<div class="mat-choice"><div class="mat-row"><span>${esc(c.name)}<span class="small muted" style="display:block">for ${esc(c.for)}</span></span><span>${money(c.price)}</span></div>${linkRow(c.links)}</div>`).join("")}</div>`
     : `<div class="mat"><div class="mat-row"><span><b>${esc(m.name)}</b><span class="small muted" style="display:block">${m.free ? esc(m.pack) : `${m.qty > 1 ? "need " + m.qty + " · " : ""}${m.packs > 1 ? m.packs + " × " : ""}${esc(m.pack)}`}${m.note ? " · " + esc(m.note) : ""}</span></span>
-        <span>${m.free ? "Free" : money(m.cost)}</span></div>${m.links ? linkRow(m.links) : ""}</div>`).join("");
+        <span>${m.free ? "Free" : m.optional ? `<span class="muted">${money(m.price)}<br><small>optional</small></span>` : money(m.cost)}</span></div>${m.links ? linkRow(m.links) : ""}</div>`).join("");
   view.innerHTML = `<a href="#/build" class="small" style="text-decoration:none">‹ Build It</a>
     <h1 style="margin-top:6px">${esc(b.name)}</h1>
     <div class="build-hero">${buildArt(b.id, b.steps.length, true)}</div>
