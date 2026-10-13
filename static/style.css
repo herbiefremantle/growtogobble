@@ -857,3 +857,4 @@ svg.plot .grp-tag { fill: #fff; font-weight: 800; paint-order: stroke; stroke: r
 .reel.still { padding: 14px 18px; }
 .clip .clip-attr { font: 600 7px "Figtree", sans-serif; fill: #fff; opacity: .85; }
 .clip .clip-crop-garlic { fill: #efe3c2; } .clip .clip-crop-beans { fill: #8cc96f; }
+.outline-box summary { cursor: pointer; list-style: revert; } .outline-box[open] summary { margin-bottom: 4px; }

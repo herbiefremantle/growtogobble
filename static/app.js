@@ -1607,6 +1607,7 @@ function plotPage() {
   const T = plotDate();
   const label = plotMonth === 0 ? "Today" : `${MONTHS_LONG[T.getMonth()]}${T.getFullYear() !== today().getFullYear() ? " " + T.getFullYear() : ""}`;
   view.innerHTML = `<h1>🪴 My garden</h1>${gardenTabs()}
+    ${boundaryEdit ? "" : outlineBox()}
     ${placing ? `<div class="card tint-sun row placing" style="justify-content:space-between"><b>👆 Tap a bed to put ${plant(crop(placing).plant_id).emoji} ${esc(plant(crop(placing).plant_id).name)} in it</b><button class="btn small ghost" id="cancel-place">Cancel</button></div>` : ""}
     ${plotEdit && !boundaryEdit ? `<div class="card tint-sky small" style="margin-bottom:10px"><b>✏️ Editing:</b> drag anything to move it - zoom in for a finer grid (down to 50cm squares). Tap something to change, turn or remove it. To move several beds together, tap <b>🔗 Group beds</b>.</div>` : ""}
     <div class="plan-bar"><button class="btn small ${plotEdit ? "primary" : ""}" id="edit">${plotEdit ? "✅ Done editing" : "✏️ Edit plan"}</button>
@@ -1754,16 +1755,23 @@ function editPanel() {
       <label class="field" for="pathw" style="margin-top:8px">Path between beds</label>
       <select id="pathw">${[[0, "No path - right up against each other"], [0.3, "30cm"], [0.4, "40cm"], [0.5, "50cm"], [0.6, "60cm"], [0.75, "75cm"], [1, "1m"]]
         .map(([v, l]) => `<option value="${v}" ${Math.abs(v - g.path_w) < 0.001 ? "selected" : ""}>${l}</option>`).join("")}</select>
-      <p class="small muted" style="margin:6px 0 0">Paths are drawn for you between beds that sit side by side.</p></div>
-    <div class="card"><b>📐 Your whole garden or field</b>
-      <p class="small muted" style="margin:4px 0 8px">Trace it on a satellite map, or type its size. The plan then shows its edge, so you can place everything where it really is.</p>
+      <p class="small muted" style="margin:6px 0 0">Paths are drawn for you between beds that sit side by side.</p></div>`;
+}
+
+// Your whole garden or field: at the top of the Garden page to start with; once it's traced (or sized), folded away
+let outlineOpen = false;
+function outlineBox() {
+  const g = S.g.garden;
+  const body = `<p class="small muted" style="margin:4px 0 8px">Trace it on a satellite map, or type its size. The plan then shows its edge, so you can place everything where it really is.</p>
       <div class="row"><button class="btn small primary" id="trace">🗺️ ${g.shape ? "Trace it again" : "Trace it on a satellite map"}</button>
       ${g.w ? `<button class="btn small" id="b-start">📐 Edit boundary corners</button>` : ""}</div>
       ${g.shape ? `<p class="small" style="margin:8px 0 0">✅ Outline from the map: about ${g.w} × ${g.h} m. <button class="btn small ghost" id="gclear2">Remove outline</button></p>` : ""}
       <p class="small muted" style="margin:12px 0 6px">Or type its size:</p>
       <div class="size-row"><label class="big-num"><span>Width</span><input id="gw" type="number" step="0.5" min="1" inputmode="decimal" value="${g.w || ""}" placeholder="e.g. 12"><em>m</em></label>
         <span class="times">×</span><label class="big-num"><span>Length</span><input id="gh" type="number" step="0.5" min="1" inputmode="decimal" value="${g.h || ""}" placeholder="e.g. 8"><em>m</em></label></div>
-      <div class="row" style="margin-top:10px"><span class="small muted" id="g-state">Changes as you type - saved automatically</span>${g.w ? `<button class="btn small ghost" id="gclear">No fixed size</button>` : ""}</div></div>`;
+      <div class="row" style="margin-top:10px"><span class="small muted" id="g-state">Changes as you type - saved automatically</span>${g.w ? `<button class="btn small ghost" id="gclear">No fixed size</button>` : ""}</div>`;
+  if (!g.w) return `<div class="card outline-box"><b>📐 Start with your whole garden or field</b>${body}</div>`;
+  return `<details class="card outline-box" id="outline-box" ${outlineOpen ? "open" : ""}><summary><b>📐 Your whole garden or field</b> <span class="small muted">· ${g.shape ? "traced" : "size set"}, about ${g.w} × ${g.h} m</span></summary>${body}</details>`;
 }
 
 function wirePlot() {
@@ -1805,6 +1813,7 @@ function wirePlot() {
   const nowBtn = $("#now"); if (nowBtn) nowBtn.onclick = () => { plotMonth = 0; redraw(); };
   const cp = $("#cancel-place"); if (cp) cp.onclick = () => { placing = null; plotPage(); };
 
+  wireOutline(redraw);
   if (plotEdit) wireEdit(svg, redraw);
   view.onclick = async (e) => {
     const gv = e.target.closest("[data-gview]");
@@ -2040,9 +2049,33 @@ function redrawPlanPicture() {
   if (plotEdit && !boundaryEdit) wireItemDrag(fresh);
 }
 
-function wireEdit(svg, redraw) {
+function wireOutline(redraw) {
+  if (!$("#trace")) return;
   const bs = $("#b-start");
-  if (bs) bs.onclick = () => { boundaryEdit = true; selected = null; bSel = null; window.scrollTo(0, 0); redraw(); };
+  if (bs) bs.onclick = () => { plotEdit = true; boundaryEdit = true; selected = null; bSel = null; window.scrollTo(0, 0); redraw(); };
+  const ob = $("#outline-box"); if (ob) ob.ontoggle = () => { outlineOpen = ob.open; };
+  {
+    let gTimer;
+    const gwEl = $("#gw"), ghEl = $("#gh");
+    const gLive = () => {
+      const w = Number(gwEl.value), h = Number(ghEl.value);
+      if (!(w >= 1 && h >= 1)) return;
+      S.g.garden.w = w; S.g.garden.h = h; S.g.garden.shape = null;  // typing a size replaces a traced outline
+      redrawPlanPicture();
+      $("#g-state").textContent = "";
+      clearTimeout(gTimer);
+      gTimer = setTimeout(async () => {
+        try { S.g = await api("POST", "/api/garden/size", { w, h }); redrawPlanPicture(); $("#g-state").textContent = `✓ saved: ${w} × ${h} m`; }
+        catch (e) { toast(e.message); }
+      }, 800);
+    };
+    gwEl.oninput = ghEl.oninput = gLive;
+  }
+  const gc = $("#gclear"); if (gc) gc.onclick = () => change("POST", "/api/garden/size", {}, "The plan now fits to what's in it");
+  const gc2 = $("#gclear2"); if (gc2) gc2.onclick = () => change("POST", "/api/garden/size", {}, "Outline removed");
+  $("#trace").onclick = openMapTrace;
+}
+function wireEdit(svg, redraw) {
   if (boundaryEdit) {
     if (svg) svg.addEventListener("click", (e) => e.stopPropagation(), true);  // editing the outline: don't open beds or crops
     wireBoundary(svg, redraw); return;
@@ -2186,26 +2219,6 @@ function wireEdit(svg, redraw) {
     const kind = b.dataset.addfeat;
     if (["tree", "bush"].includes(kind)) fruitPicker(kind, (fr) => addFeature(kind, fr)); else addFeature(kind);
   }));
-  {
-    let gTimer;
-    const gwEl = $("#gw"), ghEl = $("#gh");
-    const gLive = () => {
-      const w = Number(gwEl.value), h = Number(ghEl.value);
-      if (!(w >= 1 && h >= 1)) return;
-      S.g.garden.w = w; S.g.garden.h = h; S.g.garden.shape = null;  // typing a size replaces a traced outline
-      redrawPlanPicture();
-      $("#g-state").textContent = "";
-      clearTimeout(gTimer);
-      gTimer = setTimeout(async () => {
-        try { S.g = await api("POST", "/api/garden/size", { w, h }); redrawPlanPicture(); $("#g-state").textContent = `✓ saved: ${w} × ${h} m`; }
-        catch (e) { toast(e.message); }
-      }, 800);
-    };
-    gwEl.oninput = ghEl.oninput = gLive;
-  }
-  const gc = $("#gclear"); if (gc) gc.onclick = () => change("POST", "/api/garden/size", {}, "The plan now fits to what's in it");
-  const gc2 = $("#gclear2"); if (gc2) gc2.onclick = () => change("POST", "/api/garden/size", {}, "Outline removed");
-  $("#trace").onclick = openMapTrace;
 }
 
 // ---- trace the garden on a satellite map. Only the SHAPE is saved (metres) - never where it is ---------------
