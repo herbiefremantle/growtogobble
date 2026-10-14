@@ -1094,3 +1094,29 @@ def test_build_it_links_each_plant_to_the_right_structures(client):
     for pid in builds["cold_frame"]["for"]:
         assert "sow_in" in planner.methods_for(catalogue.BY_ID[pid]), pid
     assert {"kale", "broccoli", "sweet_pea", "tomatoes"} <= set(builds["cold_frame"]["for"])
+
+
+def test_onion_and_garlic_check_comes_back_until_they_have_rooted():
+    """'Push any that have popped out back in' comes back 4 days after each tick, one at a time, and stops once
+    they've had 4 weeks to root."""
+    from datetime import date, timedelta
+    from app import planner
+    sown = date(2026, 10, 10)
+    crop = {"id": 1, "plant_id": "garlic", "method": "sow_out", "anchor": "2026-10-01", "anchor_end": "2026-11-30",
+            "sown_on": sown.isoformat(), "planted_on": None, "harvested_on": None, "space_id": None}
+    checks = lambda done, today: [j for j in planner.crop_jobs(crop, 0, done, today) if j["key"].startswith("c1:care0")]
+    first = checks({}, date(2026, 10, 12))
+    assert len(first) == 1 and first[0]["start"] == "2026-10-10"
+    # ticked on the 14th: the next one's due on the 18th, and it's the only one still to do
+    later = checks({"c1:care0": "2026-10-14"}, date(2026, 10, 14))
+    assert [j["status"] for j in later][0] == "done" and later[1]["start"] == "2026-10-18" and len(later) == 2
+    # keep ticking every 4 days: it stops 4 weeks after sowing, by 7 November
+    done, day = {}, sown
+    for n in range(20):
+        open_ = [j for j in checks(done, day) if j["status"] != "done"]
+        if not open_:
+            break
+        day = date.fromisoformat(open_[0]["start"]) + timedelta(days=1)
+        done[open_[0]["key"]] = day.isoformat()
+    assert not [j for j in checks(done, day) if j["status"] != "done"]
+    assert max(date.fromisoformat(j["start"]) for j in checks(done, day)) < sown + timedelta(weeks=4)

@@ -10,7 +10,8 @@ weeks: roughly how long from sowing (or planting, for perennials) until the firs
 succession: sow another small batch every N weeks for a steady supply (0 = no).
 filler: quick crop that's good for filling a gap in a bed that's gone bare.
 grow_on: weeks from sowing indoors until it's big enough to go outside.
-care: timed reminders, as (weeks after it's sown/planted in its final spot, how many weeks the job lasts, text).
+care: timed reminders, as (weeks after it's sown/planted in its final spot, how many weeks the job lasts, text), and optionally
+      every N days - a quick check that comes back N days after you tick it, until those weeks are up).
 """
 
 LEVELS = {
@@ -76,7 +77,7 @@ PLANTS = [
                       "Push each clove in, pointy end up, until the tip is 2-3cm under the soil (about a finger-joint deep) 👆",
                       "Leave a gap the size of your hand between each one ✋", "Press the soil down firmly around each one 👋",
                       "Cover with netting, fleece or twiggy sticks to stop birds pulling them out 🐦", "Stick in a label 🏷️ - they won't pop up for a few weeks"],
-        "care": [[0, 4, "Check your garlic every few days - push any that have popped out back in 🧄"],
+        "care": [[0, 4, "Check your garlic - push any that have popped out back in 🧄", 4],
                  [8, 16, "Pull out weeds around your garlic - it doesn't like sharing 🌿"]],
         "harvest_tip": "When the leaves turn yellow and flop over, loosen with a fork and lift the bulbs. Dry them in the sun for a week.",
         "eat": "Roast a whole bulb in foil and squeeze the soft garlic onto bread.",
@@ -91,7 +92,7 @@ PLANTS = [
                       "Push each little onion into the soil so only the very tip is showing 🧅",
                       "Leave a gap the size of your hand between each one ✋", "Press the soil down firmly around each one 👋",
                       "Cover with netting or twiggy sticks for the first few weeks 🐦", "Water them in 🚿", "Stick in a label 🏷️"],
-        "care": [[0, 4, "Check your onions every few days - push any that have popped out back in 🧅"],
+        "care": [[0, 4, "Check your onions - push any that have popped out back in 🧅", 4],
                  [6, 14, "Pull out weeds around your onions - they hate sharing 🌿"]],
         "harvest_tip": "When the leaves go yellow and flop over, lift them and leave them to dry in the sun.",
         "eat": "Slice and fry slowly until soft and sweet - great in burgers.",

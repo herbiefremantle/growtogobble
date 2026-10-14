@@ -179,8 +179,21 @@ def crop_jobs(crop, shift, done_keys, today):
     # 2. looking after it
     # Short jobs come once. Ongoing ones (weeding, deadheading, feeding...) come back every 4 weeks, each ticked off
     # on its own - ticking November's weeding doesn't make December's disappear.
-    for i, (after_weeks, for_weeks, text) in enumerate(plant.get("care", [])):
+    for i, (after_weeks, for_weeks, text, *every) in enumerate(plant.get("care", [])):
         start, end = growing_from + after_weeks * WEEK, growing_from + (after_weeks + max(for_weeks, 1)) * WEEK
+        if every:
+            # a quick check that comes back a few days after you last did it, until the period's over (e.g. birds
+            # pulling onion sets out - only until they've rooted). Only the next one shows, not a long list of them.
+            n, s0 = 0, start
+            while s0 < end:
+                key = "care%d" % i if n == 0 else "care%d_%d" % (i, n)
+                add(key, "care", "🧤", text, s0, min(end, s0 + every[0] * DAY), waiting=not in_ground)
+                ticked = done_keys.get("c%d:%s" % (cid, key)) if isinstance(done_keys, dict) else None
+                if not ticked:
+                    break
+                s0 = date.fromisoformat(ticked[:10]) + every[0] * DAY
+                n += 1
+            continue
         if for_weeks <= 6:
             add("care%d" % i, "care", "🧤", text, start, end, waiting=not in_ground)
             continue
