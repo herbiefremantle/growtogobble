@@ -181,6 +181,8 @@ def crop_jobs(crop, shift, done_keys, today):
     # on its own - ticking November's weeding doesn't make December's disappear.
     for i, (after_weeks, for_weeks, text, *every) in enumerate(plant.get("care", [])):
         start, end = growing_from + after_weeks * WEEK, growing_from + (after_weeks + max(for_weeks, 1)) * WEEK
+        if every and len(every) > 1 and every[1] != method:
+            continue  # only for that way of growing it (mice dig up seeds sown outside, not bought plants)
         if every:
             # a quick check that comes back a few days after you last did it, until the period's over (e.g. birds
             # pulling onion sets out - only until they've rooted). Only the next one shows, not a long list of them.
