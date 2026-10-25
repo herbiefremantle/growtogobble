@@ -1061,6 +1061,7 @@ def test_build_it_guides_have_everything(client):
     assert ids == ["raised_bed", "bean_wigwam", "sweet_pea_wigwam", "bean_aframe", "pea_frame", "broad_bean_string", "tomato_stakes", "tomato_strings", "hoop_tunnel", "bottle_cloche", "cold_frame", "staging", "compost_bin", "water_butt"]
     for b in data["builds"]:
         assert b["steps"] and b["tools"] and b["materials"] and b["why"]
+        assert all(st["check"] for st in b["steps"]), b["id"]  # a "check before moving on" line for every step
         assert all(p in catalogue.BY_ID for p in b["for"]) and (b["for"] or b.get("good_for"))
         assert [s["pic"] for s in b["steps"]] == list(range(1, len(b["steps"]) + 1))  # a picture for every step
         for m in b["materials"]:

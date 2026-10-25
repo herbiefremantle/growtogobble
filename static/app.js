@@ -3825,248 +3825,10 @@ function shopPage() {
       <ul style="margin:0;padding-left:20px"><li>Plain brown cardboard (free - ask a shop for boxes!)</li><li>Peat-free compost: about 15 bags (50 litres each) for a 1.2m × 2.4m bed</li><li>A watering can with a sprinkler head (a "rose")</li><li>Plant labels and a pencil</li></ul></div>`;
 }
 
-// ---- Build It: supports, covers and a cold frame, step by step -----------------------------------------
-// Every step has a drawing of the build so far: BUILD_ART[id](stage) draws stage 1..n, with the newest part picked
-// out in gold. Same 320 x 180 frame for all of them.
-const BA = (() => {
-  const soil = `<rect x="0" y="150" width="320" height="30" class="ba-soil"/><path d="M0 150 H320" class="ba-soil-top"/>`;
-  const line = (x1, y1, x2, y2, cls = "ba-cane") => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${cls}"/>`;
-  const label = (x, y, t, anchor = "middle") => `<text x="${x}" y="${y}" text-anchor="${anchor}" class="ba-label">${t}</text>`;
-  // a climbing vine from (x1,y1) up to a fraction f of the way to (x2,y2): a wiggle, leaves, a few flowers
-  const vine = (x1, y1, x2, y2, f = 0.75, flower = "ba-flower-red") => {
-    const n = 14, pts = [];
-    for (let i = 0; i <= n * f; i++) { const t = i / n; pts.push([x1 + (x2 - x1) * t + Math.sin(t * 22) * 3, y1 + (y2 - y1) * t]); }
-    const leaves = pts.filter((_, i) => i % 2 === 1).map(([x, y], i) => `<ellipse cx="${x + (i % 2 ? 5 : -5)}" cy="${y}" rx="5" ry="3" class="ba-leaf" transform="rotate(${i % 2 ? 30 : -30} ${x + (i % 2 ? 5 : -5)} ${y})"/>`).join("");
-    const flowers = pts.filter((_, i) => i % 5 === 4).map(([x, y]) => `<circle cx="${x + 3}" cy="${y - 2}" r="2.4" class="${flower}"/>`).join("");
-    return `<polyline points="${pts.map((p) => p.join(",")).join(" ")}" class="ba-stem"/>${leaves}${flowers}`;
-  };
-  const tomato = (x, base, top, fruit = true) => {
-    const leaves = [];
-    for (let y = base - 12; y > top; y -= 14) leaves.push(`<path d="M${x} ${y} q-14 -4 -18 4 M${x} ${y - 6} q14 -4 18 4" class="ba-stem"/>`);
-    const toms = fruit ? [0.35, 0.6].map((t, i) => { const y = base - (base - top) * t; return `<circle cx="${x + (i ? 9 : -9)}" cy="${y + 6}" r="4.5" class="ba-tomato"/><circle cx="${x + (i ? 14 : -4)}" cy="${y + 9}" r="4" class="ba-tomato"/>`; }).join("") : "";
-    return `<line x1="${x}" y1="${base}" x2="${x}" y2="${top}" class="ba-stem"/>${leaves.join("")}${toms}`;
-  };
-  const seedling = (x, y) => `<path d="M${x} ${y} v-10" class="ba-stem"/><ellipse cx="${x - 5}" cy="${y - 11}" rx="5" ry="2.6" class="ba-leaf"/><ellipse cx="${x + 5}" cy="${y - 11}" rx="5" ry="2.6" class="ba-leaf"/>`;
-  return { soil, line, label, vine, tomato, seedling };
-})();
-// a wigwam of canes: beans (8 canes in the ground, a ring of string) or sweet peas (6 canes in a big pot, a spiral of
-// string, and a sixth step where it's in flower)
-function wigwamArt(s, { sweet }) {
-  const n = sweet ? 6 : 8, rx = sweet ? 44 : 70, ry = sweet ? 9 : 14, by = sweet ? 122 : 150, top = sweet ? 30 : 18;
-  const base = Array.from({ length: n }, (_, i) => { const a = (i / n) * Math.PI * 2 + 0.2; return [160 + rx * Math.cos(a), by + ry * Math.sin(a), Math.sin(a)]; })
-    .sort((p, q) => p[2] - q[2]);  // back ones first
-  const P = (k, c) => (k > s ? "" : `<g class="${k === s ? "ba-new" : ""}">${c}</g>`);
-  const apex = (x) => [160 + (160 - x) * 0.14, top];
-  const canes = base.map(([x, y]) => (s >= 3 ? BA.line(x, y, ...apex(x)) : BA.line(x, y, 160 + (x - 160) * 0.45, top + 8)));
-  const pot = sweet ? `<path d="M110 120 h100 l-10 32 h-80 z" class="ba-potclay"/><ellipse cx="160" cy="121" rx="50" ry="9" class="ba-potrim"/><ellipse cx="160" cy="122" rx="45" ry="7" class="ba-compost"/>` : "";
-  // sweet peas: a spiral of string; beans: one ring at knee height
-  const spiral = () => { const pts = []; for (let t = 0; t <= 1; t += 0.02) { const y = by - 6 - t * (by - top - 30), r = rx * (1 - t * 0.8); pts.push([160 + r * Math.cos(t * 26), y + ry * (1 - t) * Math.sin(t * 26) * 0.6]); }
-    return `<polyline points="${pts.map((q) => q.map((v) => v.toFixed(1)).join(",")).join(" ")}" class="ba-string"/>`; };
-  const front = base.filter((q) => q[2] > -0.3);
-  const plants = (f, flower) => front.map(([x, y]) => BA.vine(x, y, ...apex(x), f, flower)).join("");
-  return `${sweet ? `<rect x="0" y="150" width="320" height="30" class="ba-soil"/>` : BA.soil}
-    ${sweet ? P(1, pot + (s === 1 ? BA.label(160, 104, "a pot 40cm or wider") : "")) : P(1, `<ellipse cx="160" cy="150" rx="70" ry="14" class="ba-mark"/>${s === 1 ? BA.label(160, 120, "about 1m across") : ""}`)}
-    ${s >= 2 ? `<g class="${s === 2 ? "ba-new" : ""}">${canes.join("")}</g>` : ""}
-    ${P(3, `<circle cx="160" cy="${top + 24}" r="5" class="ba-tie"/>${s === 3 ? BA.label(196, top + 22, "tie tight here", "start") : ""}`)}
-    ${P(4, sweet ? spiral() : `<ellipse cx="160" cy="118" rx="52" ry="10" class="ba-string"/>`)}
-    ${sweet ? (s === 5 ? `<g class="ba-new">${plants(0.25)}</g>${BA.label(306, 100, "2 plants per cane", "end")}` : s >= 6 ? `<g class="ba-new">${plants(0.85, "ba-flower-sweet")}${front.flatMap(([x, y], i) => [0.2, 0.35, 0.5, 0.65, 0.8].map((t, k) => { const [ax, ay] = apex(x), fx = x + (ax - x) * t + (k % 2 ? 5 : -5), fy = y + (ay - y) * t;
-        return `<circle cx="${fx.toFixed(1)}" cy="${fy.toFixed(1)}" r="3.6" class="${["ba-flower-sweet", "ba-flower-purple", "ba-flower-white", "ba-flower-red"][(i + k) % 4]}"/>`; })).join("")}</g>` : "")
-      : P(5, plants(0.7))}`;
-}
-const BUILD_ART = {
-  broad_bean_string: (s) => {
-    const X = (x, y, z) => [64 + x * 1.5 + z * 0.8, 160 - y * 1.05 - z * 0.5];
-    const canes = [[0, 0], [60, 0], [120, 0], [0, 60], [60, 60], [120, 60]];
-    const ring = (y) => `<polyline points="${[[0, 0], [60, 0], [120, 0], [120, 60], [60, 60], [0, 60], [0, 0]].map(([x, z]) => X(x, y, z).join(",")).join(" ")}" class="ba-string"/>`;
-    const bean = (x, z) => { const [a, b] = X(x, 0, z), h = 86; const leaves = [0.3, 0.5, 0.7, 0.85].map((t) => `<ellipse cx="${a - 5}" cy="${b - h * t}" rx="6" ry="3" class="ba-leaf"/><ellipse cx="${a + 5}" cy="${b - h * t + 3}" rx="6" ry="3" class="ba-leaf"/>`).join("");
-      return `<line x1="${a}" y1="${b}" x2="${a}" y2="${b - h}" class="ba-stem"/>${leaves}<path d="M${a + 3} ${b - h * 0.45} q6 8 2 18" class="ba-pod"/>`; };
-    const P = (k, c) => (k > s ? "" : `<g class="${k === s ? "ba-new" : ""}">${c}</g>`);
-    const back = canes.filter(([, z]) => z === 60), front = canes.filter(([, z]) => z === 0);
-    const cane = ([x, z]) => BA.line(...X(x, -4, z), ...X(x, 104, z));
-    return `${BA.soil}<polygon points="${[[-6, 0, -6], [126, 0, -6], [126, 0, 66], [-6, 0, 66]].map((q) => X(...q).join(",")).join(" ")}" class="ba-bed"/>
-      <g class="${s === 1 ? "ba-new" : ""}">${back.map(cane).join("")}</g>
-      ${s >= 4 ? `<g class="ba-new">${[[20, 45], [45, 45], [75, 45], [100, 45], [20, 18], [45, 18], [75, 18], [100, 18]].map(([x, z]) => bean(x, z)).join("")}</g>` : ""}
-      <g class="${s === 1 ? "ba-new" : ""}">${front.map(cane).join("")}</g>
-      ${P(2, ring(30))}${P(3, ring(60) + ring(90))}
-      ${s === 1 ? BA.label(160, 20, "a cane at each corner, and every metre") : s === 2 ? BA.label(160, 20, "string round the outside, 30cm up") : s === 3 ? BA.label(160, 20, "then at 60cm and 90cm") : ""}`;
-  },
-  water_butt: (s) => {
-    const P = (k, c) => (k > s ? "" : `<g class="${k === s ? "ba-new" : ""}">${c}</g>`);
-    const wall = `<rect x="0" y="0" width="150" height="150" class="ba-wall"/>${Array.from({ length: 15 }, (_, r) => `<line x1="0" x2="150" y1="${r * 10}" y2="${r * 10}" class="ba-brickline"/>`).join("")}`;
-    const pipeTop = `<rect x="150" y="0" width="12" height="${s >= 4 ? 52 : 150}" class="ba-downpipe"/>`;
-    const pipeLow = s >= 4 ? `<rect x="150" y="66" width="12" height="84" class="ba-downpipe"/>` : "";
-    const blocks = `<rect x="178" y="134" width="40" height="16" class="ba-block"/><rect x="222" y="134" width="40" height="16" class="ba-block"/><rect x="178" y="118" width="40" height="16" class="ba-block"/><rect x="222" y="118" width="40" height="16" class="ba-block"/>`;
-    const butt = `<rect x="182" y="40" width="76" height="78" rx="6" class="ba-butt"/><ellipse cx="220" cy="40" rx="38" ry="7" class="ba-butt-top"/><rect x="196" y="104" width="10" height="6" class="ba-tap"/>`;
-    return `${BA.soil}${wall}${pipeTop}${pipeLow}
-      ${s === 1 ? `<g class="ba-new"><rect x="170" y="138" width="100" height="12" class="ba-mark"/></g>${BA.label(230, 128, "a level spot by the pipe")}` : ""}
-      ${P(2, blocks + (s === 2 ? BA.label(230, 108, "high enough for a can under the tap") : ""))}
-      ${P(3, butt + (s === 3 ? `<line x1="140" y1="40" x2="172" y2="40" class="ba-cutline"/>${BA.label(100, 30, "mark the top of the butt")}` : ""))}
-      ${P(4, `<rect x="146" y="50" width="20" height="18" rx="3" class="ba-diverter"/>${s === 4 ? BA.label(100, 92, "cut out a section, fit the diverter") : ""}`)}
-      ${P(5, `<path d="M166 58 C176 58 178 48 186 48" class="ba-hose"/><ellipse cx="220" cy="40" rx="38" ry="7" class="ba-lid-top"/>
-        <path d="M190 128 h22 l-3 18 h-16 z" class="ba-can"/><path d="M212 132 l14 -8" class="ba-can-spout"/>
-        ${[[30, 20], [70, 40], [110, 14], [250, 14], [290, 30]].map(([x, y]) => `<path d="M${x} ${y} l-3 8" class="ba-rain"/>`).join("")}${BA.label(100, 92, "when it's full, rain carries on down the pipe")}`)}`;
-  },
-  staging: (s) => {
-    const X = (x, y, z) => [60 + x * 1.5 + z * 0.9, 162 - y * 1.5 - z * 0.6];
-    const poly = (pts, cls) => `<polygon points="${pts.map((p) => X(...p).join(",")).join(" ")}" class="${cls}"/>`;
-    const post = (x, z, h) => poly([[x, 0, z], [x + 4, 0, z], [x + 4, h, z], [x, h, z]], "ba-wood");
-    const rail = (x0, x1, y, z) => poly([[x0, y - 4, z], [x1, y - 4, z], [x1, y, z], [x0, y, z]], "ba-wood");
-    const srail = (x, y) => poly([[x, y - 4, 0], [x, y - 4, 50], [x, y, 50], [x, y, 0]], "ba-wood-side");
-    const slats = (y) => Array.from({ length: 17 }, (_, i) => poly([[2 + i * 7, y, 0], [7 + i * 7, y, 0], [7 + i * 7, y, 50], [2 + i * 7, y, 50]], "ba-slat")).join("");
-    if (s === 1) return `${BA.soil}<g class="ba-new">${[0, 1, 2, 3].map((i) => `<rect x="${20 + i * 22}" y="40" width="10" height="90" class="ba-wood"/>`).join("")}${BA.label(54, 30, "4 legs, 75cm")}
-      ${[0, 1, 2, 3].map((i) => `<rect x="120" y="${40 + i * 14}" width="140" height="9" class="ba-wood"/>`).join("")}${BA.label(190, 32, "4 rails, 120cm")}
-      ${[0, 1, 2, 3].map((i) => `<rect x="${120 + i * 36}" y="104" width="30" height="8" class="ba-wood"/>`).join("")}${BA.label(184, 124, "4 rails, 46cm")}
-      ${Array.from({ length: 8 }, (_, i) => `<rect x="${272 + (i % 2) * 18}" y="${40 + Math.floor(i / 2) * 22}" width="12" height="18" class="ba-slat"/>`).join("")}${BA.label(290, 32, "slats")}</g>`;
-    const ends = [0, 116].map((x) => `${post(x, 50, 75)}${srail(x, 75)}${srail(x, 25)}${post(x, 0, 75)}`).join("");
-    const back = `${rail(0, 120, 75, 50)}${rail(0, 120, 25, 50)}`, front = `${rail(0, 120, 75, 0)}${rail(0, 120, 25, 0)}`;
-    return `${BA.soil}<g class="${s === 2 ? "ba-new" : ""}">${[0, 116].map((x) => `${post(x, 50, 75)}`).join("")}</g>
-      ${P2(s, 3, back)}
-      ${s >= 5 ? `<g class="${s === 5 ? "ba-new" : ""}">${slats(25)}</g>` : ""}
-      <g class="${s === 2 ? "ba-new" : ""}">${[0, 116].map((x) => `${srail(x, 75)}${srail(x, 25)}${post(x, 0, 75)}`).join("")}</g>
-      ${P2(s, 3, front)}
-      ${s >= 4 ? `<g class="${s === 4 ? "ba-new" : ""}">${slats(75)}</g>` : ""}
-      ${s >= 5 ? `<g class="ba-new">${[[20, 30], [60, 20]].map(([x, z]) => { const [a, b] = X(x, 75, z); return `<rect x="${a}" y="${b - 8}" width="42" height="9" rx="1" class="ba-tray"/>${[0, 1, 2, 3].map((k) => BA.seedling(a + 6 + k * 10, b - 7)).join("")}`; }).join("")}
-        ${[[30, 25], [80, 25]].map(([x, z]) => { const [a, b] = X(x, 25, z); return `<path d="M${a - 9} ${b - 14} h18 l-3 14 h-12 z" class="ba-potclay"/>`; }).join("")}</g>` : ""}
-      ${s === 2 ? BA.label(160, 16, "two end frames") : s === 4 ? BA.label(160, 16, "a finger-width gap between slats") : ""}`;
-  },
-  compost_bin: (s) => {
-    const X = (x, y, z) => [96 + x * 1.2 + z * 0.55, 162 - y * 1.05 - z * 0.36];
-    const poly = (pts, cls) => `<polygon points="${pts.map((p) => X(...p).join(",")).join(" ")}" class="${cls}"/>`;
-    // a pallet in a plane: boards with gaps. along: "x" (back/front) or "z" (sides)
-    const pallet = (along, at, cls = "ba-pallet") => Array.from({ length: 6 }, (_, i) => {
-      const a = i * 15 + 1, b = a + 11;
-      return along === "x" ? poly([[a, 0, at], [b, 0, at], [b, 90, at], [a, 90, at]], cls) : poly([[at, 0, a], [at, 0, b], [at, 90, b], [at, 90, a]], cls);
-    }).join("") + (along === "x" ? [12, 45, 78].map((y) => poly([[0, y, at], [90, y, at], [90, y + 7, at], [0, y + 7, at]], "ba-pallet-bar")).join("")
-      : [12, 45, 78].map((y) => poly([[at, y, 0], [at, y, 90], [at, y + 7, 90], [at, y + 7, 0]], "ba-pallet-bar")).join(""));
-    const ties = (x, z) => [15, 48, 82].map((y) => { const [a, b] = X(x, y, z); return `<rect x="${a - 3}" y="${b - 2}" width="6" height="4" rx="1" class="ba-tieblk"/>`; }).join("");
-    const ground = `<polygon points="0,150 320,150 320,180 0,180" class="ba-soil"/>${poly([[-10, 0, -10], [100, 0, -10], [100, 0, 100], [-10, 0, 100]], "ba-bare")}`;
-    if (s === 1) return `${ground}<g class="ba-new">${poly([[0, 0, 0], [90, 0, 0], [90, 0, 90], [0, 0, 90]], "ba-mark")}</g>${BA.label(160, 30, "bare soil, part shade")}`;
-    // the heap: layers of green and brown, seen through the front slats, with a carpet lid on top
-    const fill = s >= 5 ? `<g class="ba-new">${[0, 1, 2, 3, 4].map((k) => poly([[2, k * 16, 3], [88, k * 16, 3], [88, k * 16 + 16, 3], [2, k * 16 + 16, 3]], k % 2 ? "ba-brown" : "ba-green")).join("")}
-      ${poly([[0, 80, 0], [90, 80, 0], [90, 84, 90], [0, 84, 90]], "ba-carpet")}</g>` : "";
-    return `${ground}
-      <g class="${s === 2 ? "ba-new" : ""}">${pallet("x", 90)}${pallet("z", 0)}${ties(0, 90)}</g>
-      ${s >= 3 ? `<g class="${s === 3 ? "ba-new" : ""}">${pallet("z", 90)}${ties(90, 90)}</g>` : ""}
-      ${fill}
-      ${s >= 3 ? `<g class="${s === 3 ? "ba-new" : ""}">${[0, 90].map((x) => { const [a, b] = X(x, 0, 2); return `<rect x="${a - 2}" y="${b - 100}" width="4" height="104" class="ba-wood"/>`; }).join("")}</g>` : ""}
-      ${s >= 4 ? `<g class="${s === 4 ? "ba-new" : ""}" opacity="${s >= 5 ? 0.92 : 1}">${pallet("x", 0, "ba-pallet ba-gate")}${[20, 70].map((y) => { const [a, b] = X(0, y, 0); return `<circle cx="${a}" cy="${b}" r="3" class="ba-tieblk"/>`; }).join("")}</g>` : ""}
-      ${s === 2 ? BA.label(48, 30, "3 ties per corner", "start") : s === 4 ? BA.label(30, 30, "string on one side - it opens like a gate", "start") : s === 5 ? BA.label(30, 22, "half green, half brown - then a lid", "start") : ""}`;
-  },
-  raised_bed: (s) => {
-    const X = (x, y, z) => [20 + x * 0.85 + z * 0.6, 150 - y * 1.6 - z * 0.45];
-    const poly = (pts, cls) => `<polygon points="${pts.map((p) => X(...p).join(",")).join(" ")}" class="${cls}"/>`;
-    const P = (n, c) => (n > s ? "" : `<g class="${n === s ? "ba-new" : ""}">${c}</g>`);
-    const ground = `<polygon points="0,150 320,150 320,180 0,180" class="ba-soil"/><polygon points="${[[-10, 0, -10], [250, 0, -10], [250, 0, 130], [-10, 0, 130]].map((p) => X(...p).join(",")).join(" ")}" class="ba-grass"/>`;
-    if (s === 1) return `${ground}<g class="ba-new">${poly([[0, 0, 0], [240, 0, 0], [240, 0, 120], [0, 0, 120]], "ba-mark")}${BA.label(160, 168, "1.2m x 2.4m")}</g>`;
-    if (s === 2) return `${BA.soil}<g class="ba-new">${[0, 1, 2, 3].map((i) => `<rect x="20" y="${18 + i * 17}" width="200" height="12" class="ba-wood"/>`).join("")}${BA.label(120, 14, "4 x 2.4m (long sides)")}
-      ${[0, 1, 2, 3].map((i) => `<rect x="${232 + (i % 2) * 44}" y="${18 + Math.floor(i / 2) * 17}" width="40" height="12" class="ba-wood"/>`).join("")}${BA.label(274, 62, "4 x 1.2m (ends)")}
-      ${[0, 1, 2, 3].map((i) => `<rect x="${40 + i * 30}" y="96" width="10" height="40" class="ba-wood-side"/>`).join("")}${BA.label(90, 146, "4 posts, 40cm")}</g>`;
-    // an end: two boards on two posts (z runs front to back)
-    const end = (x) => `${poly([[x, -6, 0], [x, -6, 6], [x, 30, 6], [x, 30, 0]], "ba-wood-side")}${poly([[x, -6, 114], [x, -6, 120], [x, 30, 120], [x, 30, 114]], "ba-wood-side")}
-      ${poly([[x, 0, 0], [x, 0, 120], [x, 15, 120], [x, 15, 0]], "ba-wood")}${poly([[x, 15, 0], [x, 15, 120], [x, 30, 120], [x, 30, 0]], "ba-wood")}`;
-    if (s === 3) return `${ground}<g class="ba-new">${end(0)}${end(240)}</g>${BA.label(160, 24, "two boards on two posts, each end")}`;
-    const side = (z) => `${poly([[0, 0, z], [240, 0, z], [240, 15, z], [0, 15, z]], "ba-wood")}${poly([[0, 15, z], [240, 15, z], [240, 30, z], [0, 30, z]], "ba-wood")}`;
-    const box = `${side(120)}${end(0)}${end(240)}`;
-    const front = side(0);
-    const fill = s >= 6 ? `${poly([[2, 26, 2], [238, 26, 2], [238, 26, 118], [2, 26, 118]], "ba-compost")}${[[40, 60], [100, 40], [160, 80], [200, 50]].map(([x, z]) => BA.seedling(...X(x, 26, z))).join("")}` : "";
-    return `${ground}
-      ${s >= 6 ? poly([[2, 1, 2], [238, 1, 2], [238, 1, 118], [2, 1, 118]], "ba-card") : ""}
-      <g class="${s === 4 ? "ba-new" : ""}">${box}</g>${s === 6 ? `<g class="ba-new">${fill}</g>` : fill}<g class="${s === 4 ? "ba-new" : ""}">${front}</g>
-      ${s === 4 ? `<line x1="${X(0, 30, 0)[0]}" y1="${X(0, 30, 0)[1]}" x2="${X(240, 30, 120)[0]}" y2="${X(240, 30, 120)[1]}" class="ba-cutline"/><line x1="${X(240, 30, 0)[0]}" y1="${X(240, 30, 0)[1]}" x2="${X(0, 30, 120)[0]}" y2="${X(0, 30, 120)[1]}" class="ba-cutline"/>${BA.label(160, 20, "both diagonals the same = square")}` : ""}
-      ${s === 5 ? `<g class="ba-new"><rect x="${X(80, 30, 0)[0]}" y="${X(80, 30, 0)[1] - 8}" width="70" height="8" rx="2" class="ba-level"/><circle cx="${X(80, 30, 0)[0] + 35}" cy="${X(80, 30, 0)[1] - 4}" r="2.5" class="ba-bubble"/></g>${BA.label(160, 20, "check it's level")}` : ""}
-      ${s === 6 ? BA.label(160, 20, "cardboard, then compost to the top") : ""}`;
-  },
-  bean_wigwam: (s) => wigwamArt(s, {}),
-  sweet_pea_wigwam: (s) => wigwamArt(s, { sweet: true }),
-  bean_aframe: (s) => {
-    const xs = [40, 92, 144, 196, 248];
-    const P = (n, c) => (n > s ? "" : `<g class="${n === s ? "ba-new" : ""}">${c}</g>`);
-    const pairs = xs.map((x) => s >= 3 ? BA.line(x + 22, 136, x + 2, 24) + BA.line(x, 158, x + 22, 24) : BA.line(x + 22, 136, x + 22, 30) + BA.line(x, 158, x, 34));
-    return `${BA.soil}<path d="M14 166 L280 166 L306 128 L40 128 Z" class="ba-bed"/>
-      ${P(1, `<line x1="30" y1="158" x2="270" y2="158" class="ba-mark"/><line x1="52" y1="136" x2="292" y2="136" class="ba-mark"/>${s === 1 ? BA.label(300, 150, "45-60cm", "end") : ""}`)}
-      ${s >= 2 ? `<g class="${s === 2 || s === 3 ? "ba-new" : ""}">${pairs.join("")}</g>` : ""}
-      ${P(3, xs.map((x) => `<circle cx="${x + 12}" cy="40" r="3.5" class="ba-tie"/>`).join(""))}
-      ${P(4, BA.line(28, 40, 290, 40))}
-      ${P(5, xs.map((x) => BA.vine(x, 158, x + 22, 24, 0.75) + BA.vine(x + 22, 136, x + 2, 24, 0.6)).join(""))}`;
-  },
-  pea_frame: (s) => {
-    const xs = [50, 130, 210, 290];
-    const P = (n, c) => (n > s ? "" : `<g class="${n === s ? "ba-new" : ""}">${c}</g>`);
-    const net = [];
-    for (let x = 50; x < 290; x += 12) net.push(`<line x1="${x}" y1="52" x2="${x + 12}" y2="148" class="ba-net"/><line x1="${x + 12}" y1="52" x2="${x}" y2="148" class="ba-net"/>`);
-    return `${BA.soil}
-      ${P(1, xs.map((x) => BA.line(x, 155, x, 44)).join("") + (s === 1 ? BA.label(90, 30, "a cane every 1m") : ""))}
-      ${P(2, BA.line(44, 48, 296, 48))}
-      ${P(3, `<rect x="50" y="52" width="240" height="96" class="ba-netbox"/>${net.join("")}`)}
-      ${P(4, [70, 110, 150, 190, 230, 270].map((x, i) => BA.vine(x, 150, x + 4, 60, 0.7 + (i % 2) * 0.1, "ba-flower-white")).join(""))}`;
-  },
-  tomato_stakes: (s) => {
-    const xs = [90, 160, 230];
-    const P = (n, c) => (n > s ? "" : `<g class="${n === s ? "ba-new" : ""}">${c}</g>`);
-    return `${BA.soil}
-      ${P(1, xs.map((x) => BA.line(x + 8, 160, x + 8, 28)).join("") + (s === 1 ? BA.label(260, 165, "30cm deep", "start") : ""))}
-      ${s >= 2 ? `<g class="${s === 2 ? "ba-new" : ""}">${xs.map((x) => BA.tomato(x, 150, s >= 4 ? 40 : 108, s >= 4)).join("")}</g>` : ""}
-      ${P(3, xs.map((x) => `<path d="M${x} 116 c4 -5 8 5 12 0 c-4 -5 -8 5 -12 0" class="ba-tie8"/>`).join("") + (s === 3 ? BA.label(160, 96, "loose figure-of-eight") : ""))}
-      ${P(4, xs.map((x) => [86, 60].map((y) => `<path d="M${x} ${y} c4 -5 8 5 12 0 c-4 -5 -8 5 -12 0" class="ba-tie8"/>`).join("")).join(""))}`;
-  },
-  tomato_strings: (s) => {
-    const xs = [100, 160, 220];
-    const P = (n, c) => (n > s ? "" : `<g class="${n === s ? "ba-new" : ""}">${c}</g>`);
-    return `${BA.soil}
-      ${P(1, `<rect x="44" y="26" width="10" height="134" class="ba-wood"/><rect x="266" y="26" width="10" height="134" class="ba-wood"/><rect x="38" y="20" width="244" height="9" class="ba-wood"/>`)}
-      ${P(2, xs.map((x) => BA.line(x, 29, x, 150, "ba-string")).join(""))}
-      ${s >= 3 ? `<g class="${s === 3 ? "ba-new" : ""}">${xs.map((x) => BA.tomato(x, 150, s >= 4 ? 44 : 112, s >= 4) + `<ellipse cx="${x}" cy="142" rx="5" ry="2.5" class="ba-tie"/>`).join("")}</g>` : ""}
-      ${P(4, xs.map((x) => `<path d="M${x} 128 q8 -10 0 -20 q-8 -10 0 -20 q8 -10 0 -20" class="ba-string"/>`).join("") + BA.label(160, 14, "twist once round every few leaves"))}`;
-  },
-  hoop_tunnel: (s) => {
-    const P = (n, c) => (n > s ? "" : `<g class="${n === s ? "ba-new" : ""}">${c}</g>`);
-    const hoops = [0, 1, 2, 3].map((i) => { const f = [56 + i * 58, 156], b = [96 + i * 58, 128]; return { f, b, d: `M${f[0]} ${f[1] - 10} C${f[0] - 4} ${f[1] - 96}, ${b[0] - 4} ${b[1] - 96}, ${b[0]} ${b[1] - 10}` }; });
-    const sample = (h) => Array.from({ length: 11 }, (_, k) => { const t = k / 10, mt = 1 - t; const p0 = [h.f[0], h.f[1] - 10], p1 = [h.f[0] - 4, h.f[1] - 96], p2 = [h.b[0] - 4, h.b[1] - 96], p3 = [h.b[0], h.b[1] - 10];
-      return [0, 1].map((j) => mt ** 3 * p0[j] + 3 * mt * mt * t * p1[j] + 3 * mt * t * t * p2[j] + t ** 3 * p3[j]); });
-    // the tunnel's outline: up the front of the first hoop, along the top, down the back of the last, along the ground
-    const cover = [...sample(hoops[0]).slice(0, 6), ...sample(hoops[3]).slice(5), hoops[3].f.map((v, j) => v - (j ? 10 : 0))];
-    const net = [];
-    for (let x = 40; x < 280; x += 9) net.push(`<line x1="${x}" y1="60" x2="${x + 40}" y2="160" class="ba-net"/>`);
-    return `${BA.soil}<path d="M36 156 L240 156 L282 128 L78 128 Z" class="ba-bed"/>
-      ${s === 1 ? `<g class="ba-new">${[60, 74, 88, 102].map((y) => `<line x1="70" y1="${y}" x2="250" y2="${y}" class="ba-pipe"/>`).join("")}${BA.label(160, 52, "cut the pipe into 1.6m lengths")}</g>` : ""}
-      ${P(2, hoops.map((h) => BA.line(h.f[0], h.f[1], h.f[0], h.f[1] - 14, "ba-cane-s") + BA.line(h.b[0], h.b[1], h.b[0], h.b[1] - 14, "ba-cane-s")).join(""))}
-      ${s >= 3 ? `<g class="${s === 3 ? "ba-new" : ""}">${hoops.map((h) => `<path d="${h.d}" class="ba-pipe"/>`).join("")}</g>` : ""}
-      ${s >= 3 && s < 4 ? [0, 1, 2, 3].map((i) => BA.seedling(80 + i * 50, 148)).join("") : ""}
-      ${P(4, `<clipPath id="ba-cov"><polygon points="${cover.map((p) => p.join(",")).join(" ")}"/></clipPath><polygon points="${cover.map((p) => p.join(",")).join(" ")}" class="ba-cover"/><g clip-path="url(#ba-cov)">${net.join("")}</g>`)}
-      ${P(5, [44, 90, 136, 182, 228].map((x) => `<rect x="${x}" y="150" width="14" height="8" rx="1.5" class="ba-brick"/>`).join("") + (s === 5 ? BA.label(160, 176, "no gaps along the edges") : ""))}`;
-  },
-  bottle_cloche: (s) => {
-    const bottle = (x, top, cut, lid = true) => `<path d="M${x - 6} ${top} h12 v8 q0 6 10 14 v${cut ? 54 : 70} q0 6 -6 6 h-20 q-6 0 -6 -6 v-${cut ? 54 : 70} q10 -8 10 -14 z" class="ba-bottle"/>${lid ? `<rect x="${x - 7}" y="${top - 6}" width="14" height="7" rx="2" class="ba-lid"/>` : ""}`;
-    if (s === 1) return `${BA.soil}${bottle(160, 30, false)}<g class="ba-new"><path d="M144 72 h34 v26 h-34 z" class="ba-labelpaper" transform="rotate(-14 160 85)"/>${BA.label(214, 80, "peel it off", "start")}</g>`;
-    if (s === 2) return `${BA.soil}${bottle(160, 30, true)}<g class="ba-new"><path d="M144 104 h32" class="ba-cutline"/><path d="M144 112 h32 v10 q0 6 -6 6 h-20 q-6 0 -6 -6 z" class="ba-bottle"/>${BA.label(214, 108, "cut here", "start")}</g>`;
-    return `${BA.soil}${BA.seedling(160, 150)}
-      <g class="${s === 3 ? "ba-new" : ""}">${bottle(160, 70, true, s < 4)}</g>
-      ${s === 3 ? BA.label(214, 146, "2cm into the soil", "start") : ""}
-      ${s >= 4 ? `<g class="ba-new"><line x1="160" y1="40" x2="160" y2="150" class="ba-cane-s"/><rect x="196" y="122" width="14" height="7" rx="2" class="ba-lid" transform="rotate(20 203 125)"/><circle cx="262" cy="40" r="12" class="ba-sun"/>${BA.label(214, 70, "lid off on warm days", "start")}</g>` : ""}`;
-  },
-  cold_frame: (s) => {
-    const X = (x, y, z) => [60 + x * 1.5 + z * 0.95, 158 - y * 2.2 - z * 0.75];
-    const poly = (pts, cls) => `<polygon points="${pts.map((p) => X(...p).join(",")).join(" ")}" class="${cls}"/>`;
-    const P = (n, c) => (n > s ? "" : `<g class="${n === s ? "ba-new" : ""}">${c}</g>`);
-    if (s === 1) return `${BA.soil}<g class="ba-new">${[0, 1, 2].map((i) => `<rect x="30" y="${24 + i * 20}" width="180" height="14" class="ba-wood"/>${BA.label(120, 35 + i * 20, "120cm")}`).join("")}
-      ${[0, 1, 2, 3].map((i) => `<rect x="${226 + (i % 2) * 46}" y="${24 + Math.floor(i / 2) * 22}" width="40" height="14" class="ba-wood"/>`).join("")}${BA.label(268, 76, "4 x 60cm")}
-      <polygon points="30,104 210,104 210,118 30,128" class="ba-wood"/>${BA.label(120, 142, "slant the top side boards: 30cm to 15cm")}</g>`;
-    if (s === 2) return `${BA.soil}<g class="ba-new">${[[90, 66], [130, 66], [190, 33], [230, 33]].map(([x, h]) => `<rect x="${x}" y="${150 - h}" width="12" height="${h}" class="ba-wood"/>`).join("")}
-      ${BA.label(116, 72, "2 x 30cm")}${BA.label(216, 106, "2 x 15cm")}</g>`;
-    const box = `${poly([[0, 0, 60], [120, 0, 60], [120, 30, 60], [0, 30, 60]], "ba-wood")}${poly([[0, 0, 0], [0, 0, 60], [0, 30, 60], [0, 15, 0]], "ba-wood-side")}
-      ${poly([[120, 0, 0], [120, 0, 60], [120, 30, 60], [120, 15, 0]], "ba-wood-side")}${poly([[0, 0, 0], [120, 0, 0], [120, 15, 0], [0, 15, 0]], "ba-wood")}
-      <path d="M${X(0, 15, 60).join(" ")} L${X(120, 15, 60).join(" ")}" class="ba-seam"/>`;
-    const lidPts = s >= 5 ? [[0, 30, 60], [120, 30, 60], [120, 52, 18], [0, 52, 18]] : [[0, 46, 52], [120, 46, 52], [120, 40, 0], [0, 40, 0]];
-    return `${BA.soil}
-      ${s >= 5 ? [20, 50, 80, 100].map((x) => BA.seedling(...X(x, 2, 26))).join("") : ""}
-      <g class="${s === 3 ? "ba-new" : ""}">${box}</g>
-      ${P(4, poly(lidPts, "ba-poly") + (s === 4 ? BA.label(160, 22, "lid: battens + clear sheet") : ""))}
-      ${P(5, `<line x1="${X(60, 15, 0)[0]}" y1="${X(60, 15, 0)[1]}" x2="${X(60, 46, 22)[0]}" y2="${X(60, 46, 22)[1]}" class="ba-cane-s"/><circle cx="286" cy="28" r="12" class="ba-sun"/>${BA.label(300, 60, "low side south", "end")}`)}`;
-  },
-};
-// plain: the finished thing, for thumbnails - no gold "this is the new bit", no labels
-const P2 = (s, n, c) => (n > s ? "" : `<g class="${n === s ? "ba-new" : ""}">${c}</g>`);
-const buildArt = (id, stage, plain) => `<svg class="ba ${plain ? "ba-plain" : ""}" viewBox="0 0 320 180" role="img" aria-label="${esc(buildById(id).name)}${plain ? "" : ", step " + stage}">${plain ? BUILD_ART[id](stage).replace(/ba-new/g, "") : BUILD_ART[id](stage)}</svg>`;
+// ---- Build It: supports, covers, beds and a cold frame, step by step --------------------------------------
+// Every step has a 3D drawing of the build so far, with the newest part picked out (static/iso.js draws them, and
+// static/iso-builds.js has each guide's parts). plain: the finished thing, for thumbnails - no highlight, no labels.
+const buildArt = (id, stage, plain) => `<div class="iso-wrap">${BUILD3D.render(id, stage, plain)}</div>`;
 const buildById = (id) => S.cat.build.builds.find((b) => b.id === id);
 const buildCost = (b) => (b.total ? `about ${money(b.total)}` : "free");
 // which builds the crops you're growing need, and when to build each by (a week or few before they go in)
@@ -4142,10 +3904,56 @@ function buildDetail(b) {
       ${b.ready_made ? `<div class="mat-choice"><span class="small">${esc(b.ready_made.text)}</span>${linkRow(b.ready_made.links)}</div>` : ""}</div>
     <div class="card"><h3>Tools</h3><ul class="small" style="margin:0;padding-left:18px">${b.tools.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></div>
     <div class="section-title"><h2>Step by step</h2></div>
-    ${b.steps.map((st, i) => `<div class="card build-step"><div class="build-step-art">${buildArt(b.id, st.pic)}</div><p><b class="step-n">${i + 1}</b>${esc(st.text)}</p></div>`).join("")}
+    <div class="card build-progress"><div class="row" style="justify-content:space-between"><b id="bp-text"></b><button class="btn small primary" id="workshop">▶ Step-by-step mode</button></div>
+      <div class="progress" style="margin-top:8px"><i id="bp-bar" style="width:0"></i></div></div>
+    ${b.steps.map((st, i) => `<article class="bstep" id="bstep-${i}"><div class="bstep-art">${buildArt(b.id, st.pic)}</div>
+      <div class="bstep-body"><p><b class="step-n">${i + 1}</b><span>${esc(st.text)}</span></p>
+        ${st.check ? `<label class="bstep-check"><input type="checkbox" data-bstep="${i}"> <span><small>CHECK BEFORE MOVING ON</small>${esc(st.check)}</span></label>` : ""}</div></article>`).join("")}
     ${b.tips.length ? `<div class="card tint-sun"><h3>Tips</h3><ul class="small" style="margin:0;padding-left:18px">${b.tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></div>` : ""}
     <p class="small muted">Prices are rough, to help you budget - shops change them.</p>`;
   window.scrollTo(0, 0);
+  wireBuildSteps(b);
+}
+// ticked steps are remembered on this device only
+const stepKey = (b) => "gtg-build-" + b.id;
+function stepsDone(b) { try { return new Set(JSON.parse(localStorage.getItem(stepKey(b)) || "[]")); } catch (e) { return new Set(); } }
+function saveSteps(b, set) { try { localStorage.setItem(stepKey(b), JSON.stringify([...set])); } catch (e) { /* private mode */ } }
+function wireBuildSteps(b) {
+  const done = stepsDone(b), n = b.steps.length;
+  const show = () => {
+    $("#bp-text").textContent = done.size === n ? "All done - nice build! 🎉" : `${done.size} of ${n} steps done`;
+    $("#bp-bar").style.width = (100 * done.size) / n + "%";
+    view.querySelectorAll("[data-bstep]").forEach((c) => { c.checked = done.has(Number(c.dataset.bstep)); c.closest(".bstep").classList.toggle("done", c.checked); });
+  };
+  view.querySelectorAll("[data-bstep]").forEach((c) => (c.onchange = () => { const i = Number(c.dataset.bstep); c.checked ? done.add(i) : done.delete(i); saveSteps(b, done); show(); }));
+  $("#workshop").onclick = () => openWorkshop(b, [...Array(n).keys()].find((i) => !done.has(i)) ?? 0, done, show);
+  show();
+}
+// big text, one step at a time, swipe or tap through - for when your hands are full
+function openWorkshop(b, start, done, after) {
+  const n = b.steps.length; let i = start;
+  const box = document.createElement("div"); box.className = "workshop"; box.setAttribute("role", "dialog"); box.setAttribute("aria-label", b.name + " - step by step");
+  document.body.append(box); document.body.style.overflow = "hidden";
+  const draw = () => {
+    const st = b.steps[i];
+    box.innerHTML = `<div class="ws-top"><span class="small muted">${esc(b.name)}</span><button class="btn small ghost" id="ws-x" aria-label="Close">✕</button></div>
+      <div class="ws-dots">${b.steps.map((_, k) => `<i class="${k === i ? "on" : done.has(k) ? "done" : ""}"></i>`).join("")}</div>
+      <div class="ws-art">${buildArt(b.id, st.pic)}</div>
+      <div class="ws-body"><div class="ws-n">Step ${i + 1} of ${n}</div><p class="ws-text">${esc(st.text)}</p>
+        ${st.check ? `<label class="bstep-check ws-check"><input type="checkbox" id="ws-check" ${done.has(i) ? "checked" : ""}> <span><small>CHECK BEFORE MOVING ON</small>${esc(st.check)}</span></label>` : ""}</div>
+      <div class="ws-nav"><button class="btn" id="ws-back" ${i === 0 ? "disabled" : ""}>‹ Back</button><button class="btn primary" id="ws-next">${i === n - 1 ? "Finish ✓" : "Next ›"}</button></div>`;
+    $("#ws-x").onclick = close; $("#ws-back").onclick = () => { i = Math.max(0, i - 1); draw(); };
+    $("#ws-next").onclick = () => { if (i === n - 1) { close(); return; } i++; draw(); };
+    const ck = $("#ws-check"); if (ck) ck.onchange = () => { ck.checked ? done.add(i) : done.delete(i); saveSteps(b, done); };
+  };
+  const close = () => { box.remove(); document.body.style.overflow = ""; document.removeEventListener("keydown", key); after(); };
+  const key = (e) => { if (e.key === "Escape") close(); else if (e.key === "ArrowRight" && i < n - 1) { i++; draw(); } else if (e.key === "ArrowLeft" && i > 0) { i--; draw(); } };
+  document.addEventListener("keydown", key);
+  let x0 = null;
+  box.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+  box.addEventListener("touchend", (e) => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null;
+    if (dx < -60 && i < n - 1) { i++; draw(); } else if (dx > 60 && i > 0) { i--; draw(); } });
+  draw();
 }
 
 // ---- me & badges -----------------------------------------------------------------------------------

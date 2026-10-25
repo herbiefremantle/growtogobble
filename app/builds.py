@@ -333,6 +333,43 @@ BUILDS = [
      "tips": ["Always keep the lid on - it's safer for children and keeps mosquitoes and leaves out.",
               "Link two butts with a connector kit to store twice as much.", "Clean it out once a year, in winter."]},
 ]
+
+# "Check before moving on": one line per step, shown with a tick box under the step
+CHECKS = {
+    "raised_bed": ["The spot is flat, sunny and the string forms a neat 1.2m x 2.4m rectangle.", "Every piece is cut and you can lay them out to match the plan.",
+                   "Each end is square and the posts are flush with the top board.", "Both diagonals measure the same, to within 3mm.",
+                   "The bed doesn't rock and the spirit level bubble sits in the middle.", "No gaps in the cardboard, and the compost reaches the top."],
+    "bean_wigwam": ["The circle is about 1m across and marked on the soil.", "Every cane is firmly in, about 20cm deep, and leaning in.",
+                    "The tops are tied tight and don't slip when you push on the wigwam.", "The string ring is level and every cane has a turn of string.",
+                    "There's one plant at the foot of each cane, and they're pointing up it."],
+    "sweet_pea_wigwam": ["The pot is 40cm or wider with drainage holes, and full of compost.", "All six canes are firm and leaning in.",
+                         "The knot at the top is tight.", "The spiral of string goes from the pot rim right to the top.",
+                         "Two plants at each cane, tied in loosely.", "You've picked flowers for a vase, and no seed pods are forming."],
+    "bean_aframe": ["Two straight lines, 45-60cm apart.", "A cane every 40cm on each line, each opposite another.", "Every pair crosses and is tied at the crossing.",
+                    "The ridge cane sits in the V of every pair and is tied to each.", "A bean plant at the foot of every cane."],
+    "pea_frame": ["Canes are firm, about 1m apart and the same height.", "The top cane is level and tied at every post.", "The net is taut and tied on at the top, middle and bottom.",
+                  "Peas on both sides, with their first tendrils on the net."],
+    "broad_bean_string": ["A cane at every corner, and at least one every metre along the sides.", "The first string is tight at about 30cm all the way round.",
+                          "Strings at 60cm and 90cm too, none sagging.", "Plants are inside the box, leaning on the strings not flopping."],
+    "tomato_stakes": ["Every cane is in 30cm deep, before the plants go in.", "Each plant is 5cm from its cane.", "Ties are loose figures-of-eight with room for the stem to thicken.",
+                      "Side shoots between the leaf and stem are pinched out."],
+    "tomato_strings": ["The frame is solid and the bar doesn't wobble when you pull it.", "A string over every plant's spot, reaching the ground.",
+                       "The string is looped loosely under the first leaves, or buried under the roots.", "You twist the plant round the string once a week."],
+    "hoop_tunnel": ["Pipe is cut into equal lengths, one per metre of bed, plus one.", "Canes are in on both sides, opposite each other, about halfway down.",
+                    "Hoops are evenly spaced and the same height.", "The cover is pulled taut with no loose flapping or holes.", "Every edge is pegged or weighed down with no gaps."],
+    "bottle_cloche": ["The label is off and the bottle is clean and clear.", "The cut is straight and the edge isn't sharp.", "The bottle edge is 2cm into the soil all the way round.",
+                      "The lid is off on warm days, and a cane through the neck stops it blowing away."],
+    "cold_frame": ["Three 120cm boards and four 60cm boards, all the same thickness.", "Posts are upright, 30cm at the back and 15cm at the front.",
+                   "The box is square and the top edge slopes evenly from back to front.", "The lid sits flush with no gaps, and the sheet is screwed on through pre-drilled holes.",
+                   "The lid opens and closes smoothly and the low side faces south."],
+    "staging": ["Every leg is 75cm and the rails are all the right length.", "Each end frame is square and the same as its twin.", "The bench doesn't rock and the rails are level.",
+                "Gaps between slats are about a finger-width.", "The bench is level and strong enough to stand on."],
+    "compost_bin": ["Bare soil, part shade, and easy to reach with a wheelbarrow.", "The two pallets are upright and tied at three heights.", "The sides are tied to stakes and the bin is square.",
+                    "The front opens like a gate and closes securely.", "Layers alternate green and brown, with a lid on top."],
+    "water_butt": ["The spot is level, firm and next to the downpipe.", "The stand is level and the tap clears a watering can.", "The pipe is marked level with the top of the butt.",
+                   "The diverter is fitted and the pipe is joined back up without leaks.", "The hose is connected, the lid is on, and a test shower fills it."],
+}
+
 SECTIONS = [("beds", "Raised beds"), ("supports", "Supports for climbers"), ("covers", "Covers to protect your veg"),
             ("coldframe", "Cold frame and greenhouse"), ("compost", "Compost and water")]
 
@@ -367,7 +404,8 @@ def payload():
             m["cost"] = _cost(m)
             m.pop("shops", None)
             mats.append(m)
-        b2 = dict(b, materials=mats, total=round(sum(m["cost"] for m in mats), 2), role=ROLE[b["id"]], notes=NOTES.get(b["id"], {}))
+        steps = [dict(st, check=CHECKS.get(b["id"], [""] * len(b["steps"]))[i]) for i, st in enumerate(b["steps"])]
+        b2 = dict(b, steps=steps, materials=mats, total=round(sum(m["cost"] for m in mats), 2), role=ROLE[b["id"]], notes=NOTES.get(b["id"], {}))
         b2["for"] = _for(b)
         if b.get("ready_made"):
             b2["ready_made"] = dict(b["ready_made"], links=shops.build_links(b["ready_made"]["search"], GARDEN))

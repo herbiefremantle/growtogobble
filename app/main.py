@@ -66,7 +66,7 @@ app.mount("/static", StaticFiles(directory=STATIC), name="static")
 def _build_version():
     """A fingerprint of the app's own files: it changes whenever a new version is deployed (and only then)."""
     digest = hashlib.sha1()
-    for name in ("index.html", "app.js", "style.css"):
+    for name in ("index.html", "app.js", "iso.js", "iso-builds.js", "style.css"):
         with open(os.path.join(STATIC, name), "rb") as fh:
             digest.update(fh.read())
     return digest.hexdigest()[:12]
@@ -89,7 +89,7 @@ def index():
     after a deploy instead of running an old copy from their cache."""
     with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as f:
         page = f.read()
-    for name in ("app.js", "style.css"):
+    for name in ("app.js", "iso.js", "iso-builds.js", "style.css"):
         page = page.replace("/static/%s\"" % name, "/static/%s?v=%s\"" % (name, BUILD))
     page = page.replace("<head>", '<head>\n<meta name="app-version" content="%s">' % BUILD, 1)
     return HTMLResponse(page, headers={"Cache-Control": "no-cache"})

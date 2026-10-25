@@ -945,3 +945,29 @@ svg.plot .grp-tag { fill: #fff; font-weight: 800; paint-order: stroke; stroke: r
 .build-strip { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: -4px 0 12px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .build-strip a { padding: 5px 11px; border-radius: 999px; background: var(--soil-soft, #f3ebe1); color: var(--ink); text-decoration: none; border: 1px solid var(--line); }
 .ba .ba-pod { fill: none; stroke: #4f8f3a; stroke-width: 3.5; stroke-linecap: round; } .build-role { margin: 10px 0 6px; } .build-note { display: block; color: var(--forest) !important; font-weight: 600; }
+
+/* Build It: the 3D drawings */
+.iso-wrap { background: radial-gradient(120% 90% at 30% 10%, #fffaf0 0%, #f3e8d4 70%, #eadbc2 100%); border-radius: inherit; }
+:root[data-theme="dark"] .iso-wrap { background: radial-gradient(120% 90% at 30% 10%, #3a342a, #2a251d 80%); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .iso-wrap { background: radial-gradient(120% 90% at 30% 10%, #3a342a, #2a251d 80%); } }
+.iso { display: block; width: 100%; height: auto; max-height: 340px; }
+.build-thumb .iso-wrap, .build-link-art .iso-wrap { aspect-ratio: 4 / 3; display: grid; place-items: center; }
+.build-thumb .iso { max-height: 110px; } .build-link-art .iso { max-height: 70px; }
+
+/* Build It: steps like Mill Makes - a big picture, the instruction, a check before moving on */
+.build-progress .progress { height: 8px; }
+.bstep { background: var(--card); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; margin: 0 0 14px; box-shadow: var(--shadow); }
+.bstep.done { opacity: .75; }
+.bstep-art { background: var(--bg-2); } .bstep-art .iso { max-height: 380px; }
+.bstep-body { padding: 14px 16px 16px; } .bstep-body p { margin: 0 0 12px; display: flex; gap: 12px; align-items: flex-start; font-size: 16.5px; line-height: 1.5; }
+.bstep-check { display: flex; gap: 10px; align-items: flex-start; background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 14.5px; cursor: pointer; }
+.bstep-check input { width: 22px; height: 22px; margin-top: 2px; accent-color: var(--forest-2); flex: 0 0 auto; }
+.bstep-check small { display: block; font-size: 10.5px; letter-spacing: .08em; font-weight: 800; color: var(--forest); margin-bottom: 2px; }
+.workshop { position: fixed; inset: 0; z-index: 3000; background: var(--bg); display: flex; flex-direction: column; overflow-y: auto; }
+.ws-top { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px 0; }
+.ws-dots { display: flex; gap: 5px; padding: 8px 14px; } .ws-dots i { flex: 1; height: 5px; border-radius: 3px; background: var(--line); } .ws-dots i.done { background: var(--sage-2); } .ws-dots i.on { background: var(--forest-2); }
+.ws-art { background: var(--bg-2); } .ws-art .iso { max-height: 38vh; }
+.ws-body { padding: 14px 18px; flex: 1; } .ws-n { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--forest); }
+.ws-text { font-size: clamp(20px, 5.4vw, 26px); line-height: 1.35; font-weight: 600; margin: 6px 0 16px; font-family: var(--display); }
+.ws-check { font-size: 16px; }
+.ws-nav { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; padding: 10px 14px calc(14px + env(safe-area-inset-bottom)); position: sticky; bottom: 0; background: var(--bg); }
