@@ -1120,3 +1120,78 @@ def test_onion_and_garlic_check_comes_back_until_they_have_rooted():
         done[open_[0]["key"]] = day.isoformat()
     assert not [j for j in checks(done, day) if j["status"] != "done"]
     assert max(date.fromisoformat(j["start"]) for j in checks(done, day)) < sown + timedelta(weeks=4)
+
+
+def _winter_crop(plant_id, method="sow_out", **kw):
+    crop = {"id": 1, "plant_id": plant_id, "method": method, "anchor": "2026-10-01", "anchor_end": "2026-11-30",
+            "sown_on": "2026-10-10", "planted_on": None, "harvested_on": None, "space_id": None}
+    return dict(crop, **kw)
+
+
+def test_winter_jobs_for_the_garden_and_fruit():
+    from datetime import date
+    from app import winter
+    today = date(2026, 10, 25)
+    bed = {"id": 1, "kind": "bed"}
+    apple = {"id": 7, "kind": "tree", "variety": "apple_eating", "cultivar": "Gala"}
+    plum = {"id": 8, "kind": "tree", "variety": "plum", "cultivar": None}
+    jobs = {j["key"]: j for j in winter.garden_jobs([bed], [apple, plum], [], {}, today, 0)}
+    assert {"g:beds:2026", "g:water:2026", "g:tools:2026", "g:plan:2026", "g:prune7:2026", "g:bare:2026"} <= set(jobs)
+    assert "g:snow:2026" not in jobs  # nothing under cover to knock the snow off
+    assert "g:prune8:2026" not in jobs  # plums are only pruned in summer
+    assert "g:clean:2027" not in jobs and not any(j["key"].startswith("g:clean") for j in jobs.values())  # no pots or greenhouse
+    assert all(j["crop_id"] is None and j["steps"] for j in jobs.values())
+    assert jobs["g:beds:2026"]["start"] == "2026-11-01" and jobs["g:prune7:2026"]["title"].startswith("Prune your gala")
+    # a pot or a greenhouse brings the clean-up job; ticking this year's doesn't tick next year's
+    assert any(j["key"].startswith("g:clean") for j in winter.garden_jobs([{"id": 2, "kind": "pot"}], [], [], {}, today, 0))
+    ticked = {j["key"]: j for j in winter.garden_jobs([bed], [], [], {"g:beds:2026": "2026-11-03"}, date(2026, 12, 20), 0)}
+    assert "g:beds:2027" in ticked and ticked["g:beds:2027"]["status"] == "later"
+    assert any(j["key"] == "g:snow:2026" for j in winter.garden_jobs([bed], [], [_winter_crop("kale")], {}, today, 0))
+    assert any(j["key"] == "g:snow:2026" for j in winter.garden_jobs([bed], [{"id": 3, "kind": "greenhouse"}], [], {}, today, 0))
+    assert not winter.garden_jobs([], [], [], {}, today, 0)  # nothing planned, nothing to do
+
+
+def test_winter_jobs_for_particular_crops():
+    from datetime import date
+    from app import planner
+    today = date(2026, 10, 25)
+    jobs = lambda crop, done=None, t=today: {j["key"]: j for j in planner.crop_jobs(crop, 0, done or {}, t)}
+    assert "c1:firm" in jobs(_winter_crop("garlic"))  # garlic planted in October is in the ground that winter
+    assert "c1:firm" not in jobs(_winter_crop("garlic", anchor="2027-03-01", anchor_end="2027-03-31", sown_on="2027-03-05"))  # lifted before then
+    rhubarb = _winter_crop("rhubarb", "plants", planted_on="2026-10-10", sown_on=None)
+    assert {"c1:mulch", "c1:force"} <= set(jobs(rhubarb))
+    assert "c1:tidy" in jobs(_winter_crop("strawberries", "plants", planted_on="2026-09-01", sown_on=None, anchor="2026-09-01"))
+    assert "c1:mulch" in jobs(_winter_crop("blueberries", "plants", planted_on="2026-10-10", sown_on=None))
+    # seed potatoes are chitted before planting - and the job goes once they're in the ground
+    potatoes = _winter_crop("potatoes", anchor="2027-03-20", anchor_end="2027-04-20", sown_on=None)
+    chit = jobs(potatoes)["c1:chit"]
+    assert chit["start"] == "2027-02-06" and chit["status"] != "done"
+    assert jobs(dict(potatoes, sown_on="2027-03-22"))["c1:chit"]["status"] == "done"
+
+
+def test_stored_crops_are_checked_for_rot_until_used():
+    from datetime import date, timedelta
+    from app import planner
+    harvested = date(2026, 8, 1)
+    onions = _winter_crop("onions", harvested_on=harvested.isoformat())
+    rot = lambda done, t: [j for j in planner.crop_jobs(onions, 0, done, t) if j["key"].startswith("c1:rot")]
+    first = rot({}, date(2026, 9, 1))
+    assert len(first) == 1 and first[0]["start"] == "2026-08-22"
+    after = rot({"c1:rot": "2026-08-30"}, date(2026, 9, 1))
+    assert [j["key"] for j in after] == ["c1:rot", "c1:rot_1"] and after[1]["start"] == "2026-09-27"
+    carrots = planner.crop_jobs(_winter_crop("carrots", harvested_on="2026-08-01"), 0, {}, date(2026, 9, 1))
+    assert not [j for j in carrots if j["key"].startswith("c1:rot")]  # only things that go into store
+
+
+def test_winter_jobs_reach_the_app_and_can_be_ticked(client):
+    _join(client)
+    assert client.post("/api/spaces", json={"name": "Bed 1", "kind": "bed", "width_m": 1.2, "length_m": 2.4}).status_code in (200, 201)
+    garden = client.get("/api/garden").json()
+    keys = [j["key"] for j in garden["garden_jobs"]]
+    beds = next(k for k in keys if k.startswith("g:beds:"))
+    assert client.post("/api/done", json={"key": beds}).status_code == 200
+    again = {j["key"]: j["status"] for j in client.get("/api/garden").json()["garden_jobs"]}
+    assert again[beds] == "done"
+    assert client.post("/api/done", json={"key": beds, "undo": True}).status_code == 200
+    assert client.post("/api/done", json={"key": "g:evil;drop:2026"}).status_code == 400
+    assert client.post("/api/done", json={"key": "c1:firm"}).status_code in (404, 403, 400)  # not someone else's crop

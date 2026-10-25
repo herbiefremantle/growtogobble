@@ -135,6 +135,12 @@ def due_alerts(state, days, sent):
         if tender and tonight["min"] is not None and tonight["min"] <= 2:
             out.append((["frost:" + tonight["date"]], "❄️ Frost warning tonight!",
                         "Cover your %s with fleece or an old sheet, and move pots somewhere sheltered." % _list(tender)))
+        # snow or a hard frost: heavy snow snaps hoops and cold-frame lids, so knock it off
+        for day in days[:2]:
+            if growing and day["min"] is not None and day["min"] <= 0 and (day["rain"] or 0) >= 2:
+                out.append((["snow:" + day["date"]], "❄️ Snow may be on the way",
+                            "After it falls, knock snow off nets, fleece, cloches and cold-frame lids - the weight can snap them. Tap to see the winter jobs."))
+                break
         if growing and days[0]["max"] is not None and days[0]["max"] >= 26:
             out.append((["heat:" + days[0]["date"]], "☀️ Hot day today!",
                         "Water your plants this evening - pots most of all. Water the soil, not the leaves."))

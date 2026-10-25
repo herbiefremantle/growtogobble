@@ -3,7 +3,7 @@ Used by the API, the push alerts and the calendar feed, so they always agree wit
 import json
 from datetime import date
 
-from . import builds, clock, planner, regions, shops
+from . import builds, clock, planner, regions, shops, winter
 from . import plants as catalogue
 from .db import rows
 
@@ -28,15 +28,18 @@ def load(conn, user, today=None, real_only=False):
     friends = conn.execute("SELECT COUNT(*) FROM users WHERE invited_by = ?", (user["id"],)).fetchone()[0]
     with_jobs = [(c, planner.crop_jobs(c, shift, done, today)) for c in crops]
     liked = {c["plant_id"] for c in crops}
+    features = rows(conn, "SELECT id, kind, variety, cultivar FROM features WHERE user_id = ?%s" % real, user["id"])
+    garden_jobs = winter.garden_jobs(spaces, features, crops, done, today, shift)
     return {
+        "garden_jobs": garden_jobs,
         "today": today, "shift": shift, "spaces": spaces, "crops": crops, "done": done,
         "with_jobs": with_jobs, "liked": liked, "has_push": has_push, "friends_joined": friends,
     }
 
 
 def active_jobs(state):
-    """Jobs for crops still in the ground (or planned)."""
-    return [j for c, jobs in state["with_jobs"] if not c.get("finished_on") for j in jobs]
+    """Jobs for crops still in the ground (or planned), and the winter jobs for the garden as a whole."""
+    return [j for c, jobs in state["with_jobs"] if not c.get("finished_on") for j in jobs] + state.get("garden_jobs", [])
 
 
 def update_badges(conn, user, state):
@@ -166,6 +169,7 @@ def payload(conn, user):
         "has_sample": any(s.get("is_sample") for s in state["spaces"]),
         "crops": crops_out,
         "shopping": shopping,
+        "garden_jobs": state["garden_jobs"],
         "badges": [dict(b, earned_on=earned.get(b["id"])) for b in planner.BADGES],
         "new_badges": new_badges,
         "has_push": state["has_push"],

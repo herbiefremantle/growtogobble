@@ -823,31 +823,31 @@ function whenText(job) {
 }
 
 function jobCard(job, opts = {}) {
-  const p = plant(job.plant_id);
-  const c = crop(job.crop_id);
+  const p = job.plant_id ? plant(job.plant_id) : null;  // winter jobs for the whole garden have no plant or crop
+  const c = job.crop_id ? crop(job.crop_id) : null;
   const hot = job.status === "now" && daysBetween(today(), d(job.end)) <= 7 && !["harvest", "care", "eat", "store"].includes(job.kind);
   const done = job.status === "done";
   const canTick = job.status !== "waiting" && job.action !== "batch";
   const tickLabel = { sow: "I've sown them", plant: "I've planted them", harvest: "I've picked some!" }[job.action] || "Done";
   let extra = "";
-  if (job.kind === "buy" && !done) {
+  if (job.kind === "buy" && !done && p) {
     const links = (p.links[c.method] || []).map((l) => `<a class="btn small" href="${esc(l.url)}" target="_blank" rel="sponsored noopener">🛒 ${esc(l.shop)}</a>`).join("");
     extra = `<div class="shop-links" style="margin-top:8px">${links}</div>`;
   }
   if (job.action === "batch" && job.status === "now") extra = `<button class="btn small" style="margin-top:8px" data-batch="${esc(job.key)}">🔁 Sow another batch</button>`;
-  if (job.status === "missed" && ["sow", "plant"].includes(job.action)) {
+  if (job.status === "missed" && ["sow", "plant"].includes(job.action) && c) {
     extra = `<div class="row" style="margin-top:8px"><button class="btn small" data-replan="${job.crop_id}">📅 Plan it for next time</button>
       <button class="btn small ghost" data-tick="${esc(job.key)}">I did it anyway</button></div>`;
   }
   const bj = !done && S.cat.build && buildForJob(job);
   if (bj) extra += `<div style="margin-top:8px">${buildChip(bj, bj.id === "cold_frame" ? "Build a cold frame to harden them off" : "How to build it")}</div>`;
-  const row = rowLabel(c);
-  const where = (opts.showSpace && c.space_name ? ` · ${esc(c.space_name)}` : "") + (row ? ` · ${row}` : "");
+  const row = c ? rowLabel(c) : "";
+  const where = (opts.showSpace && c && c.space_name ? ` · ${esc(c.space_name)}` : "") + (row ? ` · ${row}` : "");
   return `<div class="job">
-    <div class="job-emoji k-${job.kind}">${p.emoji}<small>${job.emoji}</small></div>
+    <div class="job-emoji k-${job.kind}">${p ? `${p.emoji}<small>${job.emoji}</small>` : job.emoji}</div>
     <div class="job-body">
       <div class="job-title">${esc(job.title)}</div>
-      ${opts.noDrop ? "" : `<button class="job-x" data-dropcrop="${c.id}" aria-label="Remove ${esc(p.name.toLowerCase())} from my plan" title="Not growing this? Remove it">✕</button>`}
+      ${opts.noDrop || !c ? "" : `<button class="job-x" data-dropcrop="${c.id}" aria-label="Remove ${esc(p.name.toLowerCase())} from my plan" title="Not growing this? Remove it">✕</button>`}
       <div class="job-when ${hot ? "hot" : ""}">${job.emoji} ${whenText(job)}${where}</div>
       ${job.steps.length ? `<details class="how" data-key="${esc(job.key)}" ${opts.open ? "open" : ""}><summary>Show me how</summary><ol class="steps">${job.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></details>` : ""}
       ${extra}
@@ -945,7 +945,8 @@ document.addEventListener("click", async (e) => {
 });
 
 function activeCrops() { return S.g.crops.filter((c) => !c.finished_on); }
-function allJobs() { return activeCrops().flatMap((c) => c.jobs); }
+// every job: for the crops you're growing, plus the winter jobs for the garden as a whole (no crop of their own)
+function allJobs() { return activeCrops().flatMap((c) => c.jobs).concat(S.g.garden_jobs || []); }
 
 // ---- today -----------------------------------------------------------------------------------------
 
@@ -3781,7 +3782,7 @@ function calendarPage() {
   };
   calMonth = calMonth == null ? 0 : calMonth;
   const m = months[calMonth], mEnd = new Date(m.getFullYear(), m.getMonth() + 1, 0);
-  const monthJobs = crops.flatMap((c) => c.jobs).filter((j) => j.kind !== "eat" && j.kind !== "buy" && d(j.start) <= mEnd && d(j.end) >= m && j.status !== "missed" && j.status !== "done")
+  const monthJobs = allJobs().filter((j) => j.kind !== "eat" && j.kind !== "buy" && d(j.start) <= mEnd && d(j.end) >= m && j.status !== "missed" && j.status !== "done")
     .sort((a, b) => a.start.localeCompare(b.start));
   const calUrl = location.origin + S.me.calendar_path;
   view.innerHTML = `<h1>📅 Growing calendar</h1>${calTabs()}
@@ -4083,8 +4084,9 @@ function buildsYouNeed() {
 }
 // the build that goes with a job, if there is one: supports before planting, covers when they go in, a cold frame to harden off
 function buildForJob(job) {
+  if (!job.plant_id) return null;
   const p = plant(job.plant_id), c = crop(job.crop_id);
-  if (job.kind === "prep") return S.cat.build.builds.find((b) => b.role === "support" && b.for.includes(p.id)) || null;
+  if (job.kind === "prep" && job.key.includes(":prep")) return S.cat.build.builds.find((b) => b.role === "support" && b.for.includes(p.id)) || null;
   if (job.kind === "protect" && job.key.endsWith(":protect")) return buildById(p.pests.who.every((w) => w.name.startsWith("Slugs")) ? "bottle_cloche" : "hoop_tunnel");
   if (job.kind === "plant_out" && c && c.method === "sow_in") return buildById("cold_frame");
   return null;

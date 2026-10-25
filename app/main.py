@@ -1222,9 +1222,10 @@ _DATE_FOR = {"sow": "sown_on", "plant": "planted_on", "harvest": "harvested_on"}
 def mark_done(body: DoneIn, user=Depends(auth.current_user)):
     """Tick off (or un-tick) a job. Sowing, planting and picking also record the date on the crop."""
     today = clock.today().isoformat()
-    crop_key = re.match(r"^c(\d+):(buy|sow|plant|harvest|eat|store|cure|batch|protect|uncover|seeds|winter|wake|care\d+(?:_\d+)?|prep\d+)$", body.key)
+    crop_key = re.match(r"^c(\d+):(buy|sow|plant|harvest|eat|store|cure|batch|protect|uncover|seeds|winter|wake|care\d+(?:_\d+)?|prep\d+|firm|mulch|force|tidy|chit|rot(?:_\d+)?)$", body.key)
     space_key = re.match(r"^s(\d+):nodig(\d+)$", body.key)
-    if not (crop_key or space_key):
+    garden_key = re.match(r"^g:[a-z]+\d*:\d{4}$", body.key)  # a winter job for the whole garden, e.g. g:beds:2026
+    if not (crop_key or space_key or garden_key):
         raise HTTPException(400, "Unknown job")
     with db.connect() as conn:
         if crop_key:
@@ -1240,7 +1241,7 @@ def mark_done(body: DoneIn, user=Depends(auth.current_user)):
                 before = _capacities(state0, {crop["space_id"]} - {None})
                 _new_crop(conn, user, crop["plant_id"], crop["space_id"], crop["method"])
                 _guard(conn, user, before, state0, catalogue.BY_ID[crop["plant_id"]], crop["method"], planner.default_quantity(catalogue.BY_ID[crop["plant_id"]]))
-        else:
+        elif space_key:
             _own(conn, "spaces", int(space_key.group(1)), user)
         if body.undo:
             conn.execute("DELETE FROM done WHERE user_id = ? AND key = ?", (user["id"], body.key))

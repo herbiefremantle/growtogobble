@@ -695,3 +695,53 @@ MIXES += [
                "Tuck straw under the berries as they form, to keep them clean"],
      "tip": "Net the berries as they turn red - not before, or the bees can't get to the flowers."},
 ]
+
+
+# ---- winter and off-season jobs for particular crops -------------------------------------------------------
+# key, window, emoji, title ({name} is the crop), steps. Each shows once, in the first such window after the crop goes in -
+# but only if the crop is still around then (planner.crop_jobs).
+_FIRM = {"key": "firm", "window": ["12-01", "02-28"], "emoji": "🦶", "title": "Firm in any %s lifted by frost",
+         "steps": ["After a hard frost, freezing and thawing can lift plants and loosen their roots ❄️",
+                   "On a day when the soil isn't frozen, walk along the row and look for plants that have heaved up",
+                   "Press the soil firmly round each one with your hand or the heel of your boot 🦶",
+                   "Do it again after each hard frost - firm roots grow, loose ones dry out"]}
+SEASONAL = {
+    "leeks": [_FIRM], "garlic": [_FIRM], "onions": [_FIRM], "kale": [_FIRM], "sprouts": [_FIRM], "broccoli": [_FIRM],
+    "rhubarb": [
+        {"key": "mulch", "window": ["11-01", "12-15"], "emoji": "🧺", "title": "Mulch your rhubarb crown",
+         "steps": ["Cut off the dead leaves once the frost has blackened them 🍂",
+                   "Spread a thick layer (8cm) of compost or well-rotted manure over the crown, keeping it just off the buds",
+                   "That's all the feeding it needs for next year"]},
+        {"key": "force", "window": ["01-10", "02-15"], "emoji": "🌸", "title": "Force your rhubarb for early pink stalks",
+         "steps": ["Cover the crown with a bucket, dustbin or big upturned pot - something that blocks all the light 🪣",
+                   "Put a brick on top so the wind doesn't take it, and heap straw or leaves around it for warmth",
+                   "In 6-8 weeks, you'll find long, pale pink, sweet stalks - pull them and enjoy 😋",
+                   "Only force an established plant (3+ years old), and don't force the same one two years running"]},
+    ],
+    "strawberries": [
+        {"key": "tidy", "window": ["09-20", "10-31"], "emoji": "🍂", "title": "Tidy your strawberries for winter",
+         "steps": ["Cut off old, tatty leaves and any runners you don't want, about 5cm above the crown ✂️",
+                   "Pull out weeds, then put the old leaves on the compost heap (not diseased ones)",
+                   "Spread a thin layer of compost round the plants - keep it off the crowns",
+                   "Plants that are 3 years old crop less - replace a third of them each year with new runners 🍓"]},
+    ],
+    "blueberries": [
+        {"key": "mulch", "window": ["12-01", "02-28"], "emoji": "🫐", "title": "Mulch your blueberries",
+         "steps": ["Blueberries need acid soil - mulch with pine bark or ericaceous (acid-loving) compost, never ordinary compost",
+                   "Spread about 7cm over the roots, keeping it off the stem",
+                   "Water in dry spells with rainwater - tap water is too limey 🌧️"]},
+    ],
+}
+# things you keep after picking, which can rot - checked every 4 weeks while they're in store
+STORE_CHECK = {
+    "onions": (20, "Check your stored onions for rot", ["Take everything out of the box or net and look it over",
+                                                       "Throw away anything soft, mouldy or sprouting - one bad onion spoils the rest 🧅", "Keep the rest somewhere cool, dry and airy"]),
+    "garlic": (20, "Check your stored garlic for rot", ["Look over every bulb - throw away soft, mouldy or sprouting ones",
+                                                       "Use up any that are starting to shrivel first 🧄", "Keep the rest cool, dry and airy"]),
+    "potatoes": (20, "Check your stored potatoes for rot", ["Look through the sack - remove any soft, wet or green ones",
+                                                           "Keep them in the dark, so they don't turn green 🥔", "Keep them cool but frost-free"]),
+    "squash": (20, "Check your stored squash for rot", ["Look for soft patches, mould or damp spots - use those first 🎃",
+                                                       "Keep them somewhere cool and dry, not touching each other"]),
+    "pumpkin": (20, "Check your stored pumpkins for rot", ["Look for soft patches, mould or damp spots - use those first 🎃",
+                                                          "Keep them somewhere cool and dry, not touching each other"]),
+}

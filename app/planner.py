@@ -235,6 +235,7 @@ def crop_jobs(crop, shift, done_keys, today):
         add("seeds", "seeds", "🌰", "Save seeds from your %s for next year" % name.lower(), s_start, h_end + 3 * WEEK,
             steps=plant["save"]["steps"] + catalogue._extras.SEED_STORE, waiting=not in_ground)
 
+    from . import extras
     # tender plants worth keeping alive over winter (chillies!) - bring them in before the frost
     if plant.get("overwinter") and plant["id"] != "dahlia":
         year = h_end.year if h_end.month >= 8 else h_end.year - 1
@@ -244,12 +245,38 @@ def crop_jobs(crop, shift, done_keys, today):
                 steps=["You can keep it for " + plant["overwinter"]["years"]] + plant["overwinter"]["steps"]
                 + ["Tick this if you've brought it in, and we'll remind you to wake it up in spring 🌱"], waiting=not in_ground)
     # ...and once it's been brought in (that job's ticked), a nudge to wake it up in spring
-    from . import extras
     wake = extras.WAKE_UP.get(plant["id"])
     if wake and ("c%d:winter" % cid in done_keys or (plant["id"] == "dahlia" and "c%d:harvest" % cid in done_keys)):
         year = (h_end.year if h_end.month >= 8 else h_end.year - 1) + 1
         s0, s1 = window_dates(wake[0], year, shift)
         add("wake", "overwinter", "🌱", wake[1], s0, s1, steps=wake[2])
+
+    # winter and off-season jobs for this crop: firming in after frost, mulching, forcing rhubarb...
+    for item in extras.SEASONAL.get(plant["id"], []):
+        win = next_window([item["window"]], growing_from, shift)
+        if not win or (not plant.get("perennial") and win[0] > h_end + 2 * WEEK):
+            continue  # it'll be picked and gone before then
+        add(item["key"], "overwinter", item["emoji"], item["title"] % name.lower() if "%s" in item["title"] else item["title"],
+            win[0], win[1], steps=item["steps"], waiting=not in_ground)
+    # seed potatoes sprout better if they're stood on a windowsill for a few weeks first
+    if plant["id"] == "potatoes" and method == "sow_out":
+        add("chit", "prep", "🥔", "Chit your seed potatoes", anchor - 6 * WEEK, anchor,
+            steps=["Stand the seed potatoes in an egg box (or tray) with the end with the most dents - the 'rose' end - facing up 🥚",
+                   "Keep them somewhere light and cool but frost-free, like a bright windowsill or unheated room",
+                   "In about 6 weeks, short, stubby green-purple shoots appear - 2-3cm is perfect",
+                   "Plant them gently so you don't snap the shoots off. They'll crop earlier and heavier"], done=bool(sown))
+    # checking what's in store for rot, every 4 weeks after you last looked, for up to 5 months
+    if harvested and plant["id"] in extras.STORE_CHECK:
+        months, title, steps = extras.STORE_CHECK[plant["id"]]
+        n, s0 = 0, harvested + 3 * WEEK
+        while s0 < harvested + months * WEEK:
+            key = "rot" if n == 0 else "rot_%d" % n
+            add(key, "store", "🔍", title, s0, s0 + 2 * WEEK, steps=steps)
+            ticked = done_keys.get("c%d:%s" % (cid, key)) if isinstance(done_keys, dict) else None
+            if not ticked:
+                break
+            s0 = date.fromisoformat(ticked[:10]) + 4 * WEEK
+            n += 1
 
     # 4. another batch, for a steady supply
     if plant.get("succession") and method != "plants" and sown:
