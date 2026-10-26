@@ -1240,3 +1240,51 @@ def test_winter_jobs_reach_the_app_and_can_be_ticked(client):
     assert client.post("/api/done", json={"key": beds, "undo": True}).status_code == 200
     assert client.post("/api/done", json={"key": "g:evil;drop:2026"}).status_code == 400
     assert client.post("/api/done", json={"key": "c1:firm"}).status_code in (404, 403, 400)  # not someone else's crop
+
+
+# ---- search engines and AI assistants -----------------------------------------------------------------
+
+def test_every_public_page_renders_with_valid_structured_data(client):
+    import json
+    import re
+    from app import seo
+    titles = set()
+    for path in seo.paths():
+        r = client.get(path)
+        assert r.status_code == 200, path
+        for blob in re.findall(r'<script type="application/ld\+json">(.*?)</script>', r.text, re.S):
+            json.loads(blob)
+        assert 'rel="canonical"' in r.text and 'name="description"' in r.text, path
+        titles.add(re.search(r"<title>(.*?)</title>", r.text).group(1))
+    assert len(titles) == len(seo.paths())  # no two pages share a title
+
+
+def test_plant_page_answers_the_question_people_search_for(client):
+    r = client.get("/grow/tomatoes")
+    assert "When should I sow" in r.text and "central England" in r.text
+    assert 'rel="sponsored nofollow noopener"' in r.text  # affiliate links are marked as such
+    assert client.get("/grow/no-such-plant").status_code == 404
+    assert client.get("/sow/smarch").status_code == 404
+
+
+def test_home_page_is_readable_without_javascript(client):
+    r = client.get("/")
+    assert "<noscript>" in r.text and "/grow/tomatoes" in r.text and 'rel="canonical"' in r.text
+    assert "<!--seo" not in r.text
+
+
+def test_robots_sitemap_and_llms(client, monkeypatch):
+    monkeypatch.setenv("SITE_URL", "https://www.example.test")
+    robots = client.get("/robots.txt").text
+    assert "Sitemap: https://www.example.test/sitemap.xml" in robots
+    assert "Disallow: /api/" in robots and "User-agent: GPTBot" in robots and "User-agent: ClaudeBot" in robots
+    sm = client.get("/sitemap.xml").text
+    assert "https://www.example.test/grow/tomatoes" in sm and "https://www.example.test/build/raised-bed" in sm
+    assert "growtogobble" not in sm
+    assert "# Grow to Gobble" in client.get("/llms.txt").text
+
+
+def test_months_cover_the_sowing_year():
+    from app import seo
+    assert seo.windows_text([["03-15", "09-10"]]) == "mid March to early September"
+    assert seo._in_month(["10-15", "03-15"], 1) and not seo._in_month(["10-15", "03-15"], 6)

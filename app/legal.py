@@ -139,6 +139,8 @@ SHELL = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>%(title)s - Grow to Gobble</title>
 <meta name="robots" content="index,follow">
+<meta name="description" content="%(desc)s">
+<link rel="canonical" href="%(canon)s">
 <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
 <style>
 :root { color-scheme: light dark; --bg:#f3f5f2; --fg:#1d2a1f; --muted:#5b6b5e; --green:#2f7d3a; }
@@ -164,4 +166,10 @@ nav.foot a { margin-right:16px; }
 
 def page(name):
     title, body = PAGES[name]
-    return SHELL % {"title": title, "body": body % {"updated": UPDATED, "contact": contact()}}
+    path = {"privacy": "/privacy", "terms": "/terms", "affiliate": "/affiliate-disclosure"}[name]
+    desc = {"privacy": "How Grow to Gobble handles your information, in plain words.",
+            "terms": "The terms for using Grow to Gobble.",
+            "affiliate": "How Grow to Gobble earns a small commission from some shop links, at no extra cost to you."}[name]
+    canon = os.environ.get("SITE_URL", "https://www.growtogobble.co.uk").strip().rstrip("/") + path
+    return SHELL % {"title": title, "desc": html.escape(desc), "canon": html.escape(canon),
+                    "body": body % {"updated": UPDATED, "contact": contact()}}

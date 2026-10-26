@@ -289,7 +289,7 @@ async function shareApp(outEl) {
 
 // Privacy, terms and affiliate disclosure: server-rendered pages (app/legal.py)
 function legalLinks() {
-  return `<p class="small muted" style="text-align:center;margin:24px 0 8px"><a href="/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="/terms" target="_blank" rel="noopener">Terms</a> · <a href="/affiliate-disclosure" target="_blank" rel="noopener">Affiliate disclosure</a></p>`;
+  return `<p class="small muted" style="text-align:center;margin:24px 0 8px"><a href="/grow" target="_blank" rel="noopener">Plant guides</a> · <a href="/build" target="_blank" rel="noopener">Build it guides</a> · <a href="/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="/terms" target="_blank" rel="noopener">Terms</a> · <a href="/affiliate-disclosure" target="_blank" rel="noopener">Affiliate disclosure</a></p>`;
 }
 
 function loginPage() {

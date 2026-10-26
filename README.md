@@ -25,6 +25,7 @@ python3 -m venv .venv
 | `app/regions.py` | Postcode → region → how many days earlier/later to plant. Only the first half of the postcode is kept. |
 | `app/planner.py` | Turns a crop into dated jobs; bare-bed suggestions; badges. Pure logic, well tested. |
 | `app/alerts.py` | Phone notifications (Web Push), frost/heat/dry-spell warnings (Open-Meteo, free), the calendar feed. |
+| `app/seo.py` | The public pages search engines and AI assistants read: `/grow/<plant>`, `/fruit/<id>`, `/build/<guide>`, `/sow/<month>`, plus `/sitemap.xml`, `/robots.txt` and `/llms.txt`. All made from the catalogue, so adding a plant adds its page. |
 | `app/mail.py` | Sends the password-reset emails through Resend. |
 | `app/legal.py` | The Privacy, Terms and Affiliate Disclosure pages (`/privacy`, `/terms`, `/affiliate-disclosure`). Edit if what the app collects changes. |
 | `app/shops.py` | Buy links (Thompson & Morgan, Suttons, Amazon) and affiliate settings. |
@@ -44,6 +45,7 @@ Code: https://github.com/herbiefremantle/growtogobble - every push to `main` red
    - `AMAZON_TAG`, `AWIN_ID`, `AWIN_MID_THOMPSON_MORGAN`, `AWIN_MID_SUTTONS` - affiliate ids (see `app/shops.py`)
    - `RESEND_API_KEY`, `MAIL_FROM` (e.g. `Grow to Gobble <hello@yourdomain>`), optional `PUBLIC_URL` - turns on **Forgotten your
      password?** emails (free Resend account; verify your sending domain there). Without them nothing is sent.
+   - `SITE_URL=https://www.growtogobble.co.uk` - the address used in canonical links, the sitemap and link previews (that's the default)
    - `CONTACT_EMAIL=you@yourdomain` - shown on the privacy, terms and affiliate pages
    - `SESSION_SECRET` - otherwise one is generated and stored in the database
    - `ADMIN_EMAIL=you@example.com` - that account becomes an admin (comma-separate several). Admins get an

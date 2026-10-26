@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import alerts, auth, clock, db, garden, legal, mail, onboarding, planner, regions
+from . import alerts, auth, clock, db, garden, legal, mail, onboarding, planner, regions, seo
 from . import plants as catalogue
 
 STATIC = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
@@ -61,6 +61,7 @@ async def lifespan(app):
 
 app = FastAPI(title="Grow to Gobble", lifespan=lifespan, docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+app.include_router(seo.router)
 
 
 def _build_version():
@@ -92,6 +93,7 @@ def index():
     for name in ("app.js", "iso.js", "iso-builds.js", "style.css"):
         page = page.replace("/static/%s\"" % name, "/static/%s?v=%s\"" % (name, BUILD))
     page = page.replace("<head>", '<head>\n<meta name="app-version" content="%s">' % BUILD, 1)
+    page = page.replace("<!--seo-head-->", seo.home_head(), 1).replace("<!--seo-noscript-->", seo.home_noscript(), 1)
     return HTMLResponse(page, headers={"Cache-Control": "no-cache"})
 
 
