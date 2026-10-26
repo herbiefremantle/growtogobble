@@ -42,6 +42,7 @@ let showPhotos = false;
 try { showPhotos = localStorage.getItem("gtg-photos") === "1"; } catch (e) { /* private mode */ }
 const pic = (p) => (showPhotos && p.photo ? `<img class="pic" src="${esc(p.photo.src)}" alt="${esc(p.name)}" loading="lazy" data-fallback="${esc(p.emoji)}">` : p.emoji);
 const blobCls = (p) => (showPhotos && p.photo ? "has-pic" : "");
+const syncPhotoBtn = () => { const b = document.getElementById("photo-btn"); if (b) { b.setAttribute("aria-pressed", String(showPhotos)); b.title = showPhotos ? "Showing photos: tap for icons" : "Showing icons: tap for photos"; } };
 const photoToggle = () => `<button class="btn small ${showPhotos ? "primary" : ""}" data-photos aria-pressed="${showPhotos}">${showPhotos ? "🖼️ Photos" : "😀 Icons"}</button>`;
 // Plain headings and buttons: strip a decorative emoji from the start of the text (only when words follow it)
 const LEAD_EMOJI = /^\s*(?:\p{Extended_Pictographic}|\p{Regional_Indicator}{2})(?:\uFE0F|\u200D\p{Extended_Pictographic}|\p{Emoji_Modifier})*\s*(?=[\p{L}£0-9])/u;
@@ -2732,7 +2733,7 @@ function plantsPage() {
     const oc = e.target.closest("[data-open-combo]");
     if (oc) { openCombo(oc.dataset.openCombo); return; }
     if (e.target.closest("[data-mixes]")) { openSheet(`<h2>Sow together to save space</h2><p class="muted small">One is picked before the next needs the room.</p><div class="nbs">${S.cat.mixes.map((m) => mixButton(m.id)).join("")}</div>`); return; }
-    if (e.target.closest("[data-photos]")) { showPhotos = !showPhotos; remember("gtg-photos", showPhotos); plantsPage(); toast(showPhotos ? "🖼️ Showing photos" : "😀 Showing icons"); return; }
+    if (e.target.closest("[data-photos]")) { showPhotos = !showPhotos; remember("gtg-photos", showPhotos); syncPhotoBtn(); plantsPage(); toast(showPhotos ? "🖼️ Showing photos" : "😀 Showing icons"); return; }
     const g = e.target.closest("[data-pgroup]");
     if (g) { plantGroup = g.dataset.pgroup; plantFilter = "all"; plantSearch = ""; plantsPage(); return; }
     const t = e.target.closest(".tile[data-plant]");
@@ -4018,7 +4019,7 @@ function mePage() {
   api("GET", "/api/invites").then(tally, () => { $("#invite-tally").textContent = ""; });
   $("#help").onclick = helpSheet;
   view.querySelectorAll("[data-theme-set]").forEach((b) => (b.onclick = () => { setTheme(b.dataset.themeSet); mePage(); }));
-  $("#photos-pref").onchange = (e) => { showPhotos = e.target.checked; remember("gtg-photos", showPhotos); toast(showPhotos ? "Showing photos" : "Showing icons"); };
+  $("#photos-pref").onchange = (e) => { showPhotos = e.target.checked; remember("gtg-photos", showPhotos); syncPhotoBtn(); toast(showPhotos ? "Showing photos" : "Showing icons"); };
   $("#invite").onclick = async () => {
     try {
       const t = await api("POST", "/api/invites");
@@ -4170,6 +4171,8 @@ function setTheme(mode) {  // "light", "dark" or "" (match the phone)
   $("#theme-color").setAttribute("content", themeNow() === "dark" ? "#0d1511" : "#f3f5f2");
 }
 setTheme(document.documentElement.getAttribute("data-theme") || "");
+$("#photo-btn").onclick = () => { showPhotos = !showPhotos; remember("gtg-photos", showPhotos); syncPhotoBtn(); render(); toast(showPhotos ? "🖼️ Showing photos" : "😀 Showing icons"); };
+syncPhotoBtn();
 $("#theme-btn").onclick = () => { setTheme(themeNow() === "dark" ? "light" : "dark"); if (location.hash.startsWith("#/me")) mePage(); };
 
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); S.installPrompt = e; });
