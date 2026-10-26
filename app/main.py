@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import alerts, auth, clock, db, garden, onboarding, planner, regions
+from . import alerts, auth, clock, db, garden, legal, mail, onboarding, planner, regions
 from . import plants as catalogue
 
 STATIC = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
@@ -110,6 +110,21 @@ def service_worker():
 @app.get("/health")
 def health():
     return {"ok": True}
+
+
+@app.get("/privacy")
+def privacy_page():
+    return HTMLResponse(legal.page("privacy"))
+
+
+@app.get("/terms")
+def terms_page():
+    return HTMLResponse(legal.page("terms"))
+
+
+@app.get("/affiliate-disclosure")
+def affiliate_page():
+    return HTMLResponse(legal.page("affiliate"))
 
 
 # ---- accounts -------------------------------------------------------------------------------------
@@ -286,6 +301,27 @@ def reset_password(body: Reset, request: Request):
     resp = JSONResponse(_me(user))
     auth.set_cookie(resp, request, uid)
     return resp
+
+
+class Forgot(BaseModel):
+    email: str
+
+
+@app.post("/api/forgot")
+def forgot_password(body: Forgot, request: Request):
+    """Email a one-time reset link. Always answers the same way, so it can't be used to find out who has an account."""
+    ip = request.client.host if request.client else "?"
+    if auth.too_many_failures(ip):
+        raise HTTPException(429, "Too many tries. Have a break and try again in 10 minutes.")
+    auth.record_failure(ip)  # counts towards the same brake, so one address can't spam anyone's inbox
+    with db.connect() as conn:
+        row = conn.execute("SELECT id, name, email FROM users WHERE email = ?", (body.email.strip().lower(),)).fetchone()
+        if row:
+            token = auth.create_reset(conn, row["id"], None)
+    if row:
+        link = "%s/#/reset?token=%s" % (mail.public_url(request), token)
+        mail.send(row["email"], "Reset your Grow to Gobble password", mail.reset_email(row["name"], link, auth.RESET_HOURS))
+    return {"ok": True}
 
 
 def _only_admin(conn, user_id):

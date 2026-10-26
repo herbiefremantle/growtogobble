@@ -199,7 +199,7 @@ function go(hash) { if (location.hash === hash) render(); else location.hash = h
 window.addEventListener("hashchange", () => { if (!updateIfReady()) render(); });
 
 const PAGES = { "": home, garden: gardenPage, calendar: calendarPage, plants: plantsPage, build: buildPage, me: mePage, shop: shopPage, start: onboarding, admin: adminPage };
-const PUBLIC = { welcome, login: loginPage, join: joinPage, reset: resetPage };
+const PUBLIC = { welcome, login: loginPage, join: joinPage, forgot: forgotPage, reset: resetPage };
 
 // The invite code from a friend's link, kept on this phone until they sign up
 function inviteCode(fromLink) {
@@ -264,7 +264,8 @@ function welcome() {
     <p class="muted" style="margin:0">Every job is a short list of steps with pictures. Tick them off, earn badges and eat what you grow.</p>
   </div>
   <div class="card tint-leaf"><h3>📦 No digging needed</h3><p class="muted" style="margin:0">Build a no-dig bed with cardboard and compost, or grow in pots on a patio.</p></div>
-  <div class="card tint-sky"><h3>🔔 We'll remind you</h3><p class="muted" style="margin:0">Your phone gets a nudge when it's time to sow, plant, water, pick and protect from frost, with dates for where you live.</p></div>`;
+  <div class="card tint-sky"><h3>🔔 We'll remind you</h3><p class="muted" style="margin:0">Your phone gets a nudge when it's time to sow, plant, water, pick and protect from frost, with dates for where you live.</p></div>
+  ${legalLinks()}`;
   $("#share-app").onclick = () => shareApp($("#share-out"));
   showInviter($("#invited"));
   wireReel();
@@ -286,6 +287,11 @@ async function shareApp(outEl) {
   outEl.onclick = (e) => { const c = e.target.closest("[data-copy]"); if (c) navigator.clipboard.writeText(c.dataset.copy).then(() => toast("Link copied 📋"), () => toast("Select the link and copy it")); };
 }
 
+// Privacy, terms and affiliate disclosure: server-rendered pages (app/legal.py)
+function legalLinks() {
+  return `<p class="small muted" style="text-align:center;margin:24px 0 8px"><a href="/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="/terms" target="_blank" rel="noopener">Terms</a> · <a href="/affiliate-disclosure" target="_blank" rel="noopener">Affiliate disclosure</a></p>`;
+}
+
 function loginPage() {
   view.innerHTML = `<div class="auth-card"><div class="hero" style="padding-bottom:0"><div class="big">🧑‍🌾</div><h1>Welcome back</h1></div>
   <form class="card" id="f">
@@ -294,7 +300,7 @@ function loginPage() {
     <div id="err"></div>
     <button class="btn primary wide" style="margin-top:16px">Log in</button>
   </form><p class="small muted" style="text-align:center"><a href="#/join">New here? Make an account</a></p>
-  <p class="small muted" style="text-align:center">Forgotten your password? Ask whoever runs Grow to Gobble for a reset link.</p></div>`;
+  <p class="small muted" style="text-align:center"><a href="#/forgot">Forgotten your password?</a></p></div>`;
   $("#f").onsubmit = async (e) => {
     e.preventDefault();
     try { S.me = await api("POST", "/api/login", { email: $("#email").value, password: $("#pw").value }); await boot(); }
@@ -314,7 +320,8 @@ function joinPage() {
     <label class="check"><input type="checkbox" id="age"> <span>I'm 13 or older, <b>or</b> a grown-up is setting this up with me.</span></label>
     <div id="err"></div>
     <button class="btn primary wide" style="margin-top:16px">Create my garden</button>
-  </form><p class="small muted" style="text-align:center"><a href="#/login">Already have an account? Log in</a></p></div>`;
+  </form><p class="small muted" style="text-align:center"><a href="#/login">Already have an account? Log in</a></p>
+  <p class="small muted" style="text-align:center">By creating an account you agree to the <a href="/terms" target="_blank" rel="noopener">Terms</a> and <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</p></div>`;
   showInviter($("#invited"));
   $("#f").onsubmit = async (e) => {
     e.preventDefault();
@@ -3993,6 +4000,7 @@ function mePage() {
     </div>
     ${S.installPrompt ? `<div class="card tint-leaf"><h3>📲 Install the app</h3><button class="btn primary" id="install">Add to my home screen</button></div>` : ""}
     <div class="row"><button class="btn" id="logout">Log out</button></div>
+    ${legalLinks()}
     <details class="card" style="margin-top:14px"><summary><b>🔄 Start my garden again</b></summary>
       <p class="small">Clears all your beds, plants, ticked jobs and garden badges so you can set up from scratch. Your account, password, reminders and invites stay.</p>
       <label class="field" for="rspw">Type your password to confirm</label><input id="rspw" type="password" autocomplete="current-password">
@@ -4081,7 +4089,7 @@ function drawAdmin(data) {
     <div class="card tint-leaf"><b>💌 Invites:</b> ${data.invites.sent} sent · ${data.invites.joined} joined${data.invites.sent ? ` (${Math.round((100 * data.invites.joined) / data.invites.sent)}%)` : ""}
       ${data.users.some((u) => u.invites_sent) ? `<div class="small" style="margin-top:6px">${data.users.filter((u) => u.invites_sent).sort((a, b) => b.invites_joined - a.invites_joined || b.invites_sent - a.invites_sent)
         .map((u) => `${esc(u.name)}: ${u.invites_sent} sent, <b>${u.invites_joined} joined</b>`).join("<br>")}</div>` : ""}</div>
-    <p class="muted">${data.users.length} account${data.users.length === 1 ? "" : "s"}. There's no email sending yet, so to reset someone's password, make a link and send it to them yourself - it works once, for 48 hours.</p>
+    <p class="muted">${data.users.length} account${data.users.length === 1 ? "" : "s"}. People can reset their own password from the login page (by email). If that isn't set up, or they can't get the email, make a link and send it to them yourself - it works once, for 48 hours.</p>
     ${data.users.map((u) => `<div class="card">
       <div class="row" style="justify-content:space-between"><div><b>${esc(u.name)}</b> ${u.is_admin ? `<span class="chip">🛠️ Admin</span>` : ""}${u.id === data.me ? ` <span class="chip grey">You</span>` : ""}
         <div class="small muted">${esc(u.email)}${u.outcode ? " · " + esc(u.outcode) : ""}</div>
@@ -4117,7 +4125,24 @@ function drawAdmin(data) {
   };
 }
 
-// A one-time link from an admin: set a new password and carry on
+// Forgotten password: ask for a reset link by email
+function forgotPage() {
+  view.innerHTML = `<div class="auth-card"><div class="hero" style="padding-bottom:0"><div class="big">📧</div><h1>Forgotten your password?</h1></div>
+  <form class="card" id="f">
+    <p class="muted" style="margin-top:0">Type your email and we'll send you a link to set a new one.</p>
+    <label class="field" for="email">Email</label><input id="email" type="email" autocomplete="email" required>
+    <div id="err"></div><button class="btn primary wide" style="margin-top:16px">Send me a link</button>
+  </form><p class="small muted" style="text-align:center"><a href="#/login">Back to log in</a></p></div>`;
+  $("#f").onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await api("POST", "/api/forgot", { email: $("#email").value });
+      $("#f").innerHTML = `<p style="margin:0"><b>Check your email.</b> If there's an account for that address, a link is on its way (it can take a few minutes - look in junk too). The link works once, for 48 hours.</p>`;
+    } catch (err) { $("#err").innerHTML = `<div class="error">${esc(err.message)}</div>`; }
+  };
+}
+
+// A one-time link (from an email, or made by an admin): set a new password and carry on
 function resetPage() {
   const token = new URLSearchParams(location.hash.split("?")[1] || "").get("token") || "";
   view.innerHTML = `<div class="auth-card"><div class="hero" style="padding-bottom:0"><div class="big">🔑</div><h1>Set a new password</h1></div>

@@ -360,6 +360,50 @@ def test_admin_email_becomes_admin_and_can_reset_a_password(client, monkeypatch)
     assert client.post("/api/login", json={"email": "kid@example.com", "password": "brand-new-pw"}).status_code == 200
 
 
+def test_forgot_password_emails_a_one_time_link(client, monkeypatch):
+    from app import auth, mail
+    auth._failures.clear()
+    sent = []
+    monkeypatch.setattr(mail, "send", lambda to, subject, text: sent.append((to, text)) or True)
+    monkeypatch.setenv("PUBLIC_URL", "https://grow.example")
+    _join(client, "kid@example.com")
+    client.post("/api/logout")
+    # same answer whether or not the account exists, and no email goes to a stranger
+    assert client.post("/api/forgot", json={"email": "nobody@example.com"}).json() == {"ok": True}
+    assert sent == []
+    assert client.post("/api/forgot", json={"email": " Kid@Example.com "}).json() == {"ok": True}
+    assert len(sent) == 1 and sent[0][0] == "kid@example.com"
+    link = next(w for w in sent[0][1].split() if w.startswith("https://grow.example/#/reset?token="))
+    token = link.split("token=")[1]
+    assert client.post("/api/reset", json={"token": token, "password": "fresh-password"}).status_code == 200
+    assert client.post("/api/reset", json={"token": token, "password": "again-again"}).status_code == 400
+    client.post("/api/logout")
+    assert client.post("/api/login", json={"email": "kid@example.com", "password": "fresh-password"}).status_code == 200
+
+
+def test_forgot_password_is_rate_limited(client, monkeypatch):
+    from app import auth, mail
+    auth._failures.clear()
+    monkeypatch.setattr(mail, "send", lambda *a: True)
+    codes = [client.post("/api/forgot", json={"email": "x@example.com"}).status_code for _ in range(auth.MAX_FAILURES + 1)]
+    assert codes[:auth.MAX_FAILURES] == [200] * auth.MAX_FAILURES and codes[-1] == 429
+    auth._failures.clear()
+
+
+def test_email_not_configured_sends_nothing(monkeypatch):
+    from app import mail
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    assert mail.send("a@b.co", "hi", "there") is False
+
+
+def test_legal_pages(client, monkeypatch):
+    monkeypatch.setenv("CONTACT_EMAIL", "hello@example.com")
+    for path, words in [("/privacy", "Privacy Policy"), ("/terms", "Terms of Use"),
+                        ("/affiliate-disclosure", "As an Amazon Associate we earn from qualifying purchases")]:
+        r = client.get(path)
+        assert r.status_code == 200 and words in r.text and "hello@example.com" in r.text
+
+
 def test_change_password_and_email(client):
     _join(client)
     assert client.post("/api/me/password", json={"current": "wrong-one", "new": "whatever12"}).status_code == 400

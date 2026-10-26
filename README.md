@@ -25,6 +25,8 @@ python3 -m venv .venv
 | `app/regions.py` | Postcode → region → how many days earlier/later to plant. Only the first half of the postcode is kept. |
 | `app/planner.py` | Turns a crop into dated jobs; bare-bed suggestions; badges. Pure logic, well tested. |
 | `app/alerts.py` | Phone notifications (Web Push), frost/heat/dry-spell warnings (Open-Meteo, free), the calendar feed. |
+| `app/mail.py` | Sends the password-reset emails through Resend. |
+| `app/legal.py` | The Privacy, Terms and Affiliate Disclosure pages (`/privacy`, `/terms`, `/affiliate-disclosure`). Edit if what the app collects changes. |
 | `app/shops.py` | Buy links (Thompson & Morgan, Suttons, Amazon) and affiliate settings. |
 | `app/main.py` | The API. |
 | `static/` | The app screens (`app.js`), styles, service worker, icons. |
@@ -40,6 +42,9 @@ Code: https://github.com/herbiefremantle/growtogobble - every push to `main` red
 4. Optional variables (**Variables** tab):
    - `VAPID_CONTACT=mailto:you@yourdomain` - contact address sent with push notifications
    - `AMAZON_TAG`, `AWIN_ID`, `AWIN_MID_THOMPSON_MORGAN`, `AWIN_MID_SUTTONS` - affiliate ids (see `app/shops.py`)
+   - `RESEND_API_KEY`, `MAIL_FROM` (e.g. `Grow to Gobble <hello@yourdomain>`), optional `PUBLIC_URL` - turns on **Forgotten your
+     password?** emails (free Resend account; verify your sending domain there). Without them nothing is sent.
+   - `CONTACT_EMAIL=you@yourdomain` - shown on the privacy, terms and affiliate pages
    - `SESSION_SECRET` - otherwise one is generated and stored in the database
    - `ADMIN_EMAIL=you@example.com` - that account becomes an admin (comma-separate several). Admins get an
      **Admin** page under Badges → My account: every account, one-time password-reset links, make/remove admins,
@@ -62,8 +67,6 @@ app is "commercial"; swapping to Google Maps would need a Maps JavaScript API ke
 
 ## Not done yet
 
-- Password reset by email (needs an email service such as Postmark or Resend) - for now an admin makes a
-  one-time reset link and sends it themselves, like the Training Tracker
 - Photos/illustrations for each step (emoji for now)
 - Crop rotation advice, and a drawn garden layout
 - App Store / Play Store versions (the installable web app covers phones for now)
