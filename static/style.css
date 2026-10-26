@@ -973,3 +973,9 @@ svg.plot .grp-tag { fill: #fff; font-weight: 800; paint-order: stroke; stroke: r
 .ws-text { font-size: clamp(20px, 5.4vw, 26px); line-height: 1.35; font-weight: 600; margin: 6px 0 16px; font-family: var(--display); }
 .ws-check { font-size: 16px; }
 .ws-nav { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; padding: 10px 14px calc(14px + env(safe-area-inset-bottom)); position: sticky; bottom: 0; background: var(--bg); }
+
+/* "better on a laptop" note for phones, on the garden plan and the map */
+.desktop-note { display: flex; gap: 12px; align-items: flex-start; position: relative; background: var(--marigold-soft, #fdf1d6); border: 1.5px solid var(--marigold, #e9a93a); border-radius: 14px; padding: 12px 38px 12px 12px; margin: 0 0 12px; font-size: 14.5px; line-height: 1.45; }
+.desktop-note b { display: block; font-size: 15.5px; margin-bottom: 2px; }
+.dn-icon { font-size: 26px; line-height: 1; }
+.dn-x { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; border: 0; background: transparent; font-size: 16px; color: var(--muted); border-radius: 50%; cursor: pointer; }

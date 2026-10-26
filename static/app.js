@@ -1646,7 +1646,7 @@ function plotPage() {
   const T = plotDate();
   const label = plotMonth === 0 ? "Today" : `${MONTHS_LONG[T.getMonth()]}${T.getFullYear() !== today().getFullYear() ? " " + T.getFullYear() : ""}`;
   view.innerHTML = `<h1>🪴 My garden</h1>${gardenTabs()}
-    ${boundaryEdit ? "" : outlineBox()}
+    ${boundaryEdit ? "" : desktopNote(true) + outlineBox()}
     ${placing ? `<div class="card tint-sun row placing" style="justify-content:space-between"><b>👆 Tap a bed to put ${plant(crop(placing).plant_id).emoji} ${esc(plant(crop(placing).plant_id).name)} in it</b><button class="btn small ghost" id="cancel-place">Cancel</button></div>` : ""}
     ${plotEdit && !boundaryEdit ? `<div class="card tint-sky small" style="margin-bottom:10px"><b>✏️ Editing:</b> drag anything to move it - zoom in for a finer grid (down to 50cm squares). Tap something to change, turn or remove it. To move several beds together, tap <b>🔗 Group beds</b>.</div>` : ""}
     <div class="plan-bar"><button class="btn small ${plotEdit ? "primary" : ""}" id="edit">${plotEdit ? "✅ Done editing" : "✏️ Edit plan"}</button>
@@ -1799,6 +1799,22 @@ function editPanel() {
 
 // Your whole garden or field: at the top of the Garden page to start with; once it's traced (or sized), folded away
 let outlineOpen = false;
+// Drawing the garden to scale is fiddly on a small screen - say so, clearly, to anyone on a phone. On the Garden page it
+// can be put away (remembered on this device); in the map pop-up it's always there.
+const onPhone = () => matchMedia("(max-width: 700px)").matches || (matchMedia("(pointer: coarse)").matches && Math.min(innerWidth, innerHeight) < 700);
+function desktopNote(dismissible) {
+  let hidden = false;
+  try { hidden = dismissible && localStorage.getItem("gtg-desktop-note") === "1"; } catch (e) { /* private mode */ }
+  if (!onPhone() || hidden) return "";
+  return `<div class="desktop-note" role="note"><span class="dn-icon" aria-hidden="true">💻</span><span><b>Designing your garden is easier on a laptop or computer.</b>
+    The map and the plan have lots to drag and tap - on a phone it works, but a bigger screen is much easier. You can start here and carry on later: everything is saved to your account.</span>
+    ${dismissible ? `<button class="dn-x" data-hide-desktop-note aria-label="Hide this note">✕</button>` : ""}</div>`;
+}
+document.addEventListener("click", (e) => {
+  const x = e.target.closest("[data-hide-desktop-note]"); if (!x) return;
+  try { localStorage.setItem("gtg-desktop-note", "1"); } catch (err) { /* private mode */ }
+  x.closest(".desktop-note").remove();
+});
 function outlineBox() {
   const g = S.g.garden;
   const body = `<p class="small muted" style="margin:4px 0 8px">Trace it on a satellite map, or type its size. The plan then shows its edge, so you can place everything where it really is.</p>
@@ -2290,7 +2306,7 @@ function shapeStats(pts) {
 
 async function openMapTrace() {
   S.sheet = null;
-  openSheet(`<h2>🗺️ Trace your garden</h2>
+  openSheet(`<h2>🗺️ Trace your garden</h2>${desktopNote(false)}
     <p class="small" style="margin:0 0 8px">Find your garden or field, zoom in, then <b>tap each corner</b> round its edge. 🔒 Grow to Gobble only keeps the shape and size - <b>never where it is</b>. This phone remembers the spot so it can show the satellite picture under your plan.</p>
     <form id="m-find" class="row" style="flex-wrap:nowrap;margin-bottom:8px"><input id="m-pc" type="text" autocomplete="postal-code" placeholder="Full postcode, e.g. LS6 2AB" aria-label="Postcode to find on the map">
       <button class="btn small primary" type="submit">🔍 Find</button></form>
