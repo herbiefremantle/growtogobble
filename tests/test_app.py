@@ -1288,3 +1288,39 @@ def test_months_cover_the_sowing_year():
     from app import seo
     assert seo.windows_text([["03-15", "09-10"]]) == "mid March to early September"
     assert seo._in_month(["10-15", "03-15"], 1) and not seo._in_month(["10-15", "03-15"], 6)
+
+
+def test_every_planting_instruction_says_how_far_apart():
+    """Wherever the app says how to plant something - a job, the plant's page, the public page - it says how far apart,
+    in cm, from the plant's own spacing (and bulbs, crowns and canes get their own steps, not pot-plant ones)."""
+    from app import plants as catalogue, planner
+    for p in catalogue.PLANTS:
+        sp, row = p["sp_cm"], p["row_cm"]
+        for m in planner.methods_for(p):
+            text = " ".join(planner.planting_steps(p, m))
+            assert "%dcm apart" % sp in text, (p["id"], m)
+            assert ("rows %dcm apart" % row in text) == (sp != row), (p["id"], m)
+            assert "{" not in text
+    steps = lambda pid, m="plants": " ".join(planner.planting_steps(catalogue.BY_ID[pid], m))
+    assert "90cm apart" in steps("rhubarb") and "30cm between" not in steps("rhubarb")
+    assert "depth of 15cm" in steps("tulip") and "in their pots" not in steps("tulip")
+    assert "25cm" in steps("raspberries") and "45cm apart in the row, with rows 100cm apart" in steps("raspberries")
+    assert "15cm apart in the row, with rows 30cm apart" in steps("garlic", "sow_out")
+    # the same steps reach the app's plant list, so the plant page can show them
+    import json
+    from app import garden
+    p = next(x for x in garden.catalogue_payload()["plants"] if x["id"] == "tulip")
+    assert p["gap"] == "10cm apart each way" and "Space them 10cm apart each way" in " ".join(p["how_to"]["plants"])
+
+
+def test_planting_steps_read_properly_for_every_plant():
+    from app import plants as catalogue, planner
+    for p in catalogue.PLANTS:
+        for m in planner.methods_for(p):
+            text = " ".join(planner.planting_steps(p, m))
+            for bad in ("deep deep", "pot deep", "surface deep", "covered deep", "same as its pot)", "None", "{", "}"):
+                assert bad not in text, (p["id"], m, bad)
+            if m != "plants":
+                assert "same as its pot" not in text, (p["id"], m)  # seeds aren't planted 'as deep as the pot'
+    assert "(on the surface)" in " ".join(planner.planting_steps(catalogue.BY_ID["poppy"], "sow_out"))
+    assert "(1cm deep)" in " ".join(planner.planting_steps(catalogue.BY_ID["carrots"], "sow_out"))

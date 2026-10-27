@@ -77,7 +77,7 @@ PLANTS = [
                  "If one pops out, just push it back in - it'll be fine."],
         "steps_sow": ["Split a garlic bulb into cloves 🧄", "Pinch off any loose papery bits at the pointy end - birds like to tug them ✂️",
                       "Push each clove in, pointy end up, until the tip is 2-3cm under the soil (about a finger-joint deep) 👆",
-                      "Leave a gap the size of your hand between each one ✋", "Press the soil down firmly around each one 👋",
+                      "Space the cloves {gap} 📏", "Press the soil down firmly around each one 👋",
                       "Cover with netting, fleece or twiggy sticks to stop birds pulling them out 🐦", "Stick in a label 🏷️ - they won't pop up for a few weeks"],
         "care": [[0, 4, "Check your garlic - push any that have popped out back in 🧄", 4],
                  [8, 16, "Pull out weeds around your garlic - it doesn't like sharing 🌿"]],
@@ -92,7 +92,7 @@ PLANTS = [
         "tips": ["Birds like to pull sets out - snip off the dry wispy tops first, and push them back in if they do."],
         "steps_sow": ["Snip off the dry wispy tip of each onion so birds have nothing to grab ✂️",
                       "Push each little onion into the soil so only the very tip is showing 🧅",
-                      "Leave a gap the size of your hand between each one ✋", "Press the soil down firmly around each one 👋",
+                      "Space the sets {gap} 📏", "Press the soil down firmly around each one 👋",
                       "Cover with netting or twiggy sticks for the first few weeks 🐦", "Water them in 🚿", "Stick in a label 🏷️"],
         "care": [[0, 4, "Check your onions - push any that have popped out back in 🧅", 4],
                  [6, 14, "Pull out weeds around your onions - they hate sharing 🌿"]],
@@ -118,7 +118,7 @@ PLANTS = [
         "tips": ["Buy 'first early' seed potatoes in February.",
                  "Stand them in an egg box on a windowsill for a few weeks to grow little shoots ('chitting')."],
         "steps_sow": ["Dig a hole with a trowel, about as deep as your hand ✋", "Put in one potato with the shoots pointing up 🥔",
-                      "Cover it with soil or compost", "Leave a big gap (a ruler length, 30cm) to the next one 📏",
+                      "Cover it with soil or compost", "Space the potatoes {gap} 📏",
                       "In a bag: 3 potatoes on 15cm of compost, then cover with 10cm more 🛍️"],
         "care": [[3, 4, "Earth up: pull soil or compost over the green shoots so just the tips show - it protects from frost ❄️"]],
         "harvest_tip": "When the plants have flowered, dig gently with a fork (or tip the bag out) and hunt for your potatoes!",
@@ -303,7 +303,7 @@ PLANTS = [
                  "They need warmth: a greenhouse, a big pot on a sunny patio, or a bed covered in black plastic works best."],
         "steps_plant": ["When your slips arrive, stand them in a jar of water for a day to perk up 🫙",
                       "Plant them deep - bury the stem right up to the top few leaves 👆",
-                      "Leave a ruler-length (30cm) between each one 📏", "Water well, and cover with fleece for the first couple of weeks to keep them warm 🧣"],
+                      "Space the slips {gap} 📏", "Water well, and cover with fleece for the first couple of weeks to keep them warm 🧣"],
         "care": [[1, 14, "Water every few days in dry weather - but they don't need feeding 💧"],
                  [8, 4, "Lift the long trailing stems now and then, so they don't root into the ground and make lots of tiny potatoes"]],
         "harvest_tip": "Dig them up before the first frost, when the leaves start to yellow. Dig gently - the skin bruises easily.",
@@ -487,15 +487,15 @@ BY_ID = {p["id"]: p for p in PLANTS}
 # Default step-by-step instructions, used when a plant doesn't have its own.
 STEPS_SOW_OUT = [
     "Pull out any weeds and rake the top of your bed until it's crumbly, like cake crumbs 🍰",
-    "Make a little line in the soil {depth} deep with your finger or a stick ✏️",
-    "Drop the seeds in, about {spacing} apart 🌱",
+    "Make a little line in the soil ({deep}) with your finger or a stick ✏️",
+    "Drop the seeds in, about {gap} 🌱",
     "Gently cover them with soil and pat it down 👋",
     "Water with a watering can that has a sprinkler head 🚿",
     "Push in a label so you remember what's there 🏷️",
 ]
 STEPS_SOW_IN = [
     "Fill a small pot or tray with seed compost 🪴",
-    "Push the seeds in {depth} deep - a couple per pot 🌱",
+    "Push the seeds in ({deep}) - a couple per pot 🌱",
     "Water gently, then put them on a bright windowsill ☀️",
     "Keep the compost damp but not soggy - check it every day 💧",
     "When they have 2 proper leaves, give each seedling its own pot",
@@ -505,14 +505,35 @@ STEPS_PLANT_OUT_FROM_INDOORS = [
     "Dig a hole a bit bigger than the pot 🕳️",
     "Tip the plant out gently, holding the leaves, not the stem 🤲",
     "Pop it in the hole, firm the soil around it, and water well 🚿",
-    "Leave about {spacing} between plants 📏",
+    "Space the plants about {gap} 📏",
 ]
 STEPS_PLANT_BOUGHT = [
     "Water your new plants in their pots first 🚿",
     "Dig a hole a bit bigger than the pot 🕳️",
     "Tip the plant out gently, holding the leaves, not the stem 🤲",
     "Pop it in the hole, firm the soil around it, and water well 🚿",
-    "Leave about {spacing} between plants 📏",
+    "Space the plants about {gap} 📏",
+]
+# bulbs and tubers, rhubarb crowns and raspberry canes are planted differently from pot plants
+STEPS_BULBS = [
+    "Dig a hole to a depth of {depth} 🕳️",
+    "Set each one in with the pointy end (or the shoots) facing up 🌷",
+    "Space them {gap} 📏",
+    "Cover with soil, press down gently and water well 🚿",
+    "Push in a label so you don't dig them up by mistake 🏷️",
+]
+STEPS_CROWNS = [
+    "Dig a hole wide enough to spread the roots, and mix some compost into the soil 🕳️",
+    "Sit the crown with the buds just under the surface - about 2-3cm down 👆",
+    "Fill in, firm gently and water well 🚿",
+    "Space the plants {gap} - they get BIG 📏",
+    "Don't pick any in the first year, so it can build up strength 🌱",
+]
+STEPS_CANES = [
+    "Dig a trench or hole big enough to spread the roots out 🕳️",
+    "Plant each cane at the same depth as the soil mark on its stem - not deeper 📏",
+    "Space the canes {gap} 📏",
+    "Firm in well, water, and cut each cane down to about 25cm above the soil ✂️",
 ]
 
 # The no-dig bed journey, shown for any bed that hasn't been built yet.
@@ -955,6 +976,7 @@ for _p in PLANTS:
 NODIG_PLANTING = [
     "Never dig or turn the bed over - plant straight into the compost on top 🟫",
     "Make a hole with a trowel or your fingers, pop the plant in, and press the compost firmly round it 👋",
+    "Space plants as far apart as their page says (tap a plant to see) - crowding them gives small crops 📏",
     "Pull weeds out gently while they're tiny - they come out easily from compost 🌿",
     "When you clear a crop, twist or snip it off at the soil and leave the roots in - worms will eat them 🪱",
     "Every autumn, spread another 3-5cm of compost on top. That's all the feeding it needs 🍂",

@@ -979,3 +979,10 @@ svg.plot .grp-tag { fill: #fff; font-weight: 800; paint-order: stroke; stroke: r
 .desktop-note b { display: block; font-size: 15.5px; margin-bottom: 2px; }
 .dn-icon { font-size: 26px; line-height: 1; }
 .dn-x { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; border: 0; background: transparent; font-size: 16px; color: var(--muted); border-radius: 50%; cursor: pointer; }
+
+/* how deep and how far apart */
+.glance { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.glance span { background: var(--sage); color: var(--forest); border-radius: 999px; padding: 5px 11px; font-size: 13px; font-weight: 600; }
+.glance b { font-weight: 800; }
+.spaced { margin: 0 0 10px; padding-left: 18px; font-size: 14.5px; line-height: 1.6; }
+.how-method { margin: 8px 0; } .how-method summary { cursor: pointer; padding: 4px 0; }

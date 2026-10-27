@@ -85,8 +85,42 @@ def plan_anchor(plant, method, today, shift, not_before=None):
 
 # ---- jobs ------------------------------------------------------------------------------------------
 
-def _fmt(template_steps, plant):
-    return [s.format(depth=plant.get("depth", "1cm"), spacing=plant.get("spacing", "30cm")) for s in template_steps]
+def gap_text(plant):
+    """How far apart to plant it, in cm: the same every way for plants set in a block, or along the row and between rows."""
+    sp, row = plant["sp_cm"], plant["row_cm"]
+    return "%dcm apart each way" % sp if sp == row else "%dcm apart in the row, with rows %dcm apart" % (sp, row)
+
+
+def deep_text(plant, sowing=False):
+    """How deep, as words: '1cm deep' for a number, or the plant's own phrase ('on the surface', 'just covered').
+    'Same as its pot' only makes sense for a plant you've bought, so seeds of those are just covered."""
+    depth = plant.get("depth") or "1cm"
+    if sowing and ("pot" in depth or "graft" in depth):
+        return "just covered"
+    return "%s deep" % depth if depth[0].isdigit() and depth.endswith("cm") else depth
+
+
+def _fmt(template_steps, plant, sowing=False):
+    """Fill in a planting template from the plant's own depth and spacing (sp_cm / row_cm are in every plant)."""
+    return [s.format(depth=plant.get("depth") or "1cm", deep=deep_text(plant, sowing), spacing="%dcm" % plant["sp_cm"],
+                     rows="%dcm" % plant["row_cm"], gap=gap_text(plant)) for s in template_steps]
+
+
+def bought_steps(plant):
+    """Planting something you've bought: bulbs, crowns and canes each have their own steps; other plants go in a hole."""
+    word = plant.get("buy_word")
+    template = (plant.get("steps_plant") or (catalogue.STEPS_BULBS if word in ("bulbs", "corms", "tubers") else catalogue.STEPS_CROWNS if word == "crowns"
+                else catalogue.STEPS_CANES if word == "canes" else catalogue.STEPS_PLANT_BOUGHT))
+    return _fmt(template, plant)
+
+
+def planting_steps(plant, method):
+    """The how-to-plant steps for one way of growing it - the same wherever they're shown."""
+    if method == "sow_out":
+        return _fmt(plant.get("steps_sow") or catalogue.STEPS_SOW_OUT, plant, sowing=True)
+    if method == "sow_in":
+        return _fmt(catalogue.STEPS_SOW_IN, plant, sowing=True) + _fmt(catalogue.STEPS_PLANT_OUT_FROM_INDOORS, plant)
+    return bought_steps(plant)
 
 
 def _status(start, end, done, today):
@@ -135,7 +169,7 @@ def crop_jobs(crop, shift, done_keys, today):
     # 1. getting it started
     if method == "sow_in":
         add("sow", "sow_in", "🏠", "Sow %s indoors" % name.lower(), anchor, anchor_end,
-            steps=_fmt(catalogue.STEPS_SOW_IN, plant), action="sow", done=bool(sown))
+            steps=_fmt(catalogue.STEPS_SOW_IN, plant, sowing=True), action="sow", done=bool(sown))
         ready = (sown or anchor) + plant.get("grow_on", 5) * WEEK
         if crop.get("bed_free_on"):  # following another crop: can't go out until that space is free
             ready = max(ready, date.fromisoformat(crop["bed_free_on"]))
@@ -150,12 +184,12 @@ def crop_jobs(crop, shift, done_keys, today):
     elif method == "sow_out":
         title = plant.get("sow_verb") or "Sow %s outside" % name.lower()
         steps = plant.get("steps_sow") or catalogue.STEPS_SOW_OUT
-        add("sow", "sow_out", "🌱", title, anchor, anchor_end, steps=_fmt(steps, plant), action="sow", done=bool(sown))
+        add("sow", "sow_out", "🌱", title, anchor, anchor_end, steps=_fmt(steps, plant, sowing=True), action="sow", done=bool(sown))
         growing_from = sown or anchor
         in_ground = bool(sown)
     else:
         add("plant", "plant_out", "🪴", "Plant your %s" % name.lower(), anchor, anchor_end,
-            steps=_fmt(plant.get("steps_plant") or catalogue.STEPS_PLANT_BOUGHT, plant), action="plant", done=bool(planted))
+            steps=bought_steps(plant), action="plant", done=bool(planted))
         growing_from = planted or anchor
         in_ground = bool(planted)
 

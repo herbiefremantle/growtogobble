@@ -1186,6 +1186,9 @@ const FEATURES = {
   pond: { emoji: "🦆", name: "Pond", w: 1.6, h: 1.6, round: true, fill: "#72b6da" },
   house: { emoji: "🏠", name: "House", w: 6, h: 3, fill: "#bfae95" },
 };
+// How deep and how far apart, in one line - the same for every plant, wherever planting is explained
+const depthPhrase = (q) => (/^[\d.\-]+cm$/.test(q.depth || "") ? `${q.depth} deep` : q.depth ? `(${q.depth})` : "");
+const glance = (q) => `<div class="glance">${q.depth ? `<span>🕳️ Depth <b>${esc(q.depth)}</b></span>` : ""}<span>📏 Apart <b>${q.sp_cm}cm</b></span>${q.row_cm !== q.sp_cm ? `<span>↔️ Rows <b>${q.row_cm}cm</b> apart</span>` : ""}</div>`;
 // Trees and bushes can be a fruit (app/plants.py FRUIT): what it is, when to pick, what it needs
 const fruitOf = (f) => (f && f.variety && S.cat.fruit ? S.cat.fruit.find((x) => x.id === f.variety) : null);
 const pickMonths = (fr) => (fr.pick.length ? (fr.pick.length === 1 ? MONTHS[fr.pick[0] - 1] : `${MONTHS[fr.pick[0] - 1]}-${MONTHS[fr.pick[fr.pick.length - 1] - 1]}`) : "");
@@ -1194,6 +1197,7 @@ function fruitInfo(fr) {
   const now = fr.pick.includes(new Date().getMonth() + 1);
   return `${now ? `<p class="fruit-now">🧺 It's picking time now!</p>` : ""}
     ${fr.examples ? `<p class="small muted" style="margin:0 0 8px">Kinds: ${esc(fr.examples)}</p>` : ""}
+    <p style="margin:0 0 8px"><b>📏 How far apart:</b> give it about ${fr.w} × ${fr.h}m of room - leave at least ${Math.max(fr.w, fr.h)}m between ${fr.kind === "tree" ? "trees" : "bushes"}, and plant it at the same depth as it was in its pot.</p>
     <p style="margin:0 0 8px"><b>🧺 When to pick:</b> ${esc(fr.pick_text)}</p>
     <p style="margin:0 0 8px"><b>👀 Is it ripe?</b> ${esc(fr.ripe)}</p>
     <p style="margin:0 0 8px"><b>🫙 Keeping it:</b> ${esc(fr.keep)}</p>
@@ -2903,7 +2907,7 @@ function openPlant(id, spaceId, startMethod, after) {
       <span style="font-size:24px">${S.cat.methods[m].emoji}</span><div><b>${esc(S.cat.methods[m].label)}</b>
       ${when ? `<div class="small muted">${when}</div>` : ""}</div></label>`;
   }).join("");
-  const steps = p.steps_sow || p.steps_plant || null;
+  const howMethods = p.methods.filter((m) => (p.how_to[m] || []).length);
   openSheet(`${showPhotos && p.photo ? `<figure class="hero-pic"><img src="${esc(p.photo.src)}" alt="${esc(p.name)}" data-fallback="">
       <figcaption><a href="${esc(p.photo.page)}" target="_blank" rel="noopener">📷 ${esc(p.photo.credit || "Wikimedia Commons")}</a></figcaption></figure>` : ""}
     <div class="plant-head"><span class="blob l${p.level}">${p.emoji}</span><div><h2 style="margin:0">${esc(p.name)}</h2>
@@ -2929,6 +2933,7 @@ function openPlant(id, spaceId, startMethod, after) {
     <div class="card" id="addcard"><h3>🌱 Add to my garden</h3>
       ${already.length ? `<p class="small muted">You're already growing ${already.length === 1 ? "this" : already.length + " lots of these"}. Add another?</p>` : ""}
       <div id="methods">${methodOpts()}</div>
+      ${glance(p)}
       <div id="vars">${varietyHtml()}</div>
       <label class="field" for="qty">How many ${esc(p.unit)}?</label>
       <div class="counter qty"><button class="btn small" data-q="-1" aria-label="Fewer">−</button><input id="qty" type="number" inputmode="numeric" min="1" max="5000" value="${qty}"><button class="btn small" data-q="1" aria-label="More">+</button></div>
@@ -2949,7 +2954,9 @@ function openPlant(id, spaceId, startMethod, after) {
     ${p.prep.map((x) => `<div class="card tint-soil"><h3>🪜 Before you plant: ${esc(x.title.charAt(0).toLowerCase() + x.title.slice(1))}</h3><ol class="steps">${x.steps.map((st) => `<li>${esc(st)}</li>`).join("")}</ol></div>`).join("")}
     ${p.seedling ? `<div class="card tint-sky"><h3>🌱 Is it a seedling or a weed?</h3><p style="margin:0 0 8px"><b>${p.emoji} ${esc(p.name)}:</b> ${esc(p.seedling)}</p>
       <ul class="small" style="margin:0;padding-left:18px">${S.cat.weed_tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></div>` : ""}
-    ${steps ? `<div class="card"><h3>👣 How to plant</h3><ol class="steps">${steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></div>` : ""}
+    ${howMethods.length ? `<div class="card"><h3>👣 How to plant</h3>${glance(p)}
+      ${howMethods.map((m, i) => { const list = `<ol class="steps">${p.how_to[m].map((t) => `<li>${esc(t)}</li>`).join("")}</ol>`;
+        return howMethods.length === 1 ? list : `<details class="how-method" ${m === method || (!howMethods.includes(method) && i === 0) ? "open" : ""}><summary><b>${S.cat.methods[m].emoji} ${esc(S.cat.methods[m].label)}</b></summary>${list}</details>`; }).join("")}</div>` : ""}
     ${soilCard(p)}
     ${neighboursCard(p)}
     ${pestsCard(p)}
@@ -3018,6 +3025,7 @@ function openPlant(id, spaceId, startMethod, after) {
   }));
   // "Fill the bed": pick a share of the chosen bed and we work out how many
   const drawFill = () => {
+    if (!$("#fill")) return;  // no bed or pot yet, so there's no "Where?" box to fill
     const sp = $("#sp"), bed = sp && sp.value ? space(Number(sp.value)) : null;
     const area = bed && bed.usage && bed.usage.area;
     if (bed && bed.usage && bed.usage.unit === "pots") {
@@ -3378,6 +3386,7 @@ function openCombo(id) {
   openSheet(`<h2>${c.emoji} ${esc(c.name)}</h2><p>${esc(c.why)}</p>
     <div class="nbs">${c.plants.map((id2) => { const q = plant(id2); return `<button class="nb" data-open-plant="${q.id}"><span class="e">${q.emoji}</span><span><b>${esc(q.name)}</b>
       <small>${q.height_cm >= 100 ? q.height_cm / 100 + "m" : q.height_cm + "cm"} tall · flowers ${MONTHS[q.months.harvest[0] - 1] || ""}-${MONTHS[q.months.harvest[q.months.harvest.length - 1] - 1] || ""}</small></span></button>`; }).join("")}</div>
+    <div class="card" style="margin-top:14px"><h3>📏 How far apart</h3><ul class="spaced">${c.plants.map((id2) => { const q = plant(id2); return `<li>${q.emoji} <b>${esc(q.name)}</b>: ${esc(q.gap)}${q.depth ? `, ${esc(depthPhrase(q))}` : ""}</li>`; }).join("")}</ul></div>
     ${beds.length ? `<div class="card" style="margin-top:14px"><label class="field" for="combobed" style="margin-top:0">Which bed or pots?</label>
       <select id="combobed">${beds.map((b) => `<option value="${b.id}">${esc(b.name)}</option>`).join("")}</select>
       <p class="small muted" style="margin:8px 0 0">We'll work out how many of each fit and where they go - tall at the back - then you add them as one group.</p>
@@ -3510,7 +3519,9 @@ function openMix(id, spaceId) {
     <div class="card"><h3>What it'll look like</h3>${sceneBox("mix" + m.id, rowsByHeight(m.plants.map((x) => ({ p: plant(x.plant_id), count: x.qty }))))}</div>
     <div class="card"><h3>⏱️ What happens when</h3>${order.map((x, i) => { const q = plant(x.plant_id);
       return `<div class="mix-step"><span class="e">${q.emoji}</span><div><b>${i + 1}. ${esc(q.name)}</b><div class="small">Comes up in ${esc(x.up)} · ready from about ${x.ready} weeks</div></div></div>`; }).join("")}</div>
-    <div class="card"><h3>👣 How to do it</h3><ol class="steps">${m.steps.map((t) => `<li>${esc(t)}</li>`).join("")}</ol>
+    <div class="card"><h3>👣 How to do it</h3><p class="small" style="margin:0 0 6px"><b>📏 How far apart</b></p>
+      <ul class="spaced">${m.plants.map((x) => { const q = plant(x.plant_id); return `<li>${q.emoji} <b>${esc(q.name)}</b>: ${esc(q.gap)}${q.depth ? `, ${esc(depthPhrase(q))}` : ""}</li>`; }).join("")}</ul>
+      <ol class="steps">${m.steps.map((t) => `<li>${esc(t)}</li>`).join("")}</ol>
       ${m.tip ? `<div class="checkbox"><b>💡 ${esc(m.tip)}</b></div>` : ""}</div>
     <div class="card tint-sky"><h3>🌱 Is it a seedling or a weed?</h3>
       ${order.map((x) => { const q = plant(x.plant_id); return q.seedling ? `<p style="margin:0 0 8px"><b>${q.emoji} ${esc(q.name)}:</b> ${esc(q.seedling)}</p>` : ""; }).join("")}

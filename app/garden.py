@@ -209,6 +209,7 @@ def catalogue_payload(user=None):
                      for v in plant["varieties"]]
         out.append(dict(plant, pot_fits=pot_fits, varieties=varieties, months=windows, methods=methods, next=next_by_method,
                         links={m: shops.links(plant, m) for m in methods},
+                        how_to={m: planner.planting_steps(plant, m) for m in methods}, gap=planner.gap_text(plant),
                         area_each=round(planner.area_each(plant), 4), default_qty=planner.default_quantity(plant),
                         pot_advice=planner.pot_advice(plant), family_name=catalogue.GROUPS.get(plant["family"]), then=then))
     return {

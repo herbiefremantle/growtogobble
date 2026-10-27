@@ -242,16 +242,17 @@ def _windows(p):
 
 
 def _how_steps(p):
-    fill = {"depth": p.get("depth") or "1cm", "spacing": p.get("spacing") or "20cm"}
-    fmt = lambda steps: [_clean(s).format(**fill) for s in steps]
+    """The same how-to-plant steps as the app - with how deep and how far apart, in cm."""
+    from . import planner
+    clean = lambda steps: [_clean(s) for s in steps]
     blocks = []
     if p.get("sow_in"):
-        blocks.append(("Starting it indoors", fmt(catalogue.STEPS_SOW_IN)))
+        blocks.append(("Starting it indoors", clean(planner._fmt(catalogue.STEPS_SOW_IN, p, sowing=True))))
     if p.get("sow_out"):
-        blocks.append(("Sowing it outdoors", fmt(p.get("steps_sow") or catalogue.STEPS_SOW_OUT)))
+        blocks.append(("Sowing it outdoors", clean(planner.planting_steps(p, "sow_out"))))
     if p.get("plant_out"):
-        steps = catalogue.STEPS_PLANT_OUT_FROM_INDOORS if p.get("sow_in") else (p.get("steps_plant") or catalogue.STEPS_PLANT_BOUGHT)
-        blocks.append(("Planting it out" if p.get("sow_in") else "Planting it", fmt(steps)))
+        steps = planner._fmt(catalogue.STEPS_PLANT_OUT_FROM_INDOORS, p) if p.get("sow_in") else planner.bought_steps(p)
+        blocks.append(("Planting it out" if p.get("sow_in") else "Planting it", clean(steps)))
     return blocks
 
 
