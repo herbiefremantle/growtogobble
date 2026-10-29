@@ -1015,6 +1015,7 @@ function home() {
       <a class="stat" href="#/shop"><b>${money(toBuy)}</b><span>seeds & plants still to buy</span></a>
     </div>
     ${tourResume()}${checklistCard()}${nudge}
+    ${jobTools()}
     <div class="section-title"><h2>This week</h2><span class="small muted">next 7 days</span></div>
     <div class="card">${week.length ? week.map((j) => jobCard(j, { showSpace: true })).join("") :
       `<div class="empty"><b>Nothing to do this week.</b><br>Enjoy the garden.</div>`}</div>
@@ -1023,7 +1024,7 @@ function home() {
     ${ahead.length ? `<details class="card later" ${homeAhead ? "open" : ""} id="ahead"><summary><b>Further ahead</b> <span class="small muted">${ahead.length} job${ahead.length === 1 ? "" : "s"} · by month</span></summary>
       ${byMonth.map((g) => { const [y, mo] = g.k.split("-").map(Number);
         return `<h4 class="month-head">${MONTHS_LONG[mo - 1]}${y !== t.getFullYear() ? " " + y : ""} <span class="small muted">${g.jobs.length}</span></h4>${g.jobs.map((j) => jobCard(j, { showSpace: true })).join("")}`; }).join("")}</details>` : ""}
-    ${buyNow.length ? `<a href="#/shop" class="link-row">🛒 <b>${buyNow.length} thing${buyNow.length === 1 ? "" : "s"} to buy soon</b> <span>${buyNow.slice(0, 5).map((x) => plant(x.plant_id).emoji).join(" ")} 👉</span></a>` : ""}`;
+    ${buyNow.length && !hiddenJobs().has("buy") ? `<a href="#/shop" class="link-row">🛒 <b>${buyNow.length} thing${buyNow.length === 1 ? "" : "s"} to buy soon</b> <span>${buyNow.slice(0, 5).map((x) => plant(x.plant_id).emoji).join(" ")} 👉</span></a>` : ""}`;
   wireChecklist();
   const tr = $("#tour-resume"); if (tr) tr.onclick = () => startTour(S.me.onboarding.tourProgress.path, S.me.onboarding.tourProgress.stepIndex);
   const ts = $("#tour-stop"); if (ts) ts.onclick = async () => { await saveProfile({ tourProgress: { ...S.me.onboarding.tourProgress, completed: true } }); home(); };
@@ -1034,6 +1035,57 @@ function home() {
   const aheadEl = $("#ahead");
   if (aheadEl) aheadEl.ontoggle = () => { homeAhead = aheadEl.open; };
   wirePush();
+  wireJobTools();
+  setTimeout(maybeSetupPrompt, 700);
+}
+
+// ---- which jobs you see ------------------------------------------------------------------------------------
+// Each kind of job (buying, sowing, winter tidying...) can be switched off; it's saved on the account, so reminders and the
+// calendar feed follow it too (see app/jobprefs.py).
+const hiddenJobs = () => new Set(S.me.job_hidden || []);
+const winterJobs = () => allJobs().filter((j) => j.kind === "overwinter" && j.status !== "done").sort((a, b) => a.start.localeCompare(b.start));
+
+function jobTools() {
+  const w = hiddenJobs().has("winter") ? [] : winterJobs();
+  return `<div class="job-tools">${w.length ? `<button class="btn small" data-winter-jobs>❄️ Winter jobs <span class="muted">(${w.length})</span></button>` : ""}
+    <button class="btn small ghost" data-job-choices>⚙️ Choose my jobs</button></div>`;
+}
+
+function jobChoicesHtml() {
+  const hidden = hiddenJobs();
+  return `<p class="small muted" style="margin-top:0">Tick the kinds of job you want. Anything you untick disappears from Today, the calendar and your reminders - and comes back if you tick it again.</p>
+    ${S.me.job_groups.map((g) => `<label class="job-choice"><input type="checkbox" data-jobgroup="${g.id}" ${hidden.has(g.id) ? "" : "checked"}>
+      <span><b>${g.emoji} ${esc(g.name)}</b><span class="small muted">${esc(g.about)}</span></span></label>`).join("")}`;
+}
+
+async function saveJobChoices(root) {
+  const hidden = [...root.querySelectorAll("[data-jobgroup]")].filter((c) => !c.checked).map((c) => c.dataset.jobgroup);
+  try {
+    const y = window.scrollY, out = await api("POST", "/api/me/jobs", { hidden });
+    S.me = out.me; S.g = out.garden; render(); window.scrollTo(0, y);
+    toast("Saved ✅");
+  } catch (e) { toast(e.message); }
+}
+
+function openJobChoices() {
+  openSheet(`<h2>⚙️ Which jobs do you want?</h2><div id="job-choices-sheet">${jobChoicesHtml()}</div><button class="btn primary wide" style="margin-top:12px" data-close>Done</button>`);
+  $("#sheet-card").onchange = (e) => { if (e.target.closest("[data-jobgroup]")) saveJobChoices($("#job-choices-sheet")); };
+}
+
+function openWinterJobs() {
+  const list = winterJobs(), now = list.filter((j) => j.status === "now" || j.status === "soon" || j.status === "missed"), later = list.filter((j) => !now.includes(j));
+  openSheet(`<h2>❄️ Winter jobs</h2><p class="small muted" style="margin-top:0">Quiet-season jobs for your garden, beds and fruit. Tick off the ones you do - skip the rest.</p>
+    ${now.length ? `<h3>Now and soon</h3>${now.map((j) => jobCard(j, { showSpace: true })).join("")}` : ""}
+    ${later.length ? `<h3>Coming up</h3>${later.map((j) => jobCard(j, { showSpace: true })).join("")}` : ""}
+    ${list.length ? "" : `<div class="empty"><b>No winter jobs yet.</b><br>Add a bed or a few plants and they'll appear.</div>`}
+    <button class="btn ghost wide" style="margin-top:10px" data-job-choices>⚙️ Choose my jobs</button>`);
+  $("#sheet-card").onclick = (e) => { if (e.target.closest("[data-job-choices]")) openJobChoices(); };
+}
+
+function wireJobTools() {
+  const w = document.querySelector("[data-winter-jobs]"), c = document.querySelector("[data-job-choices]");
+  if (w) w.onclick = openWinterJobs;
+  if (c) c.onclick = openJobChoices;
 }
 
 // Things they haven't picked yet that can be started now (or within 2 weeks), easiest first.
@@ -1138,6 +1190,73 @@ async function disablePush() {
     if (sub) { await api("POST", "/api/push/unsubscribe", { endpoint: sub.endpoint }); await sub.unsubscribe(); }
     S.g = await api("GET", "/api/garden"); render(); toast("Reminders off on this device");
   } catch (e) { toast(e.message); }
+}
+
+// ---- getting the app on the phone ------------------------------------------------------------------------
+// Android and desktop Chrome can install with one tap (the browser's own prompt). iPhones can't: only Safari can add an app
+// to the Home Screen with reminders, and no page can switch the browser for you - so Chrome on an iPhone is told to open
+// Safari, with a link that tries it and a copy button for the address.
+
+const ua = navigator.userAgent;
+const iosOtherBrowser = isIOS && /CriOS|FxiOS|EdgiOS|OPiOS|GSA\//i.test(ua);
+const isAndroid = /android/i.test(ua);
+const isInstalled = () => standalone || S.installedNow;
+
+function syncInstallBtn() { const b = document.getElementById("install-btn"); if (b) b.hidden = isInstalled(); }
+
+function installSteps() {
+  if (iosOtherBrowser) {
+    return `<p>On an iPhone, only <b>Safari</b> can add this app to your Home Screen (and Apple only allows reminders for apps added that way).</p>
+      <div class="row" style="margin:10px 0"><a class="btn primary" href="x-safari-${esc(location.href)}">Open in Safari</a><button class="btn" data-copy-link>Copy the link</button></div>
+      <p class="small muted">If Safari doesn't open, copy the link, open Safari and paste it in the address bar. Then:</p>
+      <ol class="how-to"><li>Tap the <b>Share</b> button <span aria-hidden="true">⬆️</span> in Safari</li><li>Tap <b>Add to Home Screen</b>, then <b>Add</b></li><li>Open Grow to Gobble from your Home Screen and log in</li></ol>`;
+  }
+  if (isIOS) {
+    return `<ol class="how-to"><li>Tap the <b>Share</b> button <span aria-hidden="true">⬆️</span> at the bottom of Safari (top on an iPad)</li>
+      <li>Scroll down and tap <b>Add to Home Screen</b></li><li>Tap <b>Add</b></li>
+      <li>Open <b>Grow to Gobble</b> from your Home Screen and log in once more. Then you can turn on reminders</li></ol>`;
+  }
+  if (isAndroid) {
+    return `<ol class="how-to"><li>Tap the <b>⋮</b> menu at the top of your browser</li><li>Tap <b>Install app</b> (or <b>Add to Home screen</b>)</li><li>Tap <b>Install</b></li></ol>`;
+  }
+  return `<ol class="how-to"><li>In Chrome or Edge, click the <b>install</b> icon at the right of the address bar (or open the <b>⋮</b> menu and choose <b>Install Grow to Gobble</b>)</li>
+    <li>In Safari on a Mac, choose <b>File → Add to Dock</b></li></ol>`;
+}
+
+// one tap where the browser allows it; otherwise show how
+async function openInstall() {
+  if (isInstalled()) { toast("Already on your phone 🎉"); return; }
+  if (S.installPrompt) {
+    const ev = S.installPrompt; S.installPrompt = null;
+    ev.prompt();
+    const choice = await ev.userChoice.catch(() => null);
+    if (choice && choice.outcome === "accepted") { S.installedNow = true; syncInstallBtn(); toast("Added! Open it from your home screen 🌱"); }
+    return;
+  }
+  openSheet(`<h2>📲 Get the app</h2>${installSteps()}`);
+  $("#sheet-card").onclick = (e) => { if (e.target.closest("[data-copy-link]")) copyLink(); };
+}
+function copyLink() { navigator.clipboard.writeText(location.origin + "/").then(() => toast("Link copied 📋"), () => toast("Select the address and copy it")); }
+
+// asked once per device, the first time you reach Today: add the app, then turn on reminders (iPhones need them in that order)
+function maybeSetupPrompt() {
+  let seen = false;
+  try { seen = localStorage.getItem("gtg-setup-seen") === "1"; } catch (e) { /* private mode */ }
+  const needInstall = !isInstalled(), needPush = pushSupported && !S.g.has_push && (!isIOS || standalone);
+  if (seen || (!needInstall && !needPush) || !$("#sheet").hidden) return;
+  try { localStorage.setItem("gtg-setup-seen", "1"); } catch (e) { /* private mode */ }
+  const iosFirst = isIOS && !standalone;
+  openSheet(`<h2>${needInstall ? "📲 Get the app" : "🔔 Turn on reminders"}</h2>
+    <p class="muted" style="margin-top:0">${needInstall ? "Put Grow to Gobble on your phone so it's one tap away, and we can nudge you when it's time to sow, plant, water and pick." : "We'll tell you when it's time to sow, plant, water and pick, and warn you about frost."}</p>
+    ${needInstall ? (S.installPrompt ? `<button class="btn primary wide" data-setup-install>📲 Add to my phone</button>` : installSteps()) : ""}
+    ${needInstall && iosFirst ? `<p class="small muted">Once it's on your Home Screen, open it and tap <b>Turn on reminders</b>.</p>` : ""}
+    ${needPush ? `<button class="btn ${needInstall ? "" : "primary"} wide" style="margin-top:10px" data-setup-push>🔔 Turn on reminders</button>` : ""}
+    <button class="btn ghost wide" style="margin-top:10px" data-close>Not now</button>`);
+  $("#sheet-card").onclick = async (e) => {
+    if (e.target.closest("[data-copy-link]")) copyLink();
+    if (e.target.closest("[data-setup-install]")) { closeSheet(); await openInstall(); }
+    if (e.target.closest("[data-setup-push]")) { closeSheet(); await enablePush(); }
+  };
 }
 
 // ---- garden ----------------------------------------------------------------------------------------
@@ -4004,6 +4123,7 @@ function mePage() {
       <div class="seg" role="radiogroup" aria-label="Light or dark">${[["", "Match my phone"], ["light", "Light"], ["dark", "Dark"]].map(([k, l]) =>
         `<button role="radio" aria-checked="${(document.documentElement.getAttribute("data-theme") || "") === k}" class="${(document.documentElement.getAttribute("data-theme") || "") === k ? "on" : ""}" data-theme-set="${k}">${l}</button>`).join("")}</div>
       <label class="check"><input type="checkbox" id="photos-pref" ${showPhotos ? "checked" : ""}> <span>Show photos of plants instead of icons</span></label></div>
+    <div class="card" id="job-choices-card"><h3>⚙️ Which jobs do you want?</h3>${jobChoicesHtml()}</div>
     <div class="card tint-leaf" id="invite-card"><h3>💌 Invite a friend</h3>
       <p class="small" style="margin:0 0 10px">Know someone who'd love to grow their own? Send them a link - we'll keep count of who joins from your invites.</p>
       <div id="invite-tally" class="small muted" style="margin-bottom:10px">…</div>
@@ -4046,6 +4166,7 @@ function mePage() {
   api("GET", "/api/invites").then(tally, () => { $("#invite-tally").textContent = ""; });
   $("#help").onclick = helpSheet;
   view.querySelectorAll("[data-theme-set]").forEach((b) => (b.onclick = () => { setTheme(b.dataset.themeSet); mePage(); }));
+  $("#job-choices-card").onchange = (e) => { if (e.target.closest("[data-jobgroup]")) saveJobChoices($("#job-choices-card")); };
   $("#photos-pref").onchange = (e) => { showPhotos = e.target.checked; remember("gtg-photos", showPhotos); syncPhotoBtn(); toast(showPhotos ? "Showing photos" : "Showing icons"); };
   $("#invite").onclick = async () => {
     try {
@@ -4080,7 +4201,7 @@ function mePage() {
   };
   const pt = $("#ptest"); if (pt) pt.onclick = () => api("POST", "/api/push/test").then(() => toast("Sent! Check your phone 📱"), (e) => toast(e.message));
   const po = $("#poff"); if (po) po.onclick = disablePush;
-  const ins = $("#install"); if (ins) ins.onclick = async () => { S.installPrompt.prompt(); S.installPrompt = null; render(); };
+  const ins = $("#install"); if (ins) ins.onclick = () => { openInstall(); };
   $("#logout").onclick = async () => { await api("POST", "/api/logout"); S.me = S.g = null; go("#/welcome"); };
   $("#resetgarden").onclick = async () => {
     if (!$("#rspw").value) { toast("Type your password first"); return; }
@@ -4198,6 +4319,9 @@ function setTheme(mode) {  // "light", "dark" or "" (match the phone)
   $("#theme-color").setAttribute("content", themeNow() === "dark" ? "#0d1511" : "#f3f5f2");
 }
 setTheme(document.documentElement.getAttribute("data-theme") || "");
+$("#install-btn").onclick = openInstall;
+syncInstallBtn();
+window.addEventListener("appinstalled", () => { S.installedNow = true; syncInstallBtn(); });
 $("#photo-btn").onclick = () => { showPhotos = !showPhotos; remember("gtg-photos", showPhotos); syncPhotoBtn(); render(); toast(showPhotos ? "🖼️ Showing photos" : "😀 Showing icons"); };
 syncPhotoBtn();
 $("#theme-btn").onclick = () => { setTheme(themeNow() === "dark" ? "light" : "dark"); if (location.hash.startsWith("#/me")) mePage(); };

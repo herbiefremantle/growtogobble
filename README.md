@@ -26,6 +26,7 @@ python3 -m venv .venv
 | `app/planner.py` | Turns a crop into dated jobs; bare-bed suggestions; badges. Pure logic, well tested. |
 | `app/alerts.py` | Phone notifications (Web Push), frost/heat/dry-spell warnings (Open-Meteo, free), the calendar feed. |
 | `app/seo.py` | The public pages search engines and AI assistants read: `/grow/<plant>`, `/fruit/<id>`, `/build/<guide>`, `/sow/<month>`, plus `/sitemap.xml`, `/robots.txt` and `/llms.txt`. All made from the catalogue, so adding a plant adds its page. |
+| `app/jobprefs.py` | The kinds of job people can switch off (buying, sowing, winter...). Saved on the account, so Today, the calendar, reminders and the calendar feed all follow it. |
 | `app/mail.py` | Sends the password-reset emails through Resend. |
 | `app/legal.py` | The Privacy, Terms and Affiliate Disclosure pages (`/privacy`, `/terms`, `/affiliate-disclosure`). Edit if what the app collects changes. |
 | `app/shops.py` | Buy links (Thompson & Morgan, Suttons, Amazon) and affiliate settings. |
