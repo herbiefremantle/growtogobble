@@ -23,7 +23,9 @@ try { var t = localStorage.getItem("gtg-theme"); if (t === "light" || t === "dar
 <body>
 <header class="topbar" id="topbar" hidden>
   <a href="#/" class="brand" id="brand">Grow to Gobble</a>
-  <span class="top-right"><button class="theme-btn" id="photo-btn" type="button" aria-label="Show photos of plants instead of icons" aria-pressed="false">
+  <span class="top-right"><button class="theme-btn install-btn" id="install-btn" type="button" aria-label="Get the app on your phone" title="Get the app" hidden>
+    <svg viewBox="0 0 24 24"><path class="ic" d="M12 4v10M8 10.5l4 4 4-4M5 19h14"/></svg></button>
+  <button class="theme-btn" id="photo-btn" type="button" aria-label="Show photos of plants instead of icons" aria-pressed="false">
     <svg viewBox="0 0 24 24"><rect class="ic" x="3.5" y="5" width="17" height="14" rx="2.5"/><circle class="ic" cx="9" cy="10" r="1.6"/><path class="ic" d="M4 17l5-4.5 3.5 3 3-2.5L20 16"/></svg></button>
   <button class="theme-btn" id="theme-btn" type="button" aria-label="Switch light or dark">
     <svg viewBox="0 0 24 24" class="i-moon"><path class="ic" d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>

@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import alerts, auth, clock, db, garden, legal, mail, onboarding, planner, regions, seo
+from . import alerts, auth, clock, db, garden, jobprefs, legal, mail, onboarding, planner, regions, seo
 from . import plants as catalogue
 
 STATIC = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
@@ -171,6 +171,7 @@ def _me(user):
         "region": dict(region, id=user["region"]),
         "calendar_path": "/calendar/%s.ics" % user["cal_token"],
         "push_key": alerts.public_key(), "is_admin": bool(user["is_admin"]),
+        "job_groups": jobprefs.describe(), "job_hidden": sorted(jobprefs.hidden_of(user)),
         "map_start": [user["lat"], user["lon"]] if user["lat"] is not None else [region["lat"], region["lon"]],
         "onboarding": json.loads(user["onboarding"]) if user.get("onboarding") else None,
     }
@@ -251,6 +252,20 @@ def update_me(body: Profile, user=Depends(auth.current_user)):
                          (oc, region, lat, lon, user["id"]))
         user = dict(conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone())
     return _me(user)
+
+
+class JobChoices(BaseModel):
+    hidden: list
+
+
+@app.post("/api/me/jobs")
+def set_job_choices(body: JobChoices, user=Depends(auth.current_user)):
+    """Which kinds of job to hide (see app/jobprefs.py). Anything that isn't a known group is ignored."""
+    ids = jobprefs.clean([i for i in body.hidden if isinstance(i, str)])
+    with db.connect() as conn:
+        conn.execute("UPDATE users SET job_hidden = ? WHERE id = ?", (json.dumps(ids), user["id"]))
+        user = dict(conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone())
+        return {"me": _me(user), "garden": garden.payload(conn, user)}
 
 
 class DeleteAccount(BaseModel):

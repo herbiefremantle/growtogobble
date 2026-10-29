@@ -622,6 +622,19 @@ h1 { font-size: 26px; } h2 { font-size: 19px; } h3 { font-size: 16px; }
 .theme-btn svg { width: 19px; height: 19px; }
 .theme-btn[aria-pressed="true"] { background: var(--sage); border-color: var(--forest); color: var(--forest); }
 #photo-btn { margin-right: 6px; }
+.install-btn { background: var(--forest); border-color: var(--forest); color: #fff; margin-right: 6px; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .install-btn { color: #0f2014; } }
+:root[data-theme="dark"] .install-btn { color: #0f2014; }
+.install-btn[hidden] { display: none; }
+.brand { white-space: nowrap; }
+@media (max-width: 420px) {  /* four round buttons plus the name: shrink a little so the name stays on one line */
+  .top-right { gap: 5px; } .top-right .theme-btn { width: 32px; height: 32px; } .top-right .theme-btn svg { width: 17px; height: 17px; }
+  .install-btn, #photo-btn { margin-right: 0; } .brand { font-size: 16px; gap: 6px; } .brand svg { width: 26px; height: 26px; }
+}
+.how-to { margin: 10px 0; padding-left: 22px; } .how-to li { margin: 8px 0; }
+.job-choice { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); }
+.job-choice:first-of-type { border-top: 0; } .job-choice input { margin-top: 5px; width: 20px; height: 20px; flex: none; }
+.job-choice b { display: block; } .job-tools { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 14px; }
 .theme-btn .i-sun { display: none; }
 :root[data-theme="dark"] .theme-btn .i-sun { display: block; } :root[data-theme="dark"] .theme-btn .i-moon { display: none; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .theme-btn .i-sun { display: block; } :root:not([data-theme="light"]) .theme-btn .i-moon { display: none; } }

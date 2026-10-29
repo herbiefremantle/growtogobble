@@ -1324,3 +1324,41 @@ def test_planting_steps_read_properly_for_every_plant():
                 assert "same as its pot" not in text, (p["id"], m)  # seeds aren't planted 'as deep as the pot'
     assert "(on the surface)" in " ".join(planner.planting_steps(catalogue.BY_ID["poppy"], "sow_out"))
     assert "(1cm deep)" in " ".join(planner.planting_steps(catalogue.BY_ID["carrots"], "sow_out"))
+
+
+# ---- choosing which jobs you see ----------------------------------------------------------------------
+
+def test_hiding_a_kind_of_job_removes_it_everywhere_and_it_comes_back(client):
+    from app import garden, db, jobprefs
+    me = _join(client)
+    assert me["job_hidden"] == [] and {g["id"] for g in me["job_groups"]} >= {"buy", "winter", "sow"}
+    client.post("/api/spaces", json={"name": "Bed 1", "kind": "bed", "width_m": 1.2, "length_m": 2.4})
+    g = client.post("/api/crops", json={"plant_id": "garlic"}).json()
+    assert any(j["kind"] == "buy" for c in g["crops"] for j in c["jobs"])
+    assert g["garden_jobs"], "winter jobs for the whole garden"
+
+    out = client.post("/api/me/jobs", json={"hidden": ["buy", "winter", "not-a-group"]}).json()
+    assert out["me"]["job_hidden"] == ["buy", "winter"]  # unknown ids are ignored
+    assert not any(j["kind"] == "buy" for c in out["garden"]["crops"] for j in c["jobs"])
+    assert out["garden"]["garden_jobs"] == []
+    assert not any(j["kind"] == "overwinter" for c in out["garden"]["crops"] for j in c["jobs"])
+    assert any(j["kind"] == "harvest" for c in out["garden"]["crops"] for j in c["jobs"])  # other kinds stay
+
+    with db.connect() as conn:  # reminders and the calendar feed use the same filter
+        user = dict(conn.execute("SELECT * FROM users WHERE email = 'kid@example.com'").fetchone())
+        kinds = {j["kind"] for j in garden.active_jobs(garden.load(conn, user, real_only=True))}
+    assert "buy" not in kinds and "overwinter" not in kinds and "harvest" in kinds
+
+    back = client.post("/api/me/jobs", json={"hidden": []}).json()
+    assert any(j["kind"] == "buy" for c in back["garden"]["crops"] for j in c["jobs"]) and back["garden"]["garden_jobs"]
+
+
+def test_every_job_kind_belongs_to_a_group():
+    from datetime import date
+    from app import jobprefs, planner, plants as catalogue
+    seen = set()
+    for p in catalogue.PLANTS:
+        for m in planner.methods_for(p):
+            for j in planner.crop_jobs(_crop(p["id"], m, date(2026, 9, 28)), 0, set(), date(2026, 9, 28)):
+                seen.add(j["kind"])
+    assert seen <= set(jobprefs.GROUP_OF), seen - set(jobprefs.GROUP_OF)

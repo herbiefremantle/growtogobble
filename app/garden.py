@@ -3,7 +3,7 @@ Used by the API, the push alerts and the calendar feed, so they always agree wit
 import json
 from datetime import date
 
-from . import builds, clock, planner, regions, shops, winter
+from . import builds, clock, jobprefs, planner, regions, shops, winter
 from . import plants as catalogue
 from .db import rows
 
@@ -31,6 +31,7 @@ def load(conn, user, today=None, real_only=False):
     features = rows(conn, "SELECT id, kind, variety, cultivar FROM features WHERE user_id = ?%s" % real, user["id"])
     garden_jobs = winter.garden_jobs(spaces, features, crops, done, today, shift)
     return {
+        "hidden": jobprefs.hidden_of(user),
         "garden_jobs": garden_jobs,
         "today": today, "shift": shift, "spaces": spaces, "crops": crops, "done": done,
         "with_jobs": with_jobs, "liked": liked, "has_push": has_push, "friends_joined": friends,
@@ -39,7 +40,8 @@ def load(conn, user, today=None, real_only=False):
 
 def active_jobs(state):
     """Jobs for crops still in the ground (or planned), and the winter jobs for the garden as a whole."""
-    return [j for c, jobs in state["with_jobs"] if not c.get("finished_on") for j in jobs] + state.get("garden_jobs", [])
+    jobs = [j for c, jobs in state["with_jobs"] if not c.get("finished_on") for j in jobs] + state.get("garden_jobs", [])
+    return jobprefs.visible(jobs, state.get("hidden"))
 
 
 def update_badges(conn, user, state):
@@ -126,7 +128,7 @@ def payload(conn, user):
         finishes, starts = planner.crop_finishes(crop, jobs), planner.crop_starts(crop, jobs)
         qty = planner.quantity(crop)
         crops_out.append(dict(
-            crop, jobs=jobs, stage=planner.crop_stage(crop, jobs, today), space_name=space_names.get(crop["space_id"]),
+            crop, jobs=jobprefs.visible(jobs, state["hidden"]), stage=planner.crop_stage(crop, jobs, today), space_name=space_names.get(crop["space_id"]),
             starts=starts.isoformat() if starts else None, finishes=finishes.isoformat() if finishes else None,
             qty=qty, area=round(qty * planner.area_each(plant), 2), harvest=planner.harvest_estimate(plant, qty),
             buy=planner.buy_estimate(plant, qty, crop["method"]),
@@ -169,7 +171,7 @@ def payload(conn, user):
         "has_sample": any(s.get("is_sample") for s in state["spaces"]),
         "crops": crops_out,
         "shopping": shopping,
-        "garden_jobs": state["garden_jobs"],
+        "garden_jobs": jobprefs.visible(state["garden_jobs"], state["hidden"]),
         "badges": [dict(b, earned_on=earned.get(b["id"])) for b in planner.BADGES],
         "new_badges": new_badges,
         "has_push": state["has_push"],
