@@ -1212,7 +1212,9 @@ function installSteps() {
       <ol class="how-to"><li>Tap the <b>Share</b> button <span aria-hidden="true">⬆️</span> in Safari</li><li>Tap <b>Add to Home Screen</b>, then <b>Add</b></li><li>Open Grow to Gobble from your Home Screen and log in</li></ol>`;
   }
   if (isIOS) {
-    return `<ol class="how-to"><li>Tap the <b>Share</b> button <span aria-hidden="true">⬆️</span> at the bottom of Safari (top on an iPad)</li>
+    const share = navigator.share ? `<div class="row" style="margin:10px 0"><button class="btn primary" data-share-app>⬆️ Open the Share menu</button></div>
+      <p class="small muted">Apple doesn't let a page add itself, so this opens the Share menu for you. Then:</p>` : "";
+    return `${share}<ol class="how-to"><li>Tap the <b>Share</b> button <span aria-hidden="true">⬆️</span> at the bottom of Safari (top on an iPad)</li>
       <li>Scroll down and tap <b>Add to Home Screen</b></li><li>Tap <b>Add</b></li>
       <li>Open <b>Grow to Gobble</b> from your Home Screen and log in once more. Then you can turn on reminders</li></ol>`;
   }
@@ -1234,7 +1236,10 @@ async function openInstall() {
     return;
   }
   openSheet(`<h2>📲 Get the app</h2>${installSteps()}`);
-  $("#sheet-card").onclick = (e) => { if (e.target.closest("[data-copy-link]")) copyLink(); };
+  $("#sheet-card").onclick = (e) => {
+    if (e.target.closest("[data-copy-link]")) copyLink();
+    if (e.target.closest("[data-share-app]")) navigator.share({ title: "Grow to Gobble", url: location.origin + "/" }).catch(() => {});
+  };
 }
 function copyLink() { navigator.clipboard.writeText(location.origin + "/").then(() => toast("Link copied 📋"), () => toast("Select the address and copy it")); }
 
@@ -1254,6 +1259,7 @@ function maybeSetupPrompt() {
     <button class="btn ghost wide" style="margin-top:10px" data-close>Not now</button>`);
   $("#sheet-card").onclick = async (e) => {
     if (e.target.closest("[data-copy-link]")) copyLink();
+    if (e.target.closest("[data-share-app]")) navigator.share({ title: "Grow to Gobble", url: location.origin + "/" }).catch(() => {});
     if (e.target.closest("[data-setup-install]")) { closeSheet(); await openInstall(); }
     if (e.target.closest("[data-setup-push]")) { closeSheet(); await enablePush(); }
   };
