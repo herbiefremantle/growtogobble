@@ -999,3 +999,5 @@ svg.plot .grp-tag { fill: #fff; font-weight: 800; paint-order: stroke; stroke: r
 .glance b { font-weight: 800; }
 .spaced { margin: 0 0 10px; padding-left: 18px; font-size: 14.5px; line-height: 1.6; }
 .how-method { margin: 8px 0; } .how-method summary { cursor: pointer; padding: 4px 0; }
+
+.build-pic{display:block;width:100%;height:auto;border-radius:12px}

@@ -3988,7 +3988,11 @@ function shopPage() {
 // ---- Build It: supports, covers, beds and a cold frame, step by step --------------------------------------
 // Every step has a 3D drawing of the build so far, with the newest part picked out (static/iso.js draws them, and
 // static/iso-builds.js has each guide's parts). plain: the finished thing, for thumbnails - no highlight, no labels.
-const buildArt = (id, stage, plain) => `<div class="iso-wrap">${BUILD3D.render(id, stage, plain)}</div>`;
+// builds with painted pictures (static/builds/<id>/hero.jpg and step1.jpg...): shown when the Photos button is on
+const BUILD_PICS = { cold_frame: 5 };
+const buildArt = (id, stage, plain) => BUILD_PICS[id] && showPhotos && (plain || (stage >= 1 && stage <= BUILD_PICS[id]))
+  ? `<div class="iso-wrap"><img class="build-pic" src="/static/builds/${id}/${plain ? "hero" : "step" + stage}.jpg" alt="${plain ? "The finished build" : "Step " + stage}" loading="lazy"></div>`
+  : `<div class="iso-wrap">${BUILD3D.render(id, stage, plain)}</div>`;
 const buildById = (id) => S.cat.build.builds.find((b) => b.id === id);
 const buildCost = (b) => (b.total ? `about ${money(b.total)}` : "free");
 // which builds the crops you're growing need, and when to build each by (a week or few before they go in)
