@@ -141,7 +141,9 @@ SHELL = """<!doctype html>
 <meta name="robots" content="index,follow">
 <meta name="description" content="%(desc)s">
 <link rel="canonical" href="%(canon)s">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
 <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="/static/icons/favicon-192.png" type="image/png" sizes="192x192">
 <style>
 :root { color-scheme: light dark; --bg:#f3f5f2; --fg:#1d2a1f; --muted:#5b6b5e; --green:#2f7d3a; }
 @media (prefers-color-scheme: dark) { :root { --bg:#141a15; --fg:#e8efe9; --muted:#9fb0a3; --green:#7fd38a; } }

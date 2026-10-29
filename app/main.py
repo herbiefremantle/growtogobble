@@ -84,6 +84,13 @@ async def version_header(request: Request, call_next):
     return response
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    """Browsers and Google look for the site icon at this address."""
+    return FileResponse(os.path.join(STATIC, "favicon.ico"), media_type="image/x-icon",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/")
 def index():
     """The app page, with ?v=<version> on its script and styles - so phones always fetch the newest version

@@ -164,7 +164,9 @@ def layout(title, description, path, body, ld=None, image=None, robots="index,fo
 <meta name="twitter:description" content="%(desc)s">
 <meta name="twitter:image" content="%(image)s">
 <meta name="theme-color" content="#1f5c3b">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
 <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="/static/icons/favicon-192.png" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
 <style>%(css)s</style>
 %(ld)s
