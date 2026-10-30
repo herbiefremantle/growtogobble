@@ -14,7 +14,7 @@ from datetime import date, timedelta
 from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -74,6 +74,16 @@ def _build_version():
 
 
 BUILD = _build_version()
+
+
+@app.middleware("http")
+async def apex_to_www(request: Request, call_next):
+    """growtogobble.co.uk (no www) sends visitors and search engines to the one real address, www.growtogobble.co.uk."""
+    www = seo.site().split("://", 1)[-1]
+    host = request.headers.get("host", "").split(":")[0].lower()
+    if www.startswith("www.") and host == www[4:] and request.method in ("GET", "HEAD"):
+        return RedirectResponse(seo.site() + request.url.path + ("?" + request.url.query if request.url.query else ""), 301)
+    return await call_next(request)
 
 
 @app.middleware("http")

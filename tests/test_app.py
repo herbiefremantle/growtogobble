@@ -1362,3 +1362,11 @@ def test_every_job_kind_belongs_to_a_group():
             for j in planner.crop_jobs(_crop(p["id"], m, date(2026, 9, 28)), 0, set(), date(2026, 9, 28)):
                 seen.add(j["kind"])
     assert seen <= set(jobprefs.GROUP_OF), seen - set(jobprefs.GROUP_OF)
+
+
+def test_apex_domain_redirects_to_www(client):
+    r = client.get("/grow/radish?x=1", headers={"host": "growtogobble.co.uk"}, follow_redirects=False)
+    assert r.status_code == 301
+    assert r.headers["location"] == "https://www.growtogobble.co.uk/grow/radish?x=1"
+    assert client.get("/grow/radish", headers={"host": "www.growtogobble.co.uk"}, follow_redirects=False).status_code == 200
+    assert client.get("/health", follow_redirects=False).status_code == 200
